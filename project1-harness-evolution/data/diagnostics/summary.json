@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "source": "/media/imc/data/yzy/agent/project1/baseline/retail40-v1/results.json",
+  "run_dir": "/media/imc/data/yzy/agent/project1/diagnostics/retail40-v2",
+  "num_failures_planned": 4,
+  "num_diagnosed": 4,
+  "entries": [
+    {
+      "case": "4dc02ac3-d50e-4c52-a5e7-2031880bb91d",
+      "trajectory_id": "4dc02ac3-d50e-4c52-a5e7-2031880bb91d",
+      "task_id": "38",
+      "predicted_category": 10,
+      "predicted_step": 0,
+      "evidence": "No failure occurred; the agent successfully cancelled the order as requested.",
+      "prompt_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null
+    },
+    {
+      "case": "5bf67a62-cc7d-4099-886a-094960bfce08",
+      "trajectory_id": "5bf67a62-cc7d-4099-886a-094960bfce08",
+      "task_id": "27",
+      "predicted_category": 1,
+      "predicted_step": 26,
+      "evidence": "The agent attempted to call return_delivered_order_items and exchange_delivered_order_items for the same order in the same step (in parallel). According to the domain policy, these actions must be sequential, and the exchange must be attempted while the order is still in 'delivered' status. Executin",
+      "prompt_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null
+    },
+    {
+      "case": "bdbbe707-4cc8-4a3e-a5a4-27aacd8c32b0",
+      "trajectory_id": "bdbbe707-4cc8-4a3e-a5a4-27aacd8c32b0",
+      "task_id": "34",
+      "predicted_category": 10,
+      "predicted_step": -1,
+      "evidence": "No failure occurred. The agent correctly followed the policy: authenticated the user, retrieved order details, explained that items could not be removed from a pending order, obtained explicit user confirmation with order id and reason before cancellation, performed the cancellation, and accurately ",
+      "prompt_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null
+    },
+    {
+      "case": "d7c4eda8-5d1e-4f31-91ad-3d3a9b4cc8b8",
+      "trajectory_id": "d7c4eda8-5d1e-4f31-91ad-3d3a9b4cc8b8",
+      "task_id": "16",
+      "predicted_category": 10,
+      "predicted_step": -1,
+      "evidence": "No failure occurred in the conversation. All requested actions were completed as per user requests and policy.",
+      "prompt_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null
+    }
+  ],
+  "failed_trajectories": [],
+  "total_tokens": 0,
+  "note": "无人工标注：仅预测结果，用于闭环反馈；诊断准确率评测需另标。 部分轨迹诊断失败原因：AgentRx 静态检查生成代码引用未定义辅助函数。"
+}

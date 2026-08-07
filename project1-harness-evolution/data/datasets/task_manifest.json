@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "source": "/media/imc/data/yzy/agent/project1/baseline/retail40-v1/results.json",
+  "tasks": {
+    "0": {
+      "simulations": [
+        "f1820515-9962-4be0-a4ae-fb919276d626"
+      ],
+      "max_reward": 1.0
+    },
+    "1": {
+      "simulations": [
+        "db6f384e-cdee-4f53-a7b0-54c889b685be"
+      ],
+      "max_reward": 1.0
+    },
+    "2": {
+      "simulations": [
+        "ac17c022-dfa1-45b5-aa9c-8481327b9fd7"
+      ],
+      "max_reward": 1.0
+    },
+    "3": {
+      "simulations": [
+        "4bbc8b32-5aaa-4963-9012-e3a3a0dd8641"
+      ],
+      "max_reward": 1.0
+    },
+    "4": {
+      "simulations": [
+        "ef99bc6a-e8e4-4388-887f-6c518beebc7c"
+      ],
+      "max_reward": 1.0
+    },
+    "5": {
+      "simulations": [
+        "f8aa43bd-e44f-48dc-a69a-912ee6947f76"
+      ],
+      "max_reward": 1.0
+    },
+    "6": {
+      "simulations": [
+        "218bb77e-a643-486d-8d77-4f7fc8d5331a"
+      ],
+      "max_reward": 1.0
+    },
+    "7": {
+      "simulations": [
+        "4d089d99-56e0-4552-8e96-0577c9f1c6a6"
+      ],
+      "max_reward": 1.0
+    },
+    "8": {
+      "simulations": [
+        "c5149fdb-5a4f-475c-91f2-2f9a6aeba5e3"
+      ],
+      "max_reward": 1.0
+    },
+    "9": {
+      "simulations": [
+        "e5c0af98-fffc-4d7f-a858-c3bbb9ef97ba"
+      ],
+      "max_reward": 1.0
+    },
+    "10": {
+      "simulations": [
+        "3acb601d-79da-40f9-ba32-482f5bb952c5"
+      ],
+      "max_reward": 1.0
+    },
+    "11": {
+      "simulations": [
+        "5ef1b55b-9dec-47df-a6db-2e7db9be56f2"
+      ],
+      "max_reward": 1.0
+    },
+    "12": {
+      "simulations": [
+        "2fab55ce-6842-4617-a1cd-58f36b84ac4e"
+      ],
+      "max_reward": 1.0
+    },
+    "13": {
+      "simulations": [
+        "1e7d3ff1-97a8-4e9a-b2aa-c804178b8468"
+      ],
+      "max_reward": 1.0
+    },
+    "14": {
+      "simulations": [
+        "f2b69edc-eb97-4b84-8c77-15862c45aae1"
+      ],
+      "max_reward": 1.0
+    },
+    "15": {
+      "simulations": [
+        "163324d1-d3bb-4348-aa90-6e40b68dfe13"
+      ],
+      "max_reward": 1.0
+    },
+    "16": {
+      "simulations": [
+        "d7c4eda8-5d1e-4f31-91ad-3d3a9b4cc8b8"
+      ],
+      "max_reward": 0.0
+    },
+    "17": {
+      "simulations": [
+        "f63a84a1-3173-4855-94e2-d0493699bfe0"
+      ],
+      "max_reward": 1.0
+    },
+    "18": {
+      "simulations": [
+        "a64842c2-8c98-460d-999e-611112b0908a"
+      ],
+      "max_reward": 1.0
+    },
+    "19": {
+      "simulations": [
+        "1c4bd566-bf73-4bac-9444-b4c9fa09538e"
+      ],
+      "max_reward": 1.0
+    },
+    "20": {
+      "simulations": [
+        "f3d5ecdb-4176-4a9b-aa49-963c5b3a90de"
+      ],
+      "max_reward": 1.0
+    },
+    "21": {
+      "simulations": [
+        "3ae42de0-89da-42f8-8149-e8365bf95254"
+      ],
+      "max_reward": 1.0
+    },
+    "22": {
+      "simulations": [
+        "2683c80e-9f96-409a-907f-344b970f6ff6"
+      ],
+      "max_reward": 1.0
+    },
+    "23": {
+      "simulations": [
+        "faa77b69-d736-4907-80c7-a649b6210cca"
+      ],
+      "max_reward": 1.0
+    },
+    "24": {
+      "simulations": [
+        "0512066e-2740-45ba-a627-561cd2f4a964"
+      ],
+      "max_reward": 1.0
+    },
+    "25": {
+      "simulations": [
+        "0d27d013-e116-492f-9fb8-aabc9de4974c"
+      ],
+      "max_reward": 1.0
+    },
+    "26": {
+      "simulations": [
+        "237b01b9-198d-4efa-8ef8-3a026952de37"
+      ],
+      "max_reward": 1.0
+    },
+    "27": {
+      "simulations": [
+        "5bf67a62-cc7d-4099-886a-094960bfce08"
+      ],
+      "max_reward": 0.0
+    },
+    "28": {
+      "simulations": [
+        "cefa6659-125e-4c88-9296-c2a126b52170"
+      ],
+      "max_reward": 1.0
+    },
+    "29": {
+      "simulations": [
+        "b9891c2a-4394-4641-9698-ce248f9aa622"
+      ],
+      "max_reward": 1.0
+    },
+    "30": {
+      "simulations": [
+        "39724d25-1005-42ed-821e-9e9717ed7ff5"
+      ],
+      "max_reward": 1.0
+    },
+    "31": {
+      "simulations": [
+        "dfec74da-4f50-4228-b94a-45f9ca79f18f"
+      ],
+      "max_reward": 1.0
+    },
+    "32": {
+      "simulations": [
+        "71d79ee6-3a1a-4f77-8a91-918e001be292"
+      ],
+      "max_reward": 1.0
+    },
+    "33": {
+      "simulations": [
+        "100bffd9-7cf3-44e3-beb8-8d08f280cb14"
+      ],
+      "max_reward": 1.0
+    },
+    "34": {
+      "simulations": [
+        "bdbbe707-4cc8-4a3e-a5a4-27aacd8c32b0"
+      ],
+      "max_reward": 0.0
+    },
+    "35": {
+      "simulations": [
+        "f3bd0b2c-ebfd-40d5-9fdd-c10a10283e23"
+      ],
+      "max_reward": 1.0
+    },
+    "36": {
+      "simulations": [
+        "9a5e34e3-38e8-44b9-aa7b-73c44bab0246"
+      ],
+      "max_reward": 1.0
+    },
+    "37": {
+      "simulations": [
+        "86cfc4d1-207f-4e06-a5e7-033a53b1574e"
+      ],
+      "max_reward": 1.0
+    },
+    "38": {
+      "simulations": [
+        "4dc02ac3-d50e-4c52-a5e7-2031880bb91d"
+      ],
+      "max_reward": 0.0
+    },
+    "39": {
+      "simulations": [
+        "a797560b-e07e-43cc-9452-637c10b82696"
+      ],
+      "max_reward": 1.0
+    }
+  },
+  "num_tasks": 40
+}

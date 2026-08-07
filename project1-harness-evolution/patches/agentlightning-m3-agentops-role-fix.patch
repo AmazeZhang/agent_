@@ -1,0 +1,39 @@
+diff --git a/agentlightning/adapter/messages.py b/agentlightning/adapter/messages.py
+index fe6c591..e25c51a 100644
+--- a/agentlightning/adapter/messages.py
++++ b/agentlightning/adapter/messages.py
+@@ -131,16 +131,30 @@ def convert_to_openai_messages(prompt_completion_list: List[_RawSpanInfo]) -> Ge
+ 
+         # Extract messages
+         for msg in pc_entry["prompt"]:
+-            role = msg["role"]
+-
++            # 兼容: AgentOps 插桩（0.4.21）对带 tool_calls 的 assistant 消息与
++            # 带 tool_call_id 的 tool 消息都漏记 role 属性——按消息内容判定。
++            role = msg.get("role")
++            if role is None:
++                if "tool_calls" in msg or "name" in msg:
++                    role = "assistant"
++                elif "tool_call_id" in msg and msg.get("tool_call_id"):
++                    role = "tool"
++                else:
++                    # 无任何可判定字段的消息（插桩异常记录）——跳过
++                    continue
+             if role == "assistant" and "tool_calls" in msg:
+                 # Use the tool_calls directly
+                 # This branch is usually not used in the wild.
++                # 兼容: AgentOps 插桩对多 tool_calls 的最后一条记录不完整
++                # （id/name/arguments 可能缺任意一个）——全部兜底为空字符串。
+                 tool_calls: List[ChatCompletionMessageFunctionToolCallParam] = [
+                     ChatCompletionMessageFunctionToolCallParam(
+-                        id=call["id"],
++                        id=call.get("id", ""),
+                         type="function",
+-                        function={"name": call["name"], "arguments": call["arguments"]},
++                        function={
++                            "name": call.get("name", ""),
++                            "arguments": call.get("arguments", ""),
++                        },
+                     )
+                     for call in msg["tool_calls"]
+                 ]

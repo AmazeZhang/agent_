@@ -8,6 +8,18 @@
 **/models/
 **/datasets/
 
+# 豁免：项目一的小型实验划分/记录文件（可复现性证据，进 git）
+!project1-harness-evolution/data/datasets/
+!project1-harness-evolution/data/datasets/*.jsonl
+!project1-harness-evolution/runs/
+!project1-harness-evolution/runs/*/
+!project1-harness-evolution/runs/*/README.md
+!project1-harness-evolution/runs/*/round*.json
+# 运行痕迹仍忽略（豁免目录后需重新排除）
+project1-harness-evolution/runs/*/rollout_log.jsonl
+project1-harness-evolution/runs/*/state/
+project1-harness-evolution/optimizers/sandbox/pomltrace/
+
 # Python/build caches
 **/__pycache__/
 **/.pytest_cache/

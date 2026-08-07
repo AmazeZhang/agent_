@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "created_at": null,
+  "num_tasks": 40,
+  "fractions": {
+    "dev": 0.6,
+    "val": 0.2,
+    "holdout": 0.2
+  },
+  "splits": {
+    "dev": 24,
+    "val": 8,
+    "holdout": 8
+  },
+  "partition_hash": "3694ebbc383f0e1e",
+  "note": "划分按任务 id 稳定 hash；holdout 不得进入任何优化调用。"
+}
