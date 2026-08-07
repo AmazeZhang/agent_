@@ -12,6 +12,9 @@
 带时间戳的当前完整进度见
 [docs/PROGRESS_SUMMARY_2026-08-07.md](docs/PROGRESS_SUMMARY_2026-08-07.md)。
 
+本轮正式开发范围与完成验收标准见
+[docs/DEVELOPMENT_SCOPE.md](docs/DEVELOPMENT_SCOPE.md)。
+
 ## 克隆源码
 
 上游开源依赖以 Git submodule 固定版本，首次克隆请使用：

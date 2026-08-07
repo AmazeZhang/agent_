@@ -5,6 +5,7 @@
 - 工作区：`/home/imc/yzy/agent`
 - 远程仓库：`https://github.com/AmazeZhang/agent_`
 - 总结前基线提交：`01ed23b9d64ef3a618c9ca1ba7ec6e28b25c5df7`
+- 正式开发边界：[`DEVELOPMENT_SCOPE.md`](DEVELOPMENT_SCOPE.md)
 
 ## 一、总体结论
 
