@@ -1,0 +1,18 @@
+[submodule "project1-harness-evolution/vendor/AgentRx"]
+	path = project1-harness-evolution/vendor/AgentRx
+	url = https://github.com/microsoft/AgentRx.git
+[submodule "project1-harness-evolution/vendor/agent-lightning"]
+	path = project1-harness-evolution/vendor/agent-lightning
+	url = https://github.com/microsoft/agent-lightning.git
+[submodule "project1-harness-evolution/vendor/tau2-bench"]
+	path = project1-harness-evolution/vendor/tau2-bench
+	url = https://github.com/sierra-research/tau2-bench.git
+[submodule "project2-coding-agent-rl/vendor/SWE-agent"]
+	path = project2-coding-agent-rl/vendor/SWE-agent
+	url = https://github.com/SWE-agent/SWE-agent.git
+[submodule "project2-coding-agent-rl/vendor/SWE-smith"]
+	path = project2-coding-agent-rl/vendor/SWE-smith
+	url = https://github.com/SWE-bench/SWE-smith.git
+[submodule "project2-coding-agent-rl/vendor/rllm"]
+	path = project2-coding-agent-rl/vendor/rllm
+	url = https://github.com/rllm-org/rllm.git

@@ -1,0 +1,9 @@
+[
+  {
+    "instance_id": "pydicom__pydicom-1458-real-probe",
+    "image_name": "agent/swe-rex-py311:20260806",
+    "repo_name": "https://github.com/pydicom/pydicom.git",
+    "base_commit": "8da0b9b215ebfad5756051c891def88e426787e7",
+    "problem_statement": "Pixel Representation attribute should be optional for pixel data handler. The NumPy pixel data handler currently requires Pixel Representation, which is invalid for Float Pixel Data and Double Float Pixel Data where that attribute shall be absent. Dataset.pixel_array should decode Float Pixel Data or Double Float Pixel Data without Pixel Representation. Do not modify tests."
+  }
+]

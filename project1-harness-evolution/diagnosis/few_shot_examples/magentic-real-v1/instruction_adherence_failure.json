@@ -1,0 +1,12 @@
+{
+  "provenance": "AgentRx Magentic-One human ground truth",
+  "source_domain": "magentic_one",
+  "trajectory_id": "08cae58d-4084-4616-b6dd-dd6534e4825b",
+  "failure_case": 1,
+  "failure_category": "Instruction/Plan Adherence Failure",
+  "root_cause_step": 5,
+  "step_reason": "Was not able to search for historical stock prices of apple when it first went above $50",
+  "category_reason": "Was not able to search for historical stock prices of apple when it first went above $50",
+  "failed_agent": "WebSurfer",
+  "reason_for_root_cause": "The Websurfer was not able to find historical stock prices of Apple when it first went above $50, leading to repeated failures in adhering to the instruction throughout the trajectory. The first failure set the precedent for subsequent failures."
+}

@@ -1,0 +1,5 @@
+# Agent Lightning commit f0a77cfad71e6222a3edb7dfc7a0f611bd231364
+# Keep FastAPI aligned with the repository's uv.lock. Newer FastAPI releases
+# remove an API imported by the currently resolved LiteLLM proxy package.
+fastapi==0.121.2
+

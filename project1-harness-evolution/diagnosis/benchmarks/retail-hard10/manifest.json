@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "summary": {
+    "total": 10,
+    "success": 10,
+    "failure": 0,
+    "pending_human_review": 0,
+    "agent_cost_usd": 0.0180309584,
+    "user_cost_usd": 0.0040321456
+  },
+  "entries": [
+    {
+      "trajectory_id": "4a9bbccb-2bb6-41ac-b9ad-c4f3cdfe24e1",
+      "task_id": "16",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-hard10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 29.686329663032666,
+      "agent_cost_usd": 0.0013437928000000002,
+      "user_cost_usd": 0.0003077368,
+      "db_match": true,
+      "failed_actions": [
+        {
+          "action_id": "16_5",
+          "name": "calculate",
+          "arguments": {
+            "expression": "3131.1 + 4777.75 + 367.38"
+          },
+          "tool_type": "generic"
+        }
+      ],
+      "message_count": 28,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "4b9ca1be-9e1c-4669-be28-68a887fe8a47",
+      "task_id": "21",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-hard10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 43.30388565780595,
+      "agent_cost_usd": 0.00197568,
+      "user_cost_usd": 0.0003855936,
+      "db_match": true,
+      "failed_actions": [
+        {
+          "action_id": "21_10",
+          "name": "calculate",
+          "arguments": {
+            "expression": "155.33 - 147.05 + 268.77 - 235.13"
+          },
+          "tool_type": "generic"
+        }
+      ],
+      "message_count": 36,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "90ec63a1-faec-4765-a0d1-cf7a1e74c9d9",
+      "task_id": "23",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-hard10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 34.07304127095267,
+      "agent_cost_usd": 0.0021151368,
+      "user_cost_usd": 0.0004133584000000001,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 31,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "36b545d1-3f8c-40d4-a617-55d101d00359",
+      "task_id": "28",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-hard10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 31.81987780588679,
+      "agent_cost_usd": 0.0014463064,
+      "user_cost_usd": 0.00031752559999999997,
+      "db_match": true,
+      "failed_actions": [
+        {
+          "action_id": "28_10",
+          "name": "calculate",
+          "arguments": {
+            "expression": "200.8 + 96.35 + 193.38 + 231.37 + 196.53"
+          },
+          "tool_type": "generic"
+        }
+      ],
+      "message_count": 33,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "7df7da72-599c-42aa-acbe-f4ab2aea9ab0",
+      "task_id": "30",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-hard10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 49.780047030886635,
+      "agent_cost_usd": 0.0018011616000000001,
+      "user_cost_usd": 0.0004801384000000001,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 46,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "66239635-095c-42fe-860d-15d639605b60",
+      "task_id": "32",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-hard10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 48.33102553500794,
+      "agent_cost_usd": 0.0015056328000000003,
+      "user_cost_usd": 0.00043428559999999995,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 44,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "8fb22e9c-c1ab-430a-9399-5eac0ac77de6",
+      "task_id": "42",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-hard10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 41.96985314111225,
+      "agent_cost_usd": 0.0018512536000000002,
+      "user_cost_usd": 0.00041254080000000003,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 34,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "e8ef052e-cc9e-494b-8e8e-fabbb6c3e470",
+      "task_id": "54",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-hard10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 42.147796662990004,
+      "agent_cost_usd": 0.0020561408000000004,
+      "user_cost_usd": 0.0003694544,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 40,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "8ac39051-e32c-4bc8-af03-787d7229d655",
+      "task_id": "55",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-hard10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 27.797483045142144,
+      "agent_cost_usd": 0.0014259672,
+      "user_cost_usd": 0.00032462640000000003,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 27,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "21eac1d8-df1a-496e-9e36-4ac95affeb54",
+      "task_id": "104",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-hard10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 50.55847423383966,
+      "agent_cost_usd": 0.0025098864000000004,
+      "user_cost_usd": 0.0005868856000000001,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 45,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    }
+  ]
+}

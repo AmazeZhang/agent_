@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "evaluation_scope": "The same seven upstream tau-retail failure trajectories, one judge run per case. This is a small diagnostic comparison, not a generalization estimate.",
+  "leakage_control": "Few-shot examples come from labeled Magentic-One trajectories and have no task or trajectory ID overlap with the tau-retail evaluation cases.",
+  "configurations": [
+    {
+      "name": "zero_shot",
+      "examples": 0,
+      "category_correct": 1,
+      "exact_step": 1,
+      "step_within_2": 4,
+      "mean_step_absolute_error": 7.857142857142857,
+      "total_tokens": 65114
+    },
+    {
+      "name": "magentic_real_v1_label_only",
+      "examples": 5,
+      "category_correct": 2,
+      "exact_step": 3,
+      "step_within_2": 3,
+      "mean_step_absolute_error": 8.0,
+      "total_tokens": 73240
+    },
+    {
+      "name": "magentic_real_v2_with_excerpts",
+      "examples": 5,
+      "category_correct": 1,
+      "exact_step": 2,
+      "step_within_2": 4,
+      "mean_step_absolute_error": 7.285714285714286,
+      "total_tokens": 105588
+    }
+  ],
+  "decision": "No configuration shows a reliable across-metric improvement. Stop prompt tuning on these seven evaluation cases; build separate development and held-out evaluation sets before further judge optimization."
+}

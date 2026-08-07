@@ -1,0 +1,20 @@
+diff --git a/sweagent/environment/repo.py b/sweagent/environment/repo.py
+index 655db8d..ebdc255 100644
+--- a/sweagent/environment/repo.py
++++ b/sweagent/environment/repo.py
+@@ -31,9 +31,13 @@ class Repo(Protocol):
+ def _get_git_reset_commands(base_commit: str) -> list[str]:
++    quoted_commit = shlex.quote(base_commit)
++    quoted_commit_object = shlex.quote(f"{base_commit}^{{commit}}")
+     return [
+-        "git fetch",
++        # GithubRepoConfig already performs a targeted shallow fetch while copying.
++        # Avoid expanding that clone into the complete repository history on reset.
++        f"git cat-file -e {quoted_commit_object} || git fetch --depth 1 origin {quoted_commit}",
+         "git status",
+         "git restore .",
+         "git reset --hard",
+-        f"git checkout {shlex.quote(base_commit)}",
++        f"git checkout {quoted_commit}",
+         "git clean -fdq",
+     ]

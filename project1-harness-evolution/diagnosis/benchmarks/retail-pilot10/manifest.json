@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "summary": {
+    "total": 10,
+    "success": 10,
+    "failure": 0,
+    "pending_human_review": 0,
+    "agent_cost_usd": 0.0134879584,
+    "user_cost_usd": 0.0031548664000000002
+  },
+  "entries": [
+    {
+      "trajectory_id": "e9b14c4a-070f-4c61-99f9-2574dbff1ffd",
+      "task_id": "3",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-pilot10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 23.26218512491323,
+      "agent_cost_usd": 0.0019132792,
+      "user_cost_usd": 0.00032457600000000003,
+      "db_match": true,
+      "failed_actions": [
+        {
+          "action_id": "3_1",
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "6086499569"
+          },
+          "tool_type": "read"
+        }
+      ],
+      "message_count": 26,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "ac4cb6ba-c9da-4b2f-aeb6-aad439ae010f",
+      "task_id": "4",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-pilot10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 26.117360664065927,
+      "agent_cost_usd": 0.002139676,
+      "user_cost_usd": 0.0003431904,
+      "db_match": true,
+      "failed_actions": [
+        {
+          "action_id": "4_1",
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "6086499569"
+          },
+          "tool_type": "read"
+        }
+      ],
+      "message_count": 26,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "10ea3a38-c499-4080-8479-4431c6623a35",
+      "task_id": "6",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-pilot10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 27.698278384981677,
+      "agent_cost_usd": 0.0013597808000000002,
+      "user_cost_usd": 0.0003266928,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 27,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "083d1a2b-9de0-4d67-a91d-064f1ccc6f67",
+      "task_id": "5",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-pilot10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 35.10675926110707,
+      "agent_cost_usd": 0.0016080176,
+      "user_cost_usd": 0.00043510320000000007,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 31,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "9ac344c3-8ba2-4ff9-a869-442b343c9fba",
+      "task_id": "7",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-pilot10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 33.740947222104296,
+      "agent_cost_usd": 0.0014689976000000003,
+      "user_cost_usd": 0.00037980880000000004,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 29,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "0d66acca-b778-4b6a-80b0-7ad351c26991",
+      "task_id": "8",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-pilot10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 31.749166103079915,
+      "agent_cost_usd": 0.0011990552000000002,
+      "user_cost_usd": 0.00033689040000000004,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 29,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "8f4e43c8-9a19-4825-9339-d255bdd07734",
+      "task_id": "10",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-pilot10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 17.612632534001023,
+      "agent_cost_usd": 0.000645848,
+      "user_cost_usd": 0.0001662248,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 19,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "c132bc03-9702-4962-9a55-e34f8404fd83",
+      "task_id": "9",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-pilot10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 29.731887747067958,
+      "agent_cost_usd": 0.0014793016,
+      "user_cost_usd": 0.0003808672,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 31,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "93a21d0c-c36f-40f7-97bc-1ba64de780a5",
+      "task_id": "11",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-pilot10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 24.129221863113344,
+      "agent_cost_usd": 0.0010095176,
+      "user_cost_usd": 0.000262108,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 26,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    },
+    {
+      "trajectory_id": "f4aac9a7-69cb-4661-9018-029cae9f1e66",
+      "task_id": "12",
+      "source_results": "project1-harness-evolution/vendor/tau2-bench/data/simulations/p1-retail-pilot10-deepseek-v4-flash-20260806/results.json",
+      "outcome": "success",
+      "reward": 1.0,
+      "termination_reason": "user_stop",
+      "duration_seconds": 20.170329774031416,
+      "agent_cost_usd": 0.0006644848,
+      "user_cost_usd": 0.00019940480000000003,
+      "db_match": true,
+      "failed_actions": [],
+      "message_count": 19,
+      "diagnosis_annotation": {
+        "review_status": "not_required",
+        "failure_label": null,
+        "critical_step": null,
+        "evidence": [],
+        "notes": ""
+      }
+    }
+  ]
+}

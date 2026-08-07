@@ -1,0 +1,57 @@
+agent:
+  templates:
+    system_template: |-
+      You are a helpful assistant that can interact with a computer to solve tasks.
+    instance_template: |-
+      <uploaded_files>
+      {{working_dir}}
+      </uploaded_files>
+      I've uploaded a python code repository in the directory {{working_dir}}. Consider the following PR description:
+
+      <pr_description>
+      {{problem_statement}}
+      </pr_description>
+
+      Make the minimal changes to non-test files needed to satisfy the PR description. Inspect only the directly relevant code, reproduce the bug, and implement promptly; do not spend many calls surveying existing tests. Rerun the reproduction and focused tests, then submit. Do not modify tests.
+    next_step_template: |-
+      OBSERVATION:
+      {{observation}}
+    next_step_no_output_template: |-
+      Your command ran successfully and did not produce any output.
+  tools:
+    execution_timeout: 300
+    env_variables:
+      PAGER: cat
+      MANPAGER: cat
+      LESS: -R
+      PIP_PROGRESS_BAR: "off"
+      TQDM_DISABLE: "1"
+      GIT_PAGER: cat
+    bundles:
+      - path: /home/imc/yzy/agent/project2-coding-agent-rl/vendor/SWE-agent/tools/registry
+      - path: /home/imc/yzy/agent/project2-coding-agent-rl/vendor/SWE-agent/tools/edit_anthropic
+      - path: /home/imc/yzy/agent/project2-coding-agent-rl/vendor/SWE-agent/tools/review_on_submit_m
+    registry_variables:
+      USE_FILEMAP: "true"
+      SUBMIT_REVIEW_MESSAGES:
+        - |-
+          Review the diff, rerun the relevant reproduction or tests after the final edit, remove any temporary reproduction files, and ensure no test files were modified. Then submit again.
+    enable_bash_tool: true
+    parse_function:
+      type: function_calling
+  model:
+    name: openai/deepseek-v4-flash
+    api_base: https://api.deepseek.com
+    per_instance_cost_limit: 0.05
+    total_cost_limit: 0.05
+    per_instance_call_limit: 40
+    max_input_tokens: 1000000
+    max_output_tokens: 4096
+    temperature: 0.0
+    top_p: 1.0
+    litellm_model_registry: /home/imc/yzy/agent/project2-coding-agent-rl/configs/deepseek-model-registry.json
+    completion_kwargs:
+      extra_body:
+        thinking:
+          type: disabled
+  history_processors: []

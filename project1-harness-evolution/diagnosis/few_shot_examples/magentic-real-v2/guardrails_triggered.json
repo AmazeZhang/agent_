@@ -1,0 +1,33 @@
+{
+  "provenance": "AgentRx Magentic-One human ground truth",
+  "source_domain": "magentic_one",
+  "trajectory_id": "2aa5dd83fbcd0dce9a3dd4592106e5b5edf738008d932e357d477bba80e59ccf",
+  "failure_case": 8,
+  "failure_category": "Guardrails Triggered",
+  "root_cause_step": 5,
+  "step_reason": "ResponsibleAIPolicyViolation (jailbreak=True)",
+  "category_reason": "ResponsibleAIPolicyViolation (jailbreak=True)",
+  "failed_agent": "WebSurfer",
+  "reason_for_root_cause": "The root cause of the failure in this trajectory is the WebSurfer's prompt/generation that violated the Responsible AI Policy, specifically leading to a jailbreak.",
+  "trajectory_excerpt": [
+    {
+      "step_number": 3,
+      "role": "Orchestrator (thought)",
+      "content": "Updated Ledger:\n{\n  \"is_request_satisfied\": {\n    \"reason\": \"The request has not yet been satisfied as we still need to gather and process the historical weather data for Seattle for the first week of September from 2020 to 2023.\",\n    \"answer\": false\n  },\n  \"is_in_loop\": {\n    \"reason\": \"We are not in a loop as we have just defined the plan and steps to proceed.\",\n    \"answer\": false\n  },\n  \"is_progress_being_made\": {\n    \"reason\": \"We have outlined a clear plan and have just begun by initiating the request to gather data.\",\n    \"answer\": true\n  },\n  \"next_speaker\": {\n    \"reason\": \"WebSurfer needs to search for and gather the necessary historical weather data for the specified period in Seattle.\",\n    \"answer\": \"WebSurfer\"\n  },\n  \"instruction_or_question\": {\n    \"reason\": \"WebSurfer need"
+    },
+    {
+      "step_number": 4,
+      "role": "Orchestrator (-> WebSurfer)",
+      "content": "Please search for historical weather data for Seattle for the first week of September from 2020 to 2023 and find the number of rainy days (with at least 0.5mm of precipitation) during that period each year."
+    },
+    {
+      "step_number": 5,
+      "role": "WebSurfer",
+      "content": "I typed 'Seattle historical weather data September 2020-2023' into '0 characters out of 2000'.\n\nHere is a screenshot of [Seattle historical weather data September 2020-2023 - Search](https://www.bing.com/search?q=Seattle+historical+weather+data+September+2020-2023&form=QBLH&sp=-1&lq=0&pq=&sc=0-0&qs=n&sk=&cvid=273959149E7F422CB8DC7E6C09666674&ghsh=0&ghacc=0&ghpl=). The viewport shows 31% of the webpage, and is positioned at the top of the page.\nThe following metadata was extracted from the webpage:\n\n{\n    \"meta_tags\": {\n        \"referrer\": \"origin-when-cross-origin\",\n        \"SystemEntropyOriginTrialToken\": \"A1L3tx5CzccqjN3lK6st/fXMwhf9EeokCPf8XCt0DVI8JPbg37BWq0zKvlqgkdm8YEUbthoGkC/xdR1+iIz4txAAAABxeyJvcmlnaW4iOiJodHRwczovL3d3dy5iaW5nLmNvbTo0NDMiLCJmZWF0dXJlIjoiTXNVc2VyQWdlbnRMYXVuY2hOYXZUe"
+    }
+  ],
+  "expected_output": {
+    "failure_case": 8,
+    "index": 5
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "provenance": "AgentRx Magentic-One human ground truth",
+  "source_domain": "magentic_one",
+  "trajectory_id": "3af8028c2a59e28ca88baff0e6d91f2a9f170c5ef91003f1c8406755a2760ad4",
+  "failure_case": 5,
+  "failure_category": "Intent Plan Misalignment",
+  "root_cause_step": 4,
+  "step_reason": "The orchestrator failed to capture user intent. The user had given two different Magic: The Gathering Standard cards (Oko, Thief of Crowns and another) and asked which had the highest price decrease from its all-time high to its all-time low. However, the orchestrator instead searched for the date when Oko, Thief of Crowns was banned in the Standard format.",
+  "category_reason": "The orchestrator failed to capture user intent. The user had given two different Magic: The Gathering Standard cards (Oko, Thief of Crowns and another) and asked which had the highest price decrease from its all-time high to its all-time low. However, the orchestrator instead searched for the date when Oko, Thief of Crowns was banned in the Standard format.",
+  "failed_agent": "Orchestrator",
+  "reason_for_root_cause": "Orchestrator misinterpreted the user's request, focusing on a specific card's ban date rather than comparing price decreases between two cards."
+}

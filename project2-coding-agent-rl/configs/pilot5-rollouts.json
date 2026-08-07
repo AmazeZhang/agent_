@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "tasks": [
+    {
+      "task_id": "buggy-calculator",
+      "fixture": "fixtures/buggy-calculator",
+      "issue": "fixtures/buggy-calculator/issue.md",
+      "trajectory": "runs/sweagent-feasibility-deepseek-v4-flash-20260806-retry2/0ed001/0ed001.traj",
+      "patch": "runs/sweagent-feasibility-deepseek-v4-flash-20260806-retry2/0ed001/0ed001.patch",
+      "verification_container": "agent-p2-patch-eval-20260806",
+      "expected_tests": 3
+    },
+    {
+      "task_id": "buggy-slug",
+      "fixture": "fixtures/buggy-slug",
+      "issue": "fixtures/buggy-slug/issue.md",
+      "trajectory": "runs/pilot5-deepseek-20260806/buggy-slug/579608/579608.traj",
+      "patch": "runs/pilot5-deepseek-20260806/buggy-slug/579608/579608.patch",
+      "verification_container": "agent-p2-pilot-eval-slug-20260806",
+      "expected_tests": 3
+    },
+    {
+      "task_id": "buggy-inventory",
+      "fixture": "fixtures/buggy-inventory",
+      "issue": "fixtures/buggy-inventory/issue.md",
+      "trajectory": "runs/pilot5-deepseek-20260806/buggy-inventory/bc0704/bc0704.traj",
+      "patch": "runs/pilot5-deepseek-20260806/buggy-inventory/bc0704/bc0704.patch",
+      "verification_container": "agent-p2-pilot-eval-inventory-20260806",
+      "expected_tests": 3
+    },
+    {
+      "task_id": "buggy-pagination",
+      "fixture": "fixtures/buggy-pagination",
+      "issue": "fixtures/buggy-pagination/issue.md",
+      "trajectory": "runs/pilot5-deepseek-20260806/buggy-pagination/5dda00/5dda00.traj",
+      "patch": "runs/pilot5-deepseek-20260806/buggy-pagination/5dda00/5dda00.patch",
+      "verification_container": "agent-p2-pilot-eval-pagination-20260806",
+      "expected_tests": 3
+    },
+    {
+      "task_id": "buggy-dedupe",
+      "fixture": "fixtures/buggy-dedupe",
+      "issue": "fixtures/buggy-dedupe/issue.md",
+      "trajectory": "runs/pilot5-deepseek-20260806/buggy-dedupe/9782ce/9782ce.traj",
+      "patch": "runs/pilot5-deepseek-20260806/buggy-dedupe/9782ce/9782ce.patch",
+      "verification_container": "agent-p2-pilot-eval-dedupe-20260806",
+      "expected_tests": 3
+    }
+  ]
+}

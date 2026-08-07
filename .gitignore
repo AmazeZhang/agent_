@@ -1,0 +1,30 @@
+.secrets/
+.cache/
+.tools/
+**/.venv/
+**/.venvs/
+**/.env
+**/runs/
+**/models/
+**/datasets/
+
+# Python/build caches
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+*.py[cod]
+*.egg-info/
+**/dist/
+**/build/
+
+# Frontend dependencies and local editor/OS files
+**/node_modules/
+.DS_Store
+.idea/
+.vscode/
+
+# Local logs and temporary files
+*.log
+*.tmp
+*.swp
