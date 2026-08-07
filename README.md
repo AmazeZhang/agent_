@@ -9,6 +9,9 @@
 
 核心可行性见 [FEASIBILITY_REPORT.md](FEASIBILITY_REPORT.md)，五任务小规模验证和训练门槛判断见 [PILOT_REPORT.md](PILOT_REPORT.md)。
 
+带时间戳的当前完整进度见
+[docs/PROGRESS_SUMMARY_2026-08-07.md](docs/PROGRESS_SUMMARY_2026-08-07.md)。
+
 ## 克隆源码
 
 上游开源依赖以 Git submodule 固定版本，首次克隆请使用：
