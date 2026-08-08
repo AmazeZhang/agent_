@@ -40,7 +40,12 @@ from agentlightning.algorithm.apo import APO  # noqa: E402
 from agentlightning.types import PromptTemplate  # noqa: E402
 from openai import AsyncOpenAI  # noqa: E402
 
-from evaluation.gate import evaluate_decision, record_rejection, update_version  # noqa: E402
+from evaluation.gate import (  # noqa: E402
+    GateDecision,
+    evaluate_decision,
+    record_rejection,
+    update_version,
+)
 from evaluation.metrics import load_results  # noqa: E402
 from optimizers.candidate_filter import CandidateFilter  # noqa: E402
 from optimizers.diagnosis_to_feedback import DiagnosisAwareAdapter, load_diagnosis_summary  # noqa: E402
@@ -148,14 +153,33 @@ def main() -> None:
     cf = CandidateFilter()
     ok, reasons = cf.check(best_text)
     if not ok:
-        print(f"!! best 候选未通过过滤: {reasons}")
-        record_rejection(
-            evaluate_decision(
-                {"task_success_rate": algo._history_best_score, "total_cost_usd": None},
-                {"task_success_rate": 0.9, "total_cost_usd": None},
-            ),
-            round_id=f"{args.arm}-r{args.round}",
+        # 过滤失败: 记录拒绝 + 完整 round 记录（含 best 文本），不产生版本
+        decision = GateDecision(
+            accept=False,
+            reason=f"候选未通过过滤: {'; '.join(reasons)}",
+            candidate_success_rate=None,
+            baseline_success_rate=0.9,
+            candidate_cost=None,
+            baseline_cost=None,
         )
+        record_rejection(decision, round_id=f"{args.arm}-r{args.round}")
+        record = {
+            "schema_version": 1,
+            "arm": args.arm,
+            "round": args.round,
+            "feedback": feedback,
+            "train_duration_s": round(train_s, 1),
+            "best_prompt": best_text,
+            "best_internal_val_score": algo._history_best_score,
+            "val_rerun_success_rate": None,
+            "filter_reasons": reasons,
+            "gate": decision.as_dict(),
+            "new_version": None,
+            "rollout_log": str(os.environ["P1_ROLLOUT_LOG"]),
+        }
+        out_path = run_dir / f"round{args.round}.json"
+        out_path.write_text(json.dumps(record, ensure_ascii=False, indent=2))
+        print(f"==> 记录: {out_path}（候选未通过过滤，本轮无有效候选）")
         sys.exit(1)
 
     # ---- best 在 val 独立重跑（SPEC 03 §4）----

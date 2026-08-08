@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "arm": "apo-diagnosis",
+  "round": 2,
+  "feedback": "diagnosis",
+  "train_duration_s": 3471.7,
+  "best_prompt": "You are a customer service agent that helps the user according to the <policy> provided below.\nIn each turn you can either:\n- Send a message to the user.\n- Make a tool call.\nYou cannot do both at the same time.\n\nTry to be helpful and always follow the policy. Always make sure you generate valid JSON only.\n",
+  "best_internal_val_score": 1.0,
+  "val_rerun_success_rate": 0.875,
+  "gate": {
+    "accept": false,
+    "reason": "成功率回退（0.875 < 0.880）",
+    "candidate_success_rate": 0.875,
+    "baseline_success_rate": 0.9,
+    "candidate_cost": null,
+    "baseline_cost": 0.058,
+    "details": {
+      "candidate": {
+        "task_success_rate": 0.875,
+        "total_cost_usd": null
+      },
+      "baseline": {
+        "task_success_rate": 0.9,
+        "total_cost_usd": 0.058
+      }
+    }
+  },
+  "new_version": null,
+  "rollout_log": "/home/imc/yzy/agent/project1-harness-evolution/runs/loop-apo-apo-diagnosis/rollout_log.jsonl"
+}

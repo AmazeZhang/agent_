@@ -34,9 +34,13 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import tau2_deepseek_cli  # noqa: F401,E402  # DeepSeek 模型注册
 
 from gepa import optimize  # noqa: E402
-from gepa.proposer.reflective_mutation.reflection_lm import StatelessReflectionLM  # noqa: E402
 
-from evaluation.gate import evaluate_decision, record_rejection, update_version  # noqa: E402
+from evaluation.gate import (  # noqa: E402
+    GateDecision,
+    evaluate_decision,
+    record_rejection,
+    update_version,
+)
 from evaluation.metrics import load_results  # noqa: E402
 from optimizers.candidate_filter import CandidateFilter  # noqa: E402
 from optimizers.gepa_adapter import COMPONENT, DeepSeekLM, Tau2GEPAAdapter  # noqa: E402
@@ -94,13 +98,18 @@ def main() -> None:
           f" | metric 预算={args.max_metric_calls} | workers={args.max_workers}")
 
     # ---- GEPA 进化（同步阻塞，直到预算耗尽或停止条件）----
+    # reflection_lm 传裸 LanguageModel（DeepSeekLM）——GEPA 内部会用
+    # StatelessReflectionLM 包装；若传包装后的实例会被二次包装导致
+    # "'StatelessReflectionLM' object is not callable"（2026-08-08 修复）。
+    # skip_perfect_score=False: minibatch 全对也继续反思（不跳过迭代）。
     t0 = time.time()
     result = optimize(
         seed_candidate=seed_candidate,
         trainset=dev,
         valset=val,
         adapter=adapter,
-        reflection_lm=StatelessReflectionLM(DeepSeekLM()),
+        reflection_lm=DeepSeekLM(),
+        skip_perfect_score=False,
         max_metric_calls=args.max_metric_calls,
         run_dir=str(run_dir / "state"),
         seed=args.seed,
@@ -119,14 +128,37 @@ def main() -> None:
     cf = CandidateFilter()
     ok, reasons = cf.check(best)
     if not ok:
-        print(f"!! best 候选未通过过滤: {reasons}")
-        record_rejection(
-            evaluate_decision(
-                {"task_success_rate": gepa_val_score, "total_cost_usd": None},
-                {"task_success_rate": 0.9, "total_cost_usd": None},
-            ),
-            round_id=f"{args.arm}-r{args.round}",
+        # 过滤失败: 记录拒绝 + 完整 round 记录（含 best 文本），不产生版本
+        decision = GateDecision(
+            accept=False,
+            reason=f"候选未通过过滤: {'; '.join(reasons)}",
+            candidate_success_rate=None,
+            baseline_success_rate=0.9,
+            candidate_cost=None,
+            baseline_cost=None,
         )
+        record_rejection(decision, round_id=f"{args.arm}-r{args.round}")
+        record = {
+            "schema_version": 1,
+            "arm": args.arm,
+            "round": args.round,
+            "train_duration_s": round(train_s, 1),
+            "max_metric_calls": args.max_metric_calls,
+            "num_candidates": result.num_candidates,
+            "total_metric_calls": result.total_metric_calls,
+            "num_full_val_evals": result.num_full_val_evals,
+            "best_prompt": best,
+            "best_internal_val_score": gepa_val_score,
+            "val_rerun_success_rate": None,
+            "filter_reasons": reasons,
+            "gate": decision.as_dict(),
+            "new_version": None,
+            "rollout_log": str(rollout_log),
+            "run_dir_state": str(run_dir / "state"),
+        }
+        out_path = run_dir / f"round{args.round}.json"
+        out_path.write_text(json.dumps(record, ensure_ascii=False, indent=2))
+        print(f"==> 记录: {out_path}（候选未通过过滤，本轮无有效候选）")
         sys.exit(1)
 
     # ---- best 在 val 独立重跑（与 APO 臂一致，串行 tau2_rollout）----

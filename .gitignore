@@ -17,7 +17,9 @@
 !project1-harness-evolution/runs/*/round*.json
 # 运行痕迹仍忽略（豁免目录后需重新排除）
 project1-harness-evolution/runs/*/rollout_log.jsonl
+project1-harness-evolution/runs/*/rollout_log_r1_legacy.jsonl
 project1-harness-evolution/runs/*/state/
+project1-harness-evolution/runs/*/state_r1_legacy/
 project1-harness-evolution/optimizers/sandbox/pomltrace/
 
 # Python/build caches
