@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "arm": "gepa-plain",
+  "round": 3,
+  "train_duration_s": 135.7,
+  "max_metric_calls": 40,
+  "num_candidates": 2,
+  "total_metric_calls": 40,
+  "num_full_val_evals": 2,
+  "best_prompt": "You are a customer service agent that helps the user according to the <policy> provided below.\nIn each turn you can either:\n- Send a message to the user.\n- Make a tool call.\nYou cannot do both at the same time.\n\nTry to be helpful and always follow the policy. Always make sure you generate valid JSON only.\n",
+  "best_internal_val_score": 0.875,
+  "val_repeats": 3,
+  "val_rerun_success_rate": 0.875,
+  "val_task_majority": {
+    "32": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "22": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "37": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "0": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "27": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "5": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "18": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "36": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "gate": {
+    "accept": false,
+    "reason": "未产生收益（0.875 ≤ 基线 0.875，持平/无提升）",
+    "candidate_success_rate": 0.875,
+    "baseline_success_rate": 0.875,
+    "candidate_cost": null,
+    "baseline_cost": 0.058,
+    "details": {
+      "candidate": {
+        "task_success_rate": 0.875,
+        "total_cost_usd": null
+      },
+      "baseline": {
+        "task_success_rate": 0.875,
+        "total_cost_usd": 0.058
+      }
+    },
+    "corrected_at": "2026-08-08",
+    "correction": "gate 语义修正：持平（r3 前实现只拒回退，持平也 accept 导致 seed 复制品写版本 v1/v2，已清理"
+  },
+  "new_version": null,
+  "rollout_log": "/home/imc/yzy/agent/project1-harness-evolution/runs/loop-gepa-gepa-plain/rollout_log.jsonl",
+  "run_dir_state": "/home/imc/yzy/agent/project1-harness-evolution/runs/loop-gepa-gepa-plain/state"
+}

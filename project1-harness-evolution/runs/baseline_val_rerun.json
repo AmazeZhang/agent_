@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "prompt_hash": "You are a customer service agent that he",
+  "repeats": 3,
+  "task_votes": {
+    "32": {
+      "rewards": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "majority_pass": true
+    },
+    "22": {
+      "rewards": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "majority_pass": true
+    },
+    "37": {
+      "rewards": [
+        0.0,
+        1.0,
+        1.0
+      ],
+      "majority_pass": true
+    },
+    "0": {
+      "rewards": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "majority_pass": true
+    },
+    "27": {
+      "rewards": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "majority_pass": false
+    },
+    "5": {
+      "rewards": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "majority_pass": true
+    },
+    "18": {
+      "rewards": [
+        1.0,
+        1.0,
+        0.0
+      ],
+      "majority_pass": true
+    },
+    "36": {
+      "rewards": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "majority_pass": true
+    }
+  },
+  "majority_rate": 0.875,
+  "mean_rate": 0.7916666666666666,
+  "duration_s": 793.5,
+  "note": "基线 v0 在 val 8 上多次重跑（LLM 非确定性降噪）；r3 起 gate 对照基准"
+}

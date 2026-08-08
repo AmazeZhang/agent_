@@ -78,9 +78,18 @@ def evaluate_decision(
     reasons = []
     if c_rate < b_rate - cfg.success_margin_pp / 100:
         reasons.append(f"成功率回退（{c_rate:.3f} < {b_rate - cfg.success_margin_pp/100:.3f}）")
+    elif c_rate <= b_rate:
+        # 语义修正（2026-08-08 r3）: 持平不得产生新版本。
+        # 原实现只拒绝"明显回退"，持平（c_rate == b_rate）会判 accept，
+        # 导致 best 回退到 seed 的候选也能写版本（GEPA r3 实测发生）。
+        # 多次重跑多数票协议下，真实提升表现为 c_rate > b_rate；
+        # 持平即"无收益"，不产生版本。
+        reasons.append(
+            f"未产生收益（{c_rate:.3f} ≤ 基线 {b_rate:.3f}，持平/无提升）"
+        )
     if c_cost is not None and b_cost and c_cost > b_cost * cfg.cost_multiplier:
         reasons.append(
-            f"成本超限（${c_cost:.4f} > 基线 ${b_cost:.4f} × {cfg.cost_multiplier}）"
+            f"成本超限（${c_cost:.4f} > 基线 ${b_cost:.4f} × ${cfg.cost_multiplier}）"
         )
 
     if reasons:
@@ -168,15 +177,17 @@ def _append_changelog(entry: dict[str, Any], path: Path) -> None:
 
 
 if __name__ == "__main__":
-    # 自检：决策逻辑
+    # 自检：决策逻辑（r3 语义: 持平拒绝）
     base = {"task_success_rate": 0.85, "total_cost_usd": 0.50}
     good = {"task_success_rate": 0.90, "total_cost_usd": 0.55}
+    tie = {"task_success_rate": 0.85, "total_cost_usd": 0.55}
     bad = {"task_success_rate": 0.80, "total_cost_usd": 0.51}
     expensive = {"task_success_rate": 0.95, "total_cost_usd": 1.00}
-    for name, cand in [("good", good), ("bad", bad), ("expensive", expensive)]:
+    for name, cand in [("good", good), ("tie", tie), ("bad", bad), ("expensive", expensive)]:
         d = evaluate_decision(cand, base)
         print(f"{name}: accept={d.accept}  reason={d.reason}")
     assert evaluate_decision(good, base).accept
+    assert not evaluate_decision(tie, base).accept, "持平必须拒绝（无收益）"
     assert not evaluate_decision(bad, base).accept
     assert not evaluate_decision(expensive, base).accept
     print("门控自检通过")
