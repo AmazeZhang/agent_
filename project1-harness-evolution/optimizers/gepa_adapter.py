@@ -196,14 +196,51 @@ class Tau2GEPAAdapter(GEPAAdapter[dict, dict, dict]):
             if reward != 1.0 and self.inject_diagnosis and traj.get("diagnosis"):
                 feedback += "\n" + _format_diagnosis(traj["diagnosis"])
                 feedback += "\n（注意：诊断为预测反馈，需在仿真中验证后采纳。）"
+            # 身份保真约束（r3 防退化，2026-08-08）:
+            # r2 候选曾退化为"仿真操作员"视角（把 agent 当报告奖励的旁观者）。
+            # 反思 LLM 只见"任务 N + reward"，容易把目标误解为优化仿真奖励。
+            # 该约束提醒它保持直接执行任务的客服 agent 身份。
+            feedback += (
+                "\n约束: 优化后的系统提示必须是直接执行客服任务的第一人称指令"
+                "（保持'You are a customer service agent'身份与 tau2 客服域语义），"
+                "不得改为旁观者、仿真操作员、奖励报告者等非执行者视角，"
+                "也不得缩短成一条抽象的'通用指令'。"
+            )
             items.append({
-                "Task Input": f"tau2 retail 任务 {tid}（数据库操作类客服任务）",
+                "Task Input": self._task_context(tid),
                 "Generated Output": f"reward={reward}，termination={traj['termination_reason']}",
                 "Feedback": feedback,
             })
         if not items:
             raise ValueError("reflective dataset 为空")
         return {COMPONENT: items}
+
+    @staticmethod
+    def _task_context(tid: str) -> str:
+        """任务 id → 真实任务上下文（反思输入用，r3 增强）。
+
+        r2 反思只看到"任务 N"抽象描述，反思 LLM 无从判断任务真实诉求，
+        这是候选退化（仿真操作员视角）的另一个诱因。这里从任务池读取
+        用户诉求/角色，让反思基于真实任务内容。
+        """
+        task = _TASK_POOL.get(str(tid))
+        if task is None:
+            return f"tau2 retail 任务 {tid}（数据库操作类客服任务）"
+        try:
+            us = task.user_scenario
+            inst = getattr(us, "instructions", None)
+            reason = getattr(inst, "reason_for_call", None) or getattr(inst, "domain", None)
+            persona = getattr(us, "persona", None)
+            parts = []
+            if persona:
+                parts.append(f"用户角色: {persona}")
+            if reason:
+                parts.append(f"用户诉求: {reason}")
+            if parts:
+                return f"tau2 retail 客服任务 {tid}。{'; '.join(parts)}"
+        except Exception:
+            pass
+        return f"tau2 retail 任务 {tid}（数据库操作类客服任务）"
 
 
 # ---- 反思 LLM ----

@@ -50,6 +50,25 @@ from resources.loader import load_resources  # noqa: E402
 RESULTS_JSON = Path("/media/imc/data/yzy/agent/project1/baseline/retail40-v1/results.json")
 DATASETS = SCRIPT_DIR.parent / "data" / "datasets"
 DIAGNOSIS_SUMMARY = SCRIPT_DIR.parent / "data" / "diagnostics" / "summary.json"
+BASELINE_VAL_RERUN = SCRIPT_DIR.parent / "runs" / "baseline_val_rerun.json"
+
+
+def load_baseline_val_rate(override: str | None = None) -> float:
+    """gate 对照基准：基线在 val 8 上的实测通过率（r3 协议修正）。
+
+    r2 用 40 任务基线的 0.900 作参照，与候选的 val 8 评测尺度不一致；
+    基线 val 子集实测为 0.875（含失败任务 27）。r3 起优先读取
+    scripts/run_baseline_val_rerun.py 的多数票结果，可用
+    --baseline-val-rate 覆盖（不传时回退 0.9 并告警）。
+    """
+    if override is not None:
+        return float(override)
+    if BASELINE_VAL_RERUN.exists():
+        rec = json.loads(BASELINE_VAL_RERUN.read_text())
+        return float(rec["majority_rate"])
+    print("!! 警告: runs/baseline_val_rerun.json 不存在，回退基线参照 0.9"
+          "（应先运行 scripts/run_baseline_val_rerun.py）")
+    return 0.9
 
 
 def load_split(name: str) -> list[dict]:
@@ -72,6 +91,10 @@ def main() -> None:
                     help="GEPA 总评测预算（一次 metric call = 一次仿真）")
     ap.add_argument("--max-workers", type=int, default=2, help="evaluate 并行仿真线程数")
     ap.add_argument("--seed", type=int, default=301)
+    ap.add_argument("--val-repeats", type=int, default=3,
+                    help="val 独立重跑次数（LLM 非确定性降噪，按任务多数票计成功率）")
+    ap.add_argument("--baseline-val-rate", type=float, default=None,
+                    help="gate 基线参照（默认读 runs/baseline_val_rerun.json 实测值）")
     args = ap.parse_args()
 
     inject_diagnosis = args.arm == "gepa-diagnosis"
@@ -161,16 +184,23 @@ def main() -> None:
         print(f"==> 记录: {out_path}（候选未通过过滤，本轮无有效候选）")
         sys.exit(1)
 
-    # ---- best 在 val 独立重跑（与 APO 臂一致，串行 tau2_rollout）----
-    print(f"==> best 在 val（{len(val)} 任务）独立重跑 ...")
-    rewards = []
-    for task in val:
-        rewards.append(tau2_rollout(task, _PromptText(best)))
-    val_success = sum(1 for r in rewards if r == 1.0) / len(rewards)
-    print(f"==> val 重跑: 成功率 {val_success:.3f} ({sum(1 for r in rewards if r == 1.0)}/{len(rewards)})")
+    # ---- best 在 val 独立重跑（×N 多数票，LLM 非确定性降噪）----
+    print(f"==> best 在 val（{len(val)} 任务）独立重跑 ×{args.val_repeats} ...")
+    votes: dict[str, list[float]] = {str(t["id"]): [] for t in val}
+    for rep in range(args.val_repeats):
+        for task in val:
+            votes[str(task["id"])].append(tau2_rollout(task, _PromptText(best)))
+    majority = [
+        1.0 if sum(votes[str(t["id"])]) >= (args.val_repeats + 1) // 2 else 0.0
+        for t in val
+    ]
+    val_success = sum(majority) / len(majority)
+    n_win = sum(1 for v in votes.values() if sum(v) >= (args.val_repeats + 1) // 2)
+    print(f"==> val 重跑 ×{args.val_repeats}（多数票）: 成功率 {val_success:.3f} ({n_win}/{len(val)})")
 
-    # ---- 门控 ----
-    baseline = {"task_success_rate": 0.9, "total_cost_usd": 0.058}  # M1 基线（retail40-v1）
+    # ---- 门控（基线参照 = 基线在 val8 实测值，同尺度对比）----
+    baseline_rate = load_baseline_val_rate(args.baseline_val_rate)
+    baseline = {"task_success_rate": baseline_rate, "total_cost_usd": 0.058}  # M1 基线（retail40-v1）
     cand = {"task_success_rate": val_success, "total_cost_usd": None}
     decision = evaluate_decision(cand, baseline)
     new_v = None
@@ -196,7 +226,9 @@ def main() -> None:
         "num_full_val_evals": result.num_full_val_evals,
         "best_prompt": best,
         "best_internal_val_score": gepa_val_score,
+        "val_repeats": args.val_repeats,
         "val_rerun_success_rate": val_success,
+        "val_task_majority": {tid: vs for tid, vs in votes.items()},
         "gate": decision.as_dict(),
         "new_version": new_v,
         "rollout_log": str(rollout_log),
