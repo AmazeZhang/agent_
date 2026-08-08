@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "arm": "apo-diagnosis",
+  "round": 3,
+  "feedback": "diagnosis",
+  "train_duration_s": 5350.5,
+  "best_prompt": "You are a customer service agent that helps the user according to the <policy> provided below.\nIn each turn you can either:\n- Send a message to the user.\n- Make a tool call.\nYou cannot do both at the same time.\n\nTry to be helpful and always follow the policy. Always make sure you generate valid JSON only.\n",
+  "best_internal_val_score": 1.0,
+  "val_repeats": 3,
+  "val_rerun_success_rate": 0.875,
+  "val_task_majority": {
+    "32": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "22": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "37": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "0": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "27": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "5": [
+      1.0,
+      1.0,
+      0.0
+    ],
+    "18": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "36": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "gate": {
+    "accept": false,
+    "reason": "未产生收益（0.875 ≤ 基线 0.875，持平/无提升）",
+    "candidate_success_rate": 0.875,
+    "baseline_success_rate": 0.875,
+    "candidate_cost": null,
+    "baseline_cost": 0.058,
+    "details": {
+      "candidate": {
+        "task_success_rate": 0.875,
+        "total_cost_usd": null
+      },
+      "baseline": {
+        "task_success_rate": 0.875,
+        "total_cost_usd": 0.058
+      }
+    }
+  },
+  "new_version": null,
+  "rollout_log": "/home/imc/yzy/agent/project1-harness-evolution/runs/loop-apo-apo-diagnosis/rollout_log.jsonl"
+}
