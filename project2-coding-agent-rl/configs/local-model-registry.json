@@ -1,0 +1,32 @@
+{
+  "openai/qwen25-coder-3b-base": {
+    "max_tokens": 32768,
+    "max_input_tokens": 32768,
+    "max_output_tokens": 8192,
+    "input_cost_per_token": 0.0,
+    "output_cost_per_token": 0.0,
+    "litellm_provider": "openai",
+    "mode": "chat",
+    "supports_function_calling": true
+  },
+  "openai/sft": {
+    "max_tokens": 32768,
+    "max_input_tokens": 32768,
+    "max_output_tokens": 8192,
+    "input_cost_per_token": 0.0,
+    "output_cost_per_token": 0.0,
+    "litellm_provider": "openai",
+    "mode": "chat",
+    "supports_function_calling": true
+  },
+  "openai/grpo": {
+    "max_tokens": 32768,
+    "max_input_tokens": 32768,
+    "max_output_tokens": 8192,
+    "input_cost_per_token": 0.0,
+    "output_cost_per_token": 0.0,
+    "litellm_provider": "openai",
+    "mode": "chat",
+    "supports_function_calling": true
+  }
+}

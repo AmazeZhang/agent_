@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "note": "short name -> SWE-smith task metadata for pipeline scripts. eval_repo_branch: commit inside instance branch that contains hidden tests (Bug Patch).",
+  "tasks": {
+    "funcy-curry-compose-3u9hti2d": {
+      "instance_id": "Suor__funcy.207a7810.combine_file__3u9hti2d",
+      "repo_dir": "funcy-curry-compose-3u9hti2d",
+      "test_extra_pip": []
+    },
+    "funcy-lookuper-3y0j7te5": {
+      "instance_id": "Suor__funcy.207a7810.combine_file__3y0j7te5",
+      "repo_dir": "funcy-lookuper-3y0j7te5",
+      "test_extra_pip": []
+    },
+    "oauthlib-grants-1gnd4ecz": {
+      "instance_id": "oauthlib__oauthlib.1fd52536.combine_file__1gnd4ecz",
+      "repo_dir": "oauthlib-grants-1gnd4ecz",
+      "test_extra_pip": []
+    },
+    "oauthlib-signature-1bsv3m8l": {
+      "instance_id": "oauthlib__oauthlib.1fd52536.combine_file__1bsv3m8l",
+      "repo_dir": "oauthlib-signature-1bsv3m8l",
+      "test_extra_pip": []
+    },
+    "pygments-vimlexer-07pfbsi4": {
+      "instance_id": "pygments__pygments.27649ebb.combine_file__07pfbsi4",
+      "repo_dir": "pygments-vimlexer-07pfbsi4",
+      "test_extra_pip": [
+        "wcag-contrast-ratio"
+      ]
+    },
+    "pygments-groff-0jqqr58z": {
+      "instance_id": "pygments__pygments.27649ebb.combine_file__0jqqr58z",
+      "repo_dir": "pygments-groff-0jqqr58z",
+      "test_extra_pip": [
+        "wcag-contrast-ratio"
+      ]
+    },
+    "bottlepy-func-basic-0mdlomrj": {
+      "instance_id": "bottlepy__bottle.a8dfef30.func_basic__0mdlomrj",
+      "repo_dir": "bottlepy__bottle",
+      "test_extra_pip": [
+        "pytest-cov"
+      ]
+    },
+    "bottlepy-func-basic-0wprhjy0": {
+      "instance_id": "bottlepy__bottle.a8dfef30.func_basic__0wprhjy0",
+      "repo_dir": "bottlepy__bottle",
+      "test_extra_pip": [
+        "pytest-cov"
+      ]
+    },
+    "stackprinter-1i9gep13": {
+      "instance_id": "cknd__stackprinter.219fcc52.combine_file__1i9gep13",
+      "repo_dir": "cknd__stackprinter",
+      "test_extra_pip": [
+        "numpy"
+      ]
+    },
+    "stackprinter-3mb4yuht": {
+      "instance_id": "cknd__stackprinter.219fcc52.combine_file__3mb4yuht",
+      "repo_dir": "cknd__stackprinter",
+      "test_extra_pip": [
+        "numpy"
+      ]
+    },
+    "boltons-5i1f4zan": {
+      "instance_id": "mahmoud__boltons.3bfcfdd0.combine_file__5i1f4zan",
+      "repo_dir": "mahmoud__boltons",
+      "test_extra_pip": [
+        "coverage==6.5.0",
+        "pytest-cov==4.0.0",
+        "pytest<8"
+      ]
+    },
+    "boltons-7nlifqzn": {
+      "instance_id": "mahmoud__boltons.3bfcfdd0.combine_file__7nlifqzn",
+      "repo_dir": "mahmoud__boltons",
+      "test_extra_pip": [
+        "coverage==6.5.0",
+        "pytest-cov==4.0.0",
+        "pytest<8"
+      ]
+    },
+    "typeguard-3qg8gxw1": {
+      "instance_id": "agronholm__typeguard.b6a7e438.combine_file__3qg8gxw1",
+      "repo_dir": "agronholm__typeguard",
+      "test_extra_pip": [
+        "coverage[toml]>=7",
+        "mypy"
+      ]
+    },
+    "typeguard-4bk2n7og": {
+      "instance_id": "agronholm__typeguard.b6a7e438.combine_file__4bk2n7og",
+      "repo_dir": "agronholm__typeguard",
+      "test_extra_pip": [
+        "coverage[toml]>=7",
+        "mypy"
+      ]
+    },
+    "flake8-2fd9ywo2": {
+      "instance_id": "PyCQA__flake8.cf1542ce.combine_file__2fd9ywo2",
+      "repo_dir": "PyCQA__flake8",
+      "test_extra_pip": [
+        "coverage>=6"
+      ]
+    },
+    "flake8-a0r77ily": {
+      "instance_id": "PyCQA__flake8.cf1542ce.combine_file__a0r77ily",
+      "repo_dir": "PyCQA__flake8",
+      "test_extra_pip": [
+        "coverage>=6"
+      ]
+    },
+    "tenacity-1n8ql04e": {
+      "instance_id": "jd__tenacity.0d40e76f.combine_file__1n8ql04e",
+      "repo_dir": "jd__tenacity",
+      "test_extra_pip": [
+        "tornado",
+        "pytest-asyncio",
+        "pytest-tornasync",
+        "typeguard",
+        "pytest-mock"
+      ]
+    },
+    "tenacity-4gcf36bk": {
+      "instance_id": "jd__tenacity.0d40e76f.combine_file__4gcf36bk",
+      "repo_dir": "jd__tenacity",
+      "test_extra_pip": [
+        "tornado",
+        "pytest-asyncio",
+        "pytest-tornasync",
+        "typeguard",
+        "pytest-mock"
+      ]
+    },
+    "iniconfig-mntnwwxj": {
+      "instance_id": "pytest-dev__iniconfig.16793ead.combine_file__mntnwwxj",
+      "repo_dir": "pytest-dev__iniconfig",
+      "test_extra_pip": []
+    },
+    "iniconfig-rca5g2oy": {
+      "instance_id": "pytest-dev__iniconfig.16793ead.combine_file__rca5g2oy",
+      "repo_dir": "pytest-dev__iniconfig",
+      "test_extra_pip": []
+    }
+  }
+}
