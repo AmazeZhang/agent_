@@ -33,11 +33,16 @@ vendor/verl-agent/
 
 项目按以下两份文件逐阶段实施：
 
+- [`docs/SEARCH_R1_REPRODUCTION_PLAN_2026-08-12.md`](docs/SEARCH_R1_REPRODUCTION_PLAN_2026-08-12.md)：复现口径、逐级门槛与秋招交付主线；
+- [`docs/P1_SEARCH_PIPELINE_AUDIT_2026-08-12.md`](docs/P1_SEARCH_PIPELINE_AUDIT_2026-08-12.md)：数据、Retriever、Reward语义、泄漏与故障归因审计；
+- [`docs/PROGRESS_SYNC_2026-08-12.md`](docs/PROGRESS_SYNC_2026-08-12.md)：当前完成项、哈希、复现命令和下一阶段同步入口；
 - [`docs/DEVELOPMENT_SPEC_2026-08-11.md`](docs/DEVELOPMENT_SPEC_2026-08-11.md)：时间表、模块接口、验收门槛和服务器实验流程；
 - [`configs/experiment_profiles.yaml`](configs/experiment_profiles.yaml)：Smoke、开发、主实验和完整实验的初始资源配置。
 
-当前状态为`P3-0 / 源码与Spec冻结`。配置文件中的数值是租机和首轮实验的起点，不是已经
-验证过的最佳参数；必须经过单卡Smoke和20 Step吞吐测量后才能升级配置。
+当前状态为`P1完成 / P2待执行`：隔离环境、版本锁、安全门禁以及数据→Fixture Retriever→
+SearchEnv→严格EM的模型无关CPU闭环已通过；尚未下载模型，尚未完成模型驱动的Search-R1
+功能复现，也未启动训练。配置文件中的数值只是首轮实验起点，必须经过单卡Smoke和20 Step
+吞吐测量后才能升级配置。
 
 服务器准备完成后先运行只读预检，不直接启动训练：
 
@@ -48,6 +53,12 @@ bash scripts/preflight.sh 1,2,3,4,6,7
 # 仅在明确接受掉卡风险并有人值守时临时启用GPU 5
 ALLOW_UNSTABLE_GPU5=1 bash scripts/preflight.sh 1,2,3,4,5,6,7
 ```
+
+预检和所有GPU实验都必须将`PROJECT3_DATA_ROOT`指向已挂载的大容量数据盘。GPU任务通过
+`scripts/run_managed.sh`启动、通过`scripts/stop_managed.sh`定向停止；禁止直接执行上游
+8卡脚本。完整生命周期规则见[`docs/EXPERIMENT_SAFETY.md`](docs/EXPERIMENT_SAFETY.md)。
+当前服务器使用`export PROJECT3_DATA_ROOT=/media/imc/data`。
+固定的软件与硬件基线见[`docs/ENVIRONMENT_BASELINE_2026-08-12.md`](docs/ENVIRONMENT_BASELINE_2026-08-12.md)。
 
 ## 资源结论
 

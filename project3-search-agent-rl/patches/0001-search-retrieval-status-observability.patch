@@ -1,0 +1,43 @@
+diff --git a/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py b/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
+index cd3957d..3d7a783 100644
+--- a/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
++++ b/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
+@@ -96,0 +97 @@ class SearchEnv(BaseTextEnv):
++        query = [None]
+@@ -99,0 +101,7 @@ class SearchEnv(BaseTextEnv):
++            raw_retrieval_metadata = self.tool_group.last_call_metadata or {}
++            # Do not duplicate full documents/API payloads into every rollout
++            # metadata record. The request log remains the detailed evidence.
++            retrieval_metadata = {
++                key: raw_retrieval_metadata.get(key)
++                for key in ("query", "status", "api_request_error", "total_results")
++            }
+@@ -102,0 +112,6 @@ class SearchEnv(BaseTextEnv):
++            retrieval_metadata = {
++                "query": query[0] if query else None,
++                "status": "tool_exception",
++                "api_request_error": error,
++                "total_results": 0,
++            }
+@@ -119,0 +136,4 @@ class SearchEnv(BaseTextEnv):
++            "retrieval": retrieval_metadata,
++            "retrieval_failed": bool(
++                retrieval_metadata and retrieval_metadata.get("status") not in {"success", "no_results"}
++            ),
+diff --git a/agent_system/environments/env_package/search/third_party/skyrl_gym/tools/search.py b/agent_system/environments/env_package/search/third_party/skyrl_gym/tools/search.py
+index e061e16..07bda23 100644
+--- a/agent_system/environments/env_package/search/third_party/skyrl_gym/tools/search.py
++++ b/agent_system/environments/env_package/search/third_party/skyrl_gym/tools/search.py
+@@ -168,0 +169,3 @@ class SearchToolGroup(ToolGroup):
++        # Observability only: SearchEnv reads this after each synchronous tool
++        # call so retrieval failures are not silently attributed to the model.
++        self.last_call_metadata = None
+@@ -184,0 +188,6 @@ class SearchToolGroup(ToolGroup):
++            self.last_call_metadata = {
++                "query": None,
++                "status": "invalid_query",
++                "api_request_error": "query is None",
++                "total_results": 0,
++            }
+@@ -253,0 +264 @@ class SearchToolGroup(ToolGroup):
++        self.last_call_metadata = metadata

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=gpu_guard.sh
+source "${script_dir}/gpu_guard.sh"
+
 if [[ $# -lt 1 ]]; then
   echo "usage: $0 <comma-separated-physical-gpu-ids>"
   echo "recommended on the current server: $0 1,2,3,4,6,7"
@@ -9,21 +13,19 @@ if [[ $# -lt 1 ]]; then
 fi
 
 gpu_ids="$1"
-if [[ ",${gpu_ids}," == *",0,"* ]]; then
-  echo "refusing to use physical GPU 0"
-  exit 2
-fi
+project3_validate_gpu_ids "$gpu_ids"
+project3_require_known_gpus "$gpu_ids"
+project3_require_idle_gpus "$gpu_ids"
+data_root="$(project3_resolve_data_root)"
+project3_require_disk_space "$data_root"
 
-if [[ ",${gpu_ids}," == *",5,"* ]] && [[ "${ALLOW_UNSTABLE_GPU5:-0}" != "1" ]]; then
-  echo "refusing to use unstable physical GPU 5 by default"
-  echo "set ALLOW_UNSTABLE_GPU5=1 only for an explicitly supervised run"
-  exit 2
-fi
-
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES="$gpu_ids"
 
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}"
-nvidia-smi --query-gpu=index,name,memory.total,memory.used --format=csv
+nvidia-smi --id="$gpu_ids" \
+  --query-gpu=index,name,uuid,memory.total,memory.used,utilization.gpu \
+  --format=csv
 python3 --version
 python3 - <<'PY'
 import torch
@@ -36,13 +38,5 @@ for index in range(torch.cuda.device_count()):
     gib = props.total_memory / 1024**3
     print(f"logical_gpu={index} name={props.name} vram_gib={gib:.1f}")
 PY
-
-available_kib=$(df -Pk . | awk 'NR==2 {print $4}')
-available_gib=$((available_kib / 1024 / 1024))
-echo "workspace_free_disk_gib=${available_gib}"
-
-if (( available_gib < 150 )); then
-  echo "warning: less than 150 GiB free; even the reduced Search-R1 workflow may run out of disk"
-fi
 
 echo "preflight completed; this script does not start training"
