@@ -85,3 +85,22 @@ Hugging Face API在2026-08-12返回：
 
 下载完成后核验四个大文件SHA256，记录耗时、实际占用和剩余磁盘。只有该门禁通过，才执行
 索引拼接、Corpus解压和CPU Retriever环境构建。
+
+## 7. 下载传输诊断
+
+第一次下载使用环境内`huggingface_hub==0.34.4`，客户端自动进入Xet路径，但首个40GB分片
+约一分钟保持0 bytes。尝试设置`HF_HUB_DISABLE_XET=1`仍进入`xet_get`；该版本常量中没有
+此开关，因此环境变量无效。两次尝试均由当前前台会话Ctrl-C终止，退出码130，未生成完成标记。
+
+对固定revision地址执行只读HTTP Header检查得到302后200，CDN正确返回
+`Content-Length: 42949672960`、`Accept-Ranges: bytes`和预期LFS ETag。下载器因此增加显式
+`--transport curl`默认路径：
+
+- 写入`<filename>.partial`；
+- `curl --continue-at -`支持中断续传；
+- 仅curl成功后原子改名为最终文件；
+- 最终文件仍必须通过Manifest大小和SHA256检查；
+- Hugging Face客户端路径保留为可选回退，不再作为本机默认。
+
+curl试传32秒得到约303MiB，稳定在约10MiB/s，随后为切换到tmux而正常中断。该partial文件
+将被后续tmux会话续传，不重复下载已完成字节。

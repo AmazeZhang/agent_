@@ -12,8 +12,10 @@ import argparse
 import hashlib
 import json
 import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 from huggingface_hub import hf_hub_download, snapshot_download
 
@@ -61,9 +63,41 @@ def require_empty_or_resumable(root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
 
 
+def curl_download(repo_id: str, repo_type: str, revision: str, filename: str, destination: Path) -> None:
+    if destination.exists():
+        print(f"reuse_existing={destination}", flush=True)
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    partial = destination.with_name(destination.name + ".partial")
+    repo_prefix = "datasets/" if repo_type == "dataset" else ""
+    url = f"https://huggingface.co/{repo_prefix}{repo_id}/resolve/{revision}/{quote(filename, safe='/')}"
+    subprocess.run(
+        [
+            "curl",
+            "--fail",
+            "--location",
+            "--retry",
+            "10",
+            "--retry-all-errors",
+            "--retry-delay",
+            "5",
+            "--connect-timeout",
+            "30",
+            "--continue-at",
+            "-",
+            "--output",
+            str(partial),
+            url,
+        ],
+        check=True,
+    )
+    partial.replace(destination)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--transport", choices=("curl", "huggingface"), default="curl")
     args = parser.parse_args()
     root = args.output_root.resolve()
     require_empty_or_resumable(root)
@@ -74,27 +108,36 @@ def main() -> int:
     index_dir = root / "index-download"
     corpus_dir = root / "corpus-download"
     model_dir = root / "model" / "e5-base-v2"
-    for filename in ("part_aa", "part_ab"):
-        hf_hub_download(
-            repo_id=INDEX_REPO,
-            repo_type="dataset",
-            revision=INDEX_REVISION,
-            filename=filename,
-            local_dir=index_dir,
+    if args.transport == "curl":
+        for filename in ("part_aa", "part_ab"):
+            curl_download(INDEX_REPO, "dataset", INDEX_REVISION, filename, index_dir / filename)
+        curl_download(
+            CORPUS_REPO, "dataset", CORPUS_REVISION, "wiki-18.jsonl.gz", corpus_dir / "wiki-18.jsonl.gz"
         )
-    hf_hub_download(
-        repo_id=CORPUS_REPO,
-        repo_type="dataset",
-        revision=CORPUS_REVISION,
-        filename="wiki-18.jsonl.gz",
-        local_dir=corpus_dir,
-    )
-    snapshot_download(
-        repo_id=MODEL_REPO,
-        revision=MODEL_REVISION,
-        local_dir=model_dir,
-        allow_patterns=MODEL_FILES,
-    )
+        for filename in MODEL_FILES:
+            curl_download(MODEL_REPO, "model", MODEL_REVISION, filename, model_dir / filename)
+    else:
+        for filename in ("part_aa", "part_ab"):
+            hf_hub_download(
+                repo_id=INDEX_REPO,
+                repo_type="dataset",
+                revision=INDEX_REVISION,
+                filename=filename,
+                local_dir=index_dir,
+            )
+        hf_hub_download(
+            repo_id=CORPUS_REPO,
+            repo_type="dataset",
+            revision=CORPUS_REVISION,
+            filename="wiki-18.jsonl.gz",
+            local_dir=corpus_dir,
+        )
+        snapshot_download(
+            repo_id=MODEL_REPO,
+            revision=MODEL_REVISION,
+            local_dir=model_dir,
+            allow_patterns=MODEL_FILES,
+        )
 
     verified = {}
     for relative, (expected_size, expected_hash) in EXPECTED.items():
@@ -112,6 +155,7 @@ def main() -> int:
         "completed_at": datetime.now(timezone.utc).isoformat(),
         "output_root": str(root),
         "free_bytes_before_download": free_bytes,
+        "transport": args.transport,
         "revisions": {
             INDEX_REPO: INDEX_REVISION,
             CORPUS_REPO: CORPUS_REVISION,

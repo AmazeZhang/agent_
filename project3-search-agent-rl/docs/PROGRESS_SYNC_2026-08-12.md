@@ -66,6 +66,9 @@
 6. 发现上游GPU FAISS默认使用所有可见GPU，严禁未隔离照搬；
 7. 设计固定revision、250GiB磁盘门禁、保留源文件和逐文件验哈希的下载脚本；
 8. 决定先使用`CUDA_VISIBLE_DEVICES=''`的CPU FAISS验证，不占用GPU0或任何训练卡。
+9. 发现当前Hugging Face Xet客户端下载保持0 bytes，未产生完成文件；
+10. 增加显式curl Range续传、`.partial`和成功后原子改名，试传约303MiB稳定；
+11. 大文件下载将放入独立tmux会话，不依赖交互终端，完成后仍执行SHA256门禁。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
