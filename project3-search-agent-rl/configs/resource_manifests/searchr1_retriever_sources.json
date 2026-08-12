@@ -1,0 +1,65 @@
+{
+  "verified_at": "2026-08-12",
+  "purpose": "P2.5 source lock before downloading the real Search-R1 retriever resources",
+  "resources": [
+    {
+      "repo_id": "PeterJinGo/wiki-18-e5-index",
+      "repo_type": "dataset",
+      "revision": "a4d31160a035f30764604f4827cd8f1d0315eb86",
+      "license": null,
+      "license_status": "not_declared_in_hugging_face_metadata",
+      "files": {
+        "part_aa": {
+          "bytes": 42949672960,
+          "lfs_sha256": "a8a6a246951da4bbc8771a223283ef61963882a32864d9044ec00abb90fc3023"
+        },
+        "part_ab": {
+          "bytes": 21609402413,
+          "lfs_sha256": "b6d9bc943626fe7cb44de4c849e9379e7f272ab216c0552acbcf2390cc033c11"
+        }
+      }
+    },
+    {
+      "repo_id": "PeterJinGo/wiki-18-corpus",
+      "repo_type": "dataset",
+      "revision": "69c1c00ffe7c5554c68d8548355cb22e46aabc51",
+      "license": null,
+      "license_status": "not_declared_in_hugging_face_metadata",
+      "files": {
+        "wiki-18.jsonl.gz": {
+          "bytes": 5123307260,
+          "lfs_sha256": "7abd929223399cd63c52b499f289bf4f9039be1e9f8c43e1cb3938305b2317db"
+        }
+      }
+    },
+    {
+      "repo_id": "intfloat/e5-base-v2",
+      "repo_type": "model",
+      "revision": "f52bf8ec8c7124536f0efb74aca902b2995e5bcd",
+      "license": "mit",
+      "selected_files": [
+        "1_Pooling/config.json",
+        "README.md",
+        "config.json",
+        "model.safetensors",
+        "modules.json",
+        "sentence_bert_config.json",
+        "special_tokens_map.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "vocab.txt"
+      ],
+      "model_weights": {
+        "bytes": 437955512,
+        "lfs_sha256": "d0d559c47d5f71b1d280b13b62a2657f3e3bc70c0786f9ab91a36545e6a8f693"
+      }
+    }
+  ],
+  "storage_policy": {
+    "data_root": "/media/imc/data/project3-search-agent-rl",
+    "minimum_free_bytes_before_download": 268435456000,
+    "preserve_downloaded_parts": true,
+    "preserve_compressed_corpus": true,
+    "overwrite_existing_files": false
+  }
+}

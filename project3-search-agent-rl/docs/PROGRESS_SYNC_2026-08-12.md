@@ -3,7 +3,7 @@
 - 同步日期：2026-08-12
 - 上一同步提交：`4543cf3`（P0/P1）
 - verl-agent固定提交：`20bd331bdbc9026a5668e11362178e10ab7400c8`
-- 当前阶段：P0、P1、P2完成；P2.5真实Retriever待执行
+- 当前阶段：P0、P1、P2完成；P2.5资源审计完成、真实资源待下载
 - 训练状态：未开始
 
 ## 已完成内容
@@ -55,6 +55,19 @@
 9. P2达到Fixture环境下R1功能复现，训练仍未开始。
 
 对应文档：`docs/P2_MODEL_SEARCH_INTEGRATION_2026-08-12.md`。
+
+### P2.5-A：真实Retriever资源审计
+
+1. 锁定上游`wiki-18-e5-index`、`wiki-18-corpus`和`e5-base-v2`的revision；
+2. 记录两个索引分片、压缩Corpus和模型权重的大小及LFS SHA256；
+3. 确认索引分片合计64,559,075,373 bytes，上游解压/拼接后整体约132GB；
+4. 确认data盘可用3,408,163,352,576 bytes，系统可用内存约995GiB；
+5. 两个数据仓库均未声明许可证，禁止把资源当作可重新分发资产；
+6. 发现上游GPU FAISS默认使用所有可见GPU，严禁未隔离照搬；
+7. 设计固定revision、250GiB磁盘门禁、保留源文件和逐文件验哈希的下载脚本；
+8. 决定先使用`CUDA_VISIBLE_DEVICES=''`的CPU FAISS验证，不占用GPU0或任何训练卡。
+
+对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
 ## 数据和产物位置
 
@@ -109,10 +122,12 @@ CUDA_VISIBLE_DEVICES='' PYTHONPATH="$PWD/vendor/verl-agent:$PWD" \
 
 ## 下一步：P2.5与P3
 
-1. 固定真实Wikipedia Corpus、E5 Retriever模型、索引来源、revision、许可证和哈希；
-2. 优先用CPU或裁剪真实Corpus检查无答案泄漏的8/16检索结果、延迟和失败分类；
-3. 禁止使用Ground-Truth Fixture训练；
-4. 真实Retriever门禁通过后，翻译并审计可执行的veRL Hydra单步配置；
-5. P3训练仅使用物理GPU1，通过tmux和`run_managed.sh`启动；
-6. 首次只做1个非零参数更新、Checkpoint保存/重载和Reward到Loss审计；
-7. 训练启动时向用户提供tmux attach、日志查看和安全停止指令。
+1. 运行固定下载脚本并核验约70GB源文件的大小与SHA256；
+2. 保留源分片/压缩包，安全拼接索引和解压Corpus；
+3. 建立隔离CPU Retriever环境，验证FAISS维度、Corpus行数和ID对齐；
+4. 用CPU真实Corpus检查无答案泄漏的8/16检索结果、延迟和失败分类；
+5. 禁止使用Ground-Truth Fixture训练；
+6. 真实Retriever门禁通过后，翻译并审计可执行的veRL Hydra单步配置；
+7. P3训练仅使用物理GPU1，通过tmux和`run_managed.sh`启动；
+8. 首次只做1个非零参数更新、Checkpoint保存/重载和Reward到Loss审计；
+9. 训练启动时向用户提供tmux attach、日志查看和安全停止指令。
