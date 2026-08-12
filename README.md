@@ -1,9 +1,10 @@
-# Agent 算法双项目工作区
+# Agent 算法三项目工作区
 
-本目录按《Agent 算法岗位双项目实施手册》拆分为两个独立项目：
+本目录当前包含三个独立项目：
 
 - `project1-harness-evolution/`：Trace、失败诊断、自进化与可靠性评测。
 - `project2-coding-agent-rl/`：Coding Agent 数据、轨迹、SFT 与 Agentic RL。
+- `project3-search-agent-rl/`：Search Agent 的检索环境、轨迹级/步骤级信用分配与Agentic RL。
 
 环境和当前阻塞项见 [SETUP_STATUS.md](SETUP_STATUS.md)。
 
@@ -33,6 +34,9 @@ git apply --directory=project2-coding-agent-rl/vendor/SWE-agent \
   project2-coding-agent-rl/patches/sweagent-shallow-reset.patch
 ```
 
+项目三固定使用`project3-search-agent-rl/vendor/verl-agent`，上游已经包含Search-R1环境及
+GRPO、GiGPO等训练链路，避免同时维护第二套旧版verl源码。
+
 虚拟环境、密钥、模型、数据集和运行目录不会上传；它们需要按
 [SETUP_STATUS.md](SETUP_STATUS.md) 在本机或数据盘重新配置。
 
@@ -40,6 +44,7 @@ git apply --directory=project2-coding-agent-rl/vendor/SWE-agent \
 
 - 所有 GPU 任务必须由 tmux 启动。
 - 禁止使用物理 GPU 0。
+- 物理 GPU 5 有历史掉卡记录，默认不使用；项目三稳定卡集合为 `1,2,3,4,6,7`。
 - 每次启动 GPU 任务前必须重新执行 `nvidia-smi` 检查。
 - 不执行删除、覆盖、清理缓存或重建环境等操作，除非先获得用户确认。
 - 项目代码、配置和报告继续保存在 `/home/imc/yzy/agent`。

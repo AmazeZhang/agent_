@@ -16,3 +16,6 @@
 [submodule "project2-coding-agent-rl/vendor/rllm"]
 	path = project2-coding-agent-rl/vendor/rllm
 	url = https://github.com/rllm-org/rllm.git
+[submodule "project3-search-agent-rl/vendor/verl-agent"]
+	path = project3-search-agent-rl/vendor/verl-agent
+	url = https://github.com/langfengQ/verl-agent.git

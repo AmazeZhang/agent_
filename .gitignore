@@ -42,3 +42,12 @@ project1-harness-evolution/optimizers/sandbox/pomltrace/
 *.log
 *.tmp
 *.swp
+
+# Project 3 local artifacts and private working notes
+project3-search-agent-rl/data/
+project3-search-agent-rl/indexes/
+project3-search-agent-rl/checkpoints/
+project3-search-agent-rl/outputs/
+project3-search-agent-rl/wandb/
+project3-search-agent-rl/.env
+project3-search-agent-rl/秋招简历与面试知识库.md

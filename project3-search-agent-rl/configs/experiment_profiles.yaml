@@ -1,0 +1,210 @@
+# Planning manifest for project-level resource and experiment profiles.
+# This is not passed directly to Hydra. Values must be translated into a
+# versioned launch config and validated by smoke tests before long runs.
+
+metadata:
+  created_at: "2026-08-11"
+  status: "planning_defaults_not_server_validated"
+  upstream_commit: "20bd331bdbc9026a5668e11362178e10ab7400c8"
+  forbidden_physical_gpu_ids: [0]
+  unstable_physical_gpu_ids: [5]
+  default_physical_gpu_ids: [1, 2, 3, 4, 6, 7]
+  unstable_gpu_override_env: "ALLOW_UNSTABLE_GPU5=1"
+
+profiles:
+  smoke_1x24:
+    purpose: "one real optimizer update and checkpoint recovery"
+    gpu:
+      count: 1
+      min_vram_gib_each: 24
+    host:
+      min_cpu_cores: 16
+      min_ram_gib: 64
+      min_free_nvme_gib: 150
+    model:
+      name: "Qwen/Qwen2.5-1.5B-Instruct"
+      lora_rank: 32
+      lora_alpha: 32
+      gradient_checkpointing: true
+    data:
+      train_size: 8
+      val_size: 16
+      max_prompt_tokens: 2048
+      max_response_tokens: 256
+    rollout:
+      group_size: 2
+      max_environment_steps: 2
+    optimizer:
+      train_batch_size: 8
+      micro_batch_size_per_gpu: 1
+      learning_rate: 0.000003
+      parameter_offload: true
+      optimizer_offload: true
+      reference_offload: true
+    inference:
+      engine: "vllm"
+      gpu_memory_utilization: 0.35
+    retriever:
+      mode: "cpu_bm25_or_reduced_corpus"
+      full_e5_gpu_index_allowed: false
+    max_gpu_hours: 12
+
+  dev_2x24:
+    purpose: "1.5B GRPO/GiGPO development and 20-100 step curves"
+    gpu:
+      count: 2
+      min_vram_gib_each: 24
+    host:
+      min_cpu_cores: 24
+      min_ram_gib: 128
+      min_free_nvme_gib: 250
+    model:
+      name: "Qwen/Qwen2.5-1.5B-Instruct"
+      lora_rank: 32
+      lora_alpha: 32
+      gradient_checkpointing: true
+    data:
+      train_size: 16
+      val_size: 64
+      max_prompt_tokens: 3072
+      max_response_tokens: 384
+    rollout:
+      group_size: 4
+      max_environment_steps: 3
+    optimizer:
+      train_batch_size: 16
+      micro_batch_size_per_gpu: 2
+      learning_rate: 0.000003
+      parameter_offload: true
+      optimizer_offload: true
+      reference_offload: true
+    inference:
+      engine: "vllm"
+      gpu_memory_utilization: 0.45
+    retriever:
+      mode: "cpu_bm25_or_cpu_ann"
+      full_e5_gpu_index_allowed: false
+    max_gpu_hours: 96
+
+  main_4x24:
+    purpose: "resume-grade 3B GRPO/GiGPO comparison"
+    gpu:
+      count: 4
+      min_vram_gib_each: 24
+    host:
+      min_cpu_cores: 32
+      min_ram_gib: 128
+      preferred_ram_gib: 256
+      min_free_nvme_gib: 300
+    model:
+      name: "Qwen/Qwen2.5-3B-Instruct"
+      lora_rank: null
+      gradient_checkpointing: true
+    data:
+      train_size: 64
+      val_size: 256
+      max_prompt_tokens: 4096
+      max_response_tokens: 512
+    rollout:
+      group_size: 5
+      max_environment_steps: 4
+    optimizer:
+      train_batch_size: 64
+      micro_batch_size_per_gpu: 2
+      learning_rate: 0.000001
+      parameter_offload: true
+      optimizer_offload: true
+      reference_offload: true
+    inference:
+      engine: "vllm"
+      gpu_memory_utilization: 0.5
+    retriever:
+      mode: "cpu_retriever_or_reduced_dense_index"
+      full_e5_gpu_index_allowed: false
+    max_gpu_hours: 288
+
+  server_6x24:
+    purpose: "default 8x4090 server profile with display GPU 0 and unstable GPU 5 excluded"
+    gpu:
+      count: 6
+      physical_gpu_ids: [1, 2, 3, 4, 6, 7]
+      min_vram_gib_each: 24
+    host:
+      min_cpu_cores: 32
+      min_ram_gib: 128
+      preferred_ram_gib: 256
+      min_free_nvme_gib: 300
+    model:
+      name: "Qwen/Qwen2.5-3B-Instruct"
+      lora_rank: null
+      gradient_checkpointing: true
+    data:
+      train_size: 128
+      val_size: 512
+      max_prompt_tokens: 4096
+      max_response_tokens: 512
+    rollout:
+      group_size: 5
+      max_environment_steps: 4
+    optimizer:
+      train_batch_size: 96
+      micro_batch_size_per_gpu: 2
+      learning_rate: 0.000001
+      parameter_offload: false
+      optimizer_offload: false
+      reference_offload: true
+    inference:
+      engine: "vllm"
+      gpu_memory_utilization: 0.5
+    retriever:
+      mode: "cpu_retriever_or_reduced_dense_index"
+      full_e5_gpu_index_allowed: false
+    max_gpu_hours_per_run: 432
+
+  full_7x24:
+    purpose: "full dense retriever, 3B main runs, and final ablations"
+    gpu:
+      count: 7
+      min_vram_gib_each: 24
+    host:
+      min_cpu_cores: 32
+      preferred_cpu_cores: 64
+      min_ram_gib: 128
+      preferred_ram_gib: 256
+      min_free_nvme_gib: 300
+    model:
+      name: "Qwen/Qwen2.5-3B-Instruct"
+      lora_rank: null
+      gradient_checkpointing: true
+    data:
+      train_size: 128
+      val_size: 512
+      max_prompt_tokens: 4096
+      max_response_tokens: 512
+    rollout:
+      group_size: 5
+      max_environment_steps: 4
+    optimizer:
+      train_batch_size: 128
+      micro_batch_size_per_gpu: 2
+      learning_rate: 0.000001
+      parameter_offload: false
+      optimizer_offload: false
+      reference_offload: true
+    inference:
+      engine: "vllm"
+      gpu_memory_utilization: 0.5
+    retriever:
+      mode: "full_e5_flat_index_sharded_across_visible_gpus"
+      estimated_extra_vram_gib_each: 6
+      full_e5_gpu_index_allowed: true
+    max_gpu_hours_per_run: 504
+
+promotion_gates:
+  - "inference rollout returns a rule reward"
+  - "at least one non-zero optimizer update completes"
+  - "checkpoint save and resume succeeds"
+  - "retrieved tokens are excluded from policy loss"
+  - "reward has useful within-group variance"
+  - "no NaN or Inf in advantage, loss, or gradients"
+  - "20-step throughput and total cost have been estimated"
