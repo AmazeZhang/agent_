@@ -1,7 +1,7 @@
 # Search-R1复现优先实施计划
 
 - 制定日期：2026-08-12
-- 当前状态：P0环境与安全门禁通过，下一步执行P1 CPU数据/Retriever/Reward闭环
+- 当前状态：P0/P1/P2通过；下一步执行P2.5真实Corpus Retriever门禁
 - 核心框架：`langfengQ/verl-agent`内置的veRL训练栈
 - 核心任务：Search-R1多轮搜索环境
 - 原则：先复现、再诊断、后改进；不把上游能力或论文数字写成个人结果
@@ -122,6 +122,24 @@ Manifest已在P1建立；模型Manifest将在P2首次下载前建立。
 退出门槛：达到R1功能复现，并形成Base/Instruct原始能力报告。
 
 产物：Inference配置、原始Trace、S0基线指标和显存/延迟记录。
+
+状态（2026-08-12）：已在物理GPU1完成1/4/16逐级冻结推理，并通过独立强制搜索诊断和
+自然16条Run验证模型、动作投影、SearchEnv、Retriever、历史回填与Reward闭环。正式16条
+Run为9个投影search、8次实际成功检索、2条Fixture Reward=1；所有Run退出后无GPU进程残留。
+由于Fixture由Ground Truth衍生，该结果只满足R1功能复现，不构成S0质量基线。
+
+### P2.5：真实Corpus Retriever门禁
+
+任务：
+
+1. 固定上游Wikipedia Corpus、E5 Retriever、索引revision、许可证和文件哈希；
+2. 使用与答案无关的真实文档完成8/16条检索协议和延迟测试；
+3. 检查Query、Top-k文档、Retriever失败与答案之间不存在Fixture式泄漏；
+4. 冻结P3要使用的Retriever服务启动和停止方式。
+
+退出门槛：真实Retriever可重复启动，8/16请求无基础设施错误，训练不引用Fixture Corpus。
+
+产物：Corpus/Index Manifest、真实检索Trace、延迟与错误报告。
 
 ### P3：veRL GRPO单步训练闭环
 

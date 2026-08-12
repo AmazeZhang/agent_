@@ -1,10 +1,16 @@
 diff --git a/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py b/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
-index cd3957d..3d7a783 100644
+index cd3957d..5c150b2 100644
 --- a/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
 +++ b/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
-@@ -96,0 +97 @@ class SearchEnv(BaseTextEnv):
+@@ -94,12 +94,27 @@ class SearchEnv(BaseTextEnv):
+                 observations=[], reward=reward, done=done, metadata={"data_source": self.data_source, "tool_calling": False}, postprocessed_action=action
+             )
+ 
 +        query = [None]
-@@ -99,0 +101,7 @@ class SearchEnv(BaseTextEnv):
++        retrieval_metadata = None
+         try:
+             query = self._parse_action(action)
+             observation = self._execute_tool("SearchToolGroup", "search", query)
 +            raw_retrieval_metadata = self.tool_group.last_call_metadata or {}
 +            # Do not duplicate full documents/API payloads into every rollout
 +            # metadata record. The request log remains the detailed evidence.
@@ -12,32 +18,66 @@ index cd3957d..3d7a783 100644
 +                key: raw_retrieval_metadata.get(key)
 +                for key in ("query", "status", "api_request_error", "total_results")
 +            }
-@@ -102,0 +112,6 @@ class SearchEnv(BaseTextEnv):
+         except Exception as e:
+             error = str(e)
+             observation = None
 +            retrieval_metadata = {
 +                "query": query[0] if query else None,
 +                "status": "tool_exception",
 +                "api_request_error": error,
 +                "total_results": 0,
 +            }
-@@ -119,0 +136,4 @@ class SearchEnv(BaseTextEnv):
+ 
+         # Wrap the observation properly as a message
+         if observation:
+@@ -117,6 +132,10 @@ class SearchEnv(BaseTextEnv):
+             "tool_name": "search",
+             "tool_input": query,
+             "data_source": self.data_source,
 +            "retrieval": retrieval_metadata,
 +            "retrieval_failed": bool(
 +                retrieval_metadata and retrieval_metadata.get("status") not in {"success", "no_results"}
 +            ),
+         }
+ 
+         # Update chat history
+@@ -129,4 +148,4 @@ class SearchEnv(BaseTextEnv):
+             done=done,
+             metadata=info,
+             postprocessed_action=action,
+-        )
+\ No newline at end of file
++        )
 diff --git a/agent_system/environments/env_package/search/third_party/skyrl_gym/tools/search.py b/agent_system/environments/env_package/search/third_party/skyrl_gym/tools/search.py
 index e061e16..07bda23 100644
 --- a/agent_system/environments/env_package/search/third_party/skyrl_gym/tools/search.py
 +++ b/agent_system/environments/env_package/search/third_party/skyrl_gym/tools/search.py
-@@ -168,0 +169,3 @@ class SearchToolGroup(ToolGroup):
+@@ -166,6 +166,9 @@ class SearchToolGroup(ToolGroup):
+         self.topk = topk
+         self.timeout = timeout
+         self.log_requests = log_requests
 +        # Observability only: SearchEnv reads this after each synchronous tool
 +        # call so retrieval failures are not silently attributed to the model.
 +        self.last_call_metadata = None
-@@ -184,0 +188,6 @@ class SearchToolGroup(ToolGroup):
+ 
+         # Extract base URL for session sharing
+         parsed_url = urlparse(self.search_url)
+@@ -182,6 +185,12 @@ class SearchToolGroup(ToolGroup):
+     def search(self, query: str) -> str:
+         # NOTE(shu): add warning messages here?
+         if query is None:
 +            self.last_call_metadata = {
 +                "query": None,
 +                "status": "invalid_query",
 +                "api_request_error": "query is None",
 +                "total_results": 0,
 +            }
-@@ -253,0 +264 @@ class SearchToolGroup(ToolGroup):
+             return ""
+ 
+         query = query.strip()
+@@ -251,4 +260,5 @@ class SearchToolGroup(ToolGroup):
+             result_text = json.dumps({"result": "Unknown API state (no response and no error message)."})
+             logger.error("Batch search: Unknown API state.")
+ 
 +        self.last_call_metadata = metadata
+         return result_text

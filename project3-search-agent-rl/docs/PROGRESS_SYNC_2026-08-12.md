@@ -1,9 +1,9 @@
 # Search-R1复现进度同步
 
 - 同步日期：2026-08-12
-- 根仓库基线：`c3b946272c70dea17744988fa3607d834e2bbf1e`
+- 上一同步提交：`4543cf3`（P0/P1）
 - verl-agent固定提交：`20bd331bdbc9026a5668e11362178e10ab7400c8`
-- 当前阶段：P0、P1完成；P2待执行
+- 当前阶段：P0、P1、P2完成；P2.5真实Retriever待执行
 - 训练状态：未开始
 
 ## 已完成内容
@@ -37,9 +37,24 @@
 6. 跑通`<search>`→HTTP `/retrieve`→`<information>`→`<answer>`→严格EM；
 7. 增加Retriever状态观测补丁，使API错误可与模型错误分开统计；
 8. 12项CPU测试通过，耗时2.54秒；生成一条Reward=1的模型无关Trace；
-9. 未下载Wikipedia Corpus、E5 Flat Index或任何模型，未启动训练。
+9. 未下载Wikipedia Corpus或E5 Flat Index，未启动训练。
 
 对应文档：`docs/P1_SEARCH_PIPELINE_AUDIT_2026-08-12.md`。
+
+### P2：冻结模型与Search环境集成
+
+1. 固定并下载`Qwen/Qwen2.5-1.5B-Instruct` revision
+   `989aa7980e4cf806f80c7fef2b1adb7bc71aa306`，许可证Apache-2.0；
+2. 权重落在data盘，3.087GB safetensors的SHA256与上游LFS对象一致；
+3. 直接复用上游环境管理器、动作投影、SearchEnv和Chat Template实现模型驱动多轮链路；
+4. 使用物理GPU1按1、4、16条逐级执行，所有Run退出码为0且无显存进程残留；
+5. 正式16条Run有9个投影search、8次实际检索，8次均成功，16条全部终止；
+6. 发现主动搜索不足、多动作格式无效以及最大步数search不实际执行三类基线问题；
+7. 通过强制首轮搜索的独立诊断验证完整回环，但不把它混入自然策略指标；
+8. Fixture由Ground Truth衍生，Reward结果只作为集成证据，不作为模型质量或论文分数；
+9. P2达到Fixture环境下R1功能复现，训练仍未开始。
+
+对应文档：`docs/P2_MODEL_SEARCH_INTEGRATION_2026-08-12.md`。
 
 ## 数据和产物位置
 
@@ -49,6 +64,8 @@
 /media/imc/data/project3-search-agent-rl/datasets/searchr1-upstream
 /media/imc/data/project3-search-agent-rl/datasets/searchr1-smoke
 /media/imc/data/project3-search-agent-rl/envs/searchr1-repro-cu124
+/media/imc/data/project3-search-agent-rl/models/Qwen2.5-1.5B-Instruct
+/media/imc/data/project3-search-agent-rl/runs/p2-qwen15b-fixture-*
 ```
 
 关键哈希：
@@ -60,6 +77,8 @@ Smoke manifest           c2f92e66702e1e5597a9e47759172bef6db5b5d17e988a08e3d448a
 deterministic trace       5c2ac4dc40462720b44578ee64be507321c43440501419279cbdef1f7da28a62
 direct requirements       dd03ff2a705b4b0446dce48358e83fc8846a26a2979855b2456dd7f76d36c530
 third-party package lock  758ef9afec5a0796ecec4a9c072bcd72f2c973719ab756206959fe35bd177a65
+Qwen model weights         dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee
+P2 official result JSON   2a905571b1388ebf44a65710da09741e2ef570a6b4c4243e6bba36c838a7900c
 ```
 
 上游数据集Metadata没有许可证字段。当前状态为“许可证未声明、待人工核验”，不能推断为
@@ -88,12 +107,12 @@ CUDA_VISIBLE_DEVICES='' PYTHONPATH="$PWD/vendor/verl-agent:$PWD" \
 
 预期：`12 passed`。localhost HTTP测试需要允许绑定`127.0.0.1`随机端口。
 
-## 下一步：P2
+## 下一步：P2.5与P3
 
-1. 下载并固定`Qwen/Qwen2.5-1.5B-Instruct`到data盘；
-2. 在下载前记录模型revision、文件列表、许可证与来源；
-3. 使用物理GPU1依次执行1条、4条、16条模型驱动Search；
-4. 首轮使用明确标记的Fixture Retriever，只证明动作/环境/模型集成，不报告质量；
-5. 保存完整Trace、格式错误、搜索次数、延迟、峰值显存和Retriever错误分类；
-6. 每次任务退出后确认GPU1无Ray/vLLM/Python残留；
-7. 达到R1后再准备真实Corpus Retriever，训练仍需等P3并通过tmux启动。
+1. 固定真实Wikipedia Corpus、E5 Retriever模型、索引来源、revision、许可证和哈希；
+2. 优先用CPU或裁剪真实Corpus检查无答案泄漏的8/16检索结果、延迟和失败分类；
+3. 禁止使用Ground-Truth Fixture训练；
+4. 真实Retriever门禁通过后，翻译并审计可执行的veRL Hydra单步配置；
+5. P3训练仅使用物理GPU1，通过tmux和`run_managed.sh`启动；
+6. 首次只做1个非零参数更新、Checkpoint保存/重载和Reward到Loss审计；
+7. 训练启动时向用户提供tmux attach、日志查看和安全停止指令。
