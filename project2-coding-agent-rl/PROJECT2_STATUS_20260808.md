@@ -1,5 +1,10 @@
 # 项目二（Coding Agentic RL）状况说明 — 2026-08-08
 
+> **历史状态提示（2026-08-10）**：本文记录的是旧 3B smoke/WP0–WP7 闭环，
+> 不是当前 Phase 1 的完整状态。之后已完成 7B 新路线的 Phase 1a 数据管道，并进入
+> Phase 1b SFT 显存攻关。当前入口见 `../docs/PROJECT_STATUS_2026-08-10.md`，
+> Phase 1a 证据见 `PROJECT2_PHASE1A_REPORT_20260808.md`。
+
 > 本文档供下一步决策诊断使用。所有数字可追溯到各节列出的原始文件。
 > 完整训练闭环报告见 `reports/WP7_TRAINING_CLOSED_LOOP_20260808.md`。
 

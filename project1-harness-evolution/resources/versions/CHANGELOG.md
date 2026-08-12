@@ -9,3 +9,5 @@
 {"version": null, "round": "gepa-diagnosis-r2", "decision": "reject", "reason": "成功率回退（0.875 < 0.880）", "metrics": {"candidate_success_rate": 0.875, "baseline_success_rate": 0.9, "candidate_cost": null, "baseline_cost": 0.058}}
 {"version": null, "round": "apo-plain-r2", "decision": "reject", "reason": "成功率回退（0.750 < 0.880）", "metrics": {"candidate_success_rate": 0.75, "baseline_success_rate": 0.9, "candidate_cost": null, "baseline_cost": 0.058}}
 {"version": null, "round": "apo-diagnosis-r2", "decision": "reject", "reason": "成功率回退（0.875 < 0.880）", "metrics": {"candidate_success_rate": 0.875, "baseline_success_rate": 0.9, "candidate_cost": null, "baseline_cost": 0.058}}
+{"version": null, "round": "apo-plain-r3", "decision": "reject", "reason": "未产生收益（0.875 ≤ 基线 0.875，持平/无提升）", "metrics": {"candidate_success_rate": 0.875, "baseline_success_rate": 0.875, "candidate_cost": null, "baseline_cost": 0.058}}
+{"version": null, "round": "apo-diagnosis-r3", "decision": "reject", "reason": "未产生收益（0.875 ≤ 基线 0.875，持平/无提升）", "metrics": {"candidate_success_rate": 0.875, "baseline_success_rate": 0.875, "candidate_cost": null, "baseline_cost": 0.058}}

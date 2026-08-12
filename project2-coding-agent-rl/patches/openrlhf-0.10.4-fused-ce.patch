@@ -1,0 +1,72 @@
+--- a/openrlhf/models/actor.py
++++ b/openrlhf/models/actor.py
+@@ -1,5 +1,7 @@
+ from typing import Optional
+
++import os
++
+ import torch
+ import torch.distributed as dist
+ import torch.nn as nn
+@@ -262,9 +264,60 @@
+                 position_ids = attention_mask.long().cumsum(-1) - 1
+                 position_ids.masked_fill_(attention_mask == 0, 1)
+
++        fused_ce_requested = os.environ.get("OPENRLHF_FUSED_CE") == "1"
++        if fused_ce_requested:
++            unsupported = []
++            if action_mask is not None:
++                unsupported.append("action_mask")
++            if self.packing_samples:
++                unsupported.append("packing_samples")
++            if return_entropy:
++                unsupported.append("return_entropy")
++            if not return_logprobs:
++                unsupported.append("return_logprobs=False")
++            if getattr(self, "is_vlm", False):
++                unsupported.append("VLM")
++            if unsupported:
++                raise RuntimeError(
++                    "OPENRLHF_FUSED_CE=1 was requested but this Actor.forward call is unsupported: "
++                    + ", ".join(unsupported)
++                )
++
++            # Fused lm_head + CE (openrlhf.models.fused_ce): never materializes
++            # full-sequence (seq, vocab) logits/dlogits. fused_log_probs clones
++            # the gathered ZeRO-3 weight before this context restores its shard.
++            causal = self.model.module if hasattr(self.model, "module") else self.model
++            try:
++                from deepspeed.zero import GatheredParameters  # deepspeed < 0.15
++            except ModuleNotFoundError:
++                from deepspeed.runtime.zero import GatheredParameters  # deepspeed >= 0.15
++
++            from openrlhf.models.fused_ce import _chunk_size, fused_log_probs
++
++            self._fused_ce_calls = getattr(self, "_fused_ce_calls", 0) + 1
++            if self._fused_ce_calls == 1:
++                print(
++                    "[OPENRLHF_FUSED_CE_ACTIVE] "
++                    f"chunk_size={_chunk_size()} lm_head_requires_grad={causal.lm_head.weight.requires_grad}",
++                    flush=True,
++                )
++
++            with GatheredParameters(causal.lm_head.weight, fwd_module=self):
++                # causal.model is Qwen2ForCausalLM: its forward returns
++                # CausalLMOutputWithPast (no last_hidden_state in transformers
++                # 5.7). Call the base Qwen2Model directly — peft wraps the
++                # linear projections in-place, so LoRA still applies.
++                hidden = causal.model.model(
++                    sequences, attention_mask=foward_attention_mask, position_ids=position_ids, **mm_inputs
++                ).last_hidden_state
++                log_probs = fused_log_probs(causal.lm_head.weight, hidden, rolled_sequences, self.temperature)
++            output = {"aux_loss": None}
++            log_probs = log_probs[:, :-1]
++            return (log_probs, output) if return_output else log_probs
++
+         output = self.model(sequences, attention_mask=foward_attention_mask, position_ids=position_ids, **mm_inputs)
+         # https://github.com/OpenRLHF/OpenRLHF/pull/634
+-        output["logits"] = output["logits"].to(torch.float32)
++        output["logits"] = output["logits"].to(torch.bfloat16) if output["logits"].dtype == torch.float32 else output["logits"]
+
+         if return_entropy:
+             assert return_output

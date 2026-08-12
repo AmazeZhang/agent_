@@ -9,8 +9,15 @@
 
 核心可行性见 [FEASIBILITY_REPORT.md](FEASIBILITY_REPORT.md)，五任务小规模验证和训练门槛判断见 [PILOT_REPORT.md](PILOT_REPORT.md)。
 
-带时间戳的当前完整进度见
-[docs/PROGRESS_SUMMARY_2026-08-07.md](docs/PROGRESS_SUMMARY_2026-08-07.md)。
+当前双项目接手状态见
+[docs/PROJECT_STATUS_2026-08-10.md](docs/PROJECT_STATUS_2026-08-10.md)。该文档同时记录
+项目一 r3 最终结论、项目二 Phase 1a/1b 状态、未提交工作区与当前阻塞。
+项目二本轮 fused CE 与真实一步 SFT 的专项证据见
+[PROJECT2_PHASE1B_SMOKE_REPORT_20260810.md](project2-coding-agent-rl/PROJECT2_PHASE1B_SMOKE_REPORT_20260810.md)。
+
+旧进度总结保留为历史快照：
+[2026-08-08](docs/PROGRESS_SUMMARY_2026-08-08.md)、
+[2026-08-07](docs/PROGRESS_SUMMARY_2026-08-07.md)。
 
 本轮正式开发范围与完成验收标准见
 [docs/DEVELOPMENT_SCOPE.md](docs/DEVELOPMENT_SCOPE.md)。

@@ -1,5 +1,11 @@
 # Project2 阶段 1a 交付报告（2026-08-08）
 
+> **后续状态（2026-08-10 核对）**：Phase 1a 结论仍有效。Phase 1b 已安装环境、
+> 下载 7B 模型并将 287 条轨迹按 24K 预过滤为 238 条。之后 fused CE 已接入并通过
+> 数值及真实一步 SFT smoke；随后用容器隔离 GPU5，四卡 NCCL 与 ZeRO-3 正确性 smoke
+> 通过，但正式 238 条 SFT 仍未完成；详见
+> `PROJECT2_PHASE1B_SMOKE_REPORT_20260810.md` 和 `../docs/PROJECT_STATUS_2026-08-10.md`。
+
 > 阶段 1a（数据管道）核心交付完成：数据全量落盘、任务池构建、环境构建、
 > gold 复核、SFT 数据提取。关键发现：**SWE-smith 语义与 SWE-bench 相反**。
 

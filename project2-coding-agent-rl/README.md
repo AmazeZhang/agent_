@@ -1,5 +1,20 @@
 # 项目二：Coding Agentic RL
 
+## 当前状态（2026-08-10 核对）
+
+旧 3B smoke 已完成工程闭环但训练无收益。新 Phase 1 路线已经完成数据阶段：
+train 148 + eval 10 任务、287 条 SFT 轨迹、10 个 eval gold 复核，并切换到
+Qwen2.5-Coder-7B-Instruct。Phase 1b 已完成 fused CE 的 OpenRLHF 接入、CPU/GPU
+数值验证和一条真实轨迹的单卡 optimizer step，并保存 smoke adapter；正式 24K
+ZeRO-3 正式 SFT 尚未完成，G2 仍未满足。物理 GPU5 的 NVML 故障已通过容器 UUID
+白名单隔离；物理 GPU2/4/6/7 的 NCCL 与 ZeRO-3 正确性 smoke 已通过。当前剩余阻塞是
+正式长序列训练入口及 gradient checkpoint + ZeRO-3 兼容性，详见
+`PROJECT2_PHASE1B_SMOKE_REPORT_20260810.md`。
+
+接手时先阅读工作区根目录 `docs/PROJECT_STATUS_2026-08-10.md`，再看
+`SPEC_PHASE1_20260808.md` 与 `PROJECT2_PHASE1A_REPORT_20260808.md`。不要把下面的
+早期可行性记录误读为当前完整状态。
+
 ## 上游源码
 
 ```text
@@ -23,9 +38,13 @@ source .venvs/swe-tools/bin/activate
 source .venvs/rllm-base/bin/activate
 ```
 
-当前 `rllm-base` 用于 API、CLI 和 CUDA 基础检查，尚未安装 `rllm[verl]` 完整训练栈。完整训练栈、模型和 Docker 镜像均需在磁盘与 GPU 资源确认后单独安装。
+`rllm-base` 已用于旧 3B SFT/GRPO smoke；Phase 1 的 OpenRLHF SFT 使用独立环境
+`.venvs/phase1-openrlhf`。模型、数据和 checkpoint 均放在数据盘，不能仅根据 Git
+checkout 判断训练资产是否完整。
 
-所有 GPU 命令必须通过 `scripts/start_gpu_smoke_tmux.sh` 同类入口启动，并使用物理 GPU 1–7。
+所有 GPU 命令必须在 tmux 中启动、启动前重查物理卡状态，且绝不使用物理 GPU0。
+DeepSpeed 多卡必须用显式 `--include`，禁止把 `CUDA_VISIBLE_DEVICES` 与
+`--num_gpus` 组合；正式训练还必须先通过 `scripts/phase1/nccl_preflight.py`。
 
 ## DeepSeek + SWE-agent 可行性验证
 
@@ -37,7 +56,8 @@ source .venvs/rllm-base/bin/activate
 - 补丁：`runs/sweagent-feasibility-deepseek-v4-flash-20260806-retry2/0ed001/0ed001.patch`。
 - 独立复验：在断网 CPU-only 容器中重新应用补丁，3/3 单元测试通过，退出码 0。
 
-当前边界：这里只验证了单个受控仓库上的端到端 coding-agent 链路；尚未安装 `rllm[verl]`、执行 SFT/GRPO，亦未在批量真实仓库任务上评估泛化能力。
+历史边界：本节只描述最早的单仓库可行性验证。此后已完成 3B SFT/GRPO smoke、
+20 条 Pilot 和 Phase 1a 数据管道；最新边界以本文顶部状态入口为准。
 
 ## 五任务 Pilot
 

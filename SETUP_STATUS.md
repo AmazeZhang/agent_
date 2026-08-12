@@ -2,6 +2,13 @@
 
 记录日期：2026-08-06
 
+> 2026-08-10 增量提示：本文主体是初始环境快照。项目二后来新增
+> `.venvs/phase1-openrlhf`，并下载 Qwen2.5-Coder-7B-Instruct 至数据盘；fused CE 与
+> 单卡真实一步 SFT smoke 已通过；GPU5 保持故障，但已用容器 UUID 白名单隔离，物理
+> GPU2/4/6/7 的 NCCL 与四卡 ZeRO-3 正确性 smoke 也已通过。正式 238 条 SFT 尚未完成，
+> 当前训练和 GPU 状态见 `docs/PROJECT_STATUS_2026-08-10.md`。不要依据本页早期描述判断
+> Phase 1 训练是否已经完成。
+
 ## 主机状态
 
 - OS：Ubuntu 22.04.4 LTS
@@ -52,6 +59,7 @@ uv 0.12.2、CPython 3.11.15 和 CPython 3.12.13 均安装在工作区内：
 | `project1-harness-evolution/.venvs/tau2` | 3.12 | tau2-bench | 已安装，CPU Smoke Test 通过 |
 | `project2-coding-agent-rl/.venvs/swe-tools` | 3.11 | SWE-agent + SWE-smith generate | 已安装，CPU Smoke Test 通过 |
 | `project2-coding-agent-rl/.venvs/rllm-base` | 3.11 | rLLM 基础依赖 | 已安装，CPU Smoke Test 通过 |
+| `project2-coding-agent-rl/.venvs/phase1-openrlhf` | 3.11 | Phase 1 7B OpenRLHF SFT | 已安装；fused 分支和单卡一步 smoke 通过；正式 ZeRO-3 SFT 未完成 |
 
 Agent Lightning 与 AgentRx 不能放进同一个环境：前者的 AgentOps 依赖 `packaging<25`，后者依赖 `packaging>=25`。Agent Lightning 还需使用其 `uv.lock` 对应的 `fastapi==0.121.2`，否则新版 FastAPI 与当前 LiteLLM 不兼容。
 
