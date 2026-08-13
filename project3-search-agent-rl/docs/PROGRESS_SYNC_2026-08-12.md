@@ -76,6 +76,10 @@
 16. 两个索引分片、压缩Corpus和E5权重的精确大小与SHA256全部匹配固定Manifest；
 17. 下载完成标记已生成，tmux自然结束且无Python/curl/GPU进程残留；
 18. P2.5-B完成，详细验收见`docs/P25_DOWNLOAD_COMPLETION_2026-08-13.md`。
+19. 发现`wiki-18.jsonl.gz`真实为gzip压缩TAR，而非直接gzip压缩JSONL；
+20. TAR内唯一JSONL成员大小14,393,573,105 bytes，抽样字段为`id/contents`；
+21. 新增非覆盖、保留源文件、逐行JSON校验和原子完成的P2.5-C准备器；
+22. 三项小型准备器测试通过，执行计划见`docs/P25_PREPARATION_PLAN_2026-08-13.md`。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
