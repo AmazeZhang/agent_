@@ -52,6 +52,11 @@ if [[ -e "$run_dir" ]]; then
 fi
 mkdir -- "$run_dir"
 
+# Ray appends long session and socket names. Keep its live temp prefix short so
+# AF_UNIX's 107-byte path limit is not coupled to the descriptive run ID. The
+# directory is moved into the immutable run directory during cleanup.
+ray_tmp_dir="$(mktemp -d /tmp/p3r.XXXXXX)"
+
 command_file="${run_dir}/command.txt"
 printf '%q ' "$@" >"$command_file"
 printf '\n' >>"$command_file"
@@ -63,9 +68,8 @@ printf '\n' >>"$command_file"
   echo "user=$(id -un)"
   echo "working_directory=$(pwd)"
   echo "data_root=${data_root}"
+  echo "ray_tmp_dir=${ray_tmp_dir}"
 } >"${run_dir}/metadata.env"
-
-mkdir -- "${run_dir}/ray"
 child_pid=""
 cleanup_started=0
 
@@ -109,6 +113,12 @@ cleanup() {
   fi
 
   project3_report_gpu_processes "$gpu_ids" | tee -a "${run_dir}/cleanup.log"
+  if [[ -d "$ray_tmp_dir" && ! -e "${run_dir}/ray" ]]; then
+    mv -- "$ray_tmp_dir" "${run_dir}/ray"
+    echo "ray_temp_archived=${run_dir}/ray" >>"${run_dir}/metadata.env"
+  elif [[ -d "$ray_tmp_dir" ]]; then
+    echo "warning: preserving live Ray temp because archive target exists: ${ray_tmp_dir}" | tee -a "${run_dir}/cleanup.log" >&2
+  fi
   echo "finished_at=$(date --iso-8601=seconds)" >>"${run_dir}/metadata.env"
 }
 
@@ -123,7 +133,7 @@ setsid env \
   CUDA_VISIBLE_DEVICES="$gpu_ids" \
   PROJECT3_RUN_ID="$run_id" \
   PROJECT3_RUN_DIR="$run_dir" \
-  RAY_TMPDIR="${run_dir}/ray" \
+  RAY_TMPDIR="$ray_tmp_dir" \
   "$@" >"${run_dir}/stdout.log" 2>"${run_dir}/stderr.log" &
 child_pid=$!
 echo "$child_pid" >"${run_dir}/session_id"
