@@ -131,6 +131,7 @@ def test_search_environment_end_to_end(retriever: FixtureRetriever):
         assert "<information>" in search_step["observations"][0]["content"]
         assert record["answers"][0] in search_step["observations"][0]["content"]
         assert search_step["metadata"]["retrieval"]["status"] == "success"
+        assert search_step["metadata"]["retrieval"]["document_ids"][0] == f"fixture-{record['id']}"
         assert search_step["metadata"]["retrieval_failed"] is False
         answer_step = env.step(f"<answer>{record['answers'][0]}</answer>")
         assert answer_step["done"] is True
@@ -169,4 +170,5 @@ def test_retriever_failure_is_typed_not_silently_model_failure(monkeypatch):
     assert out["reward"] == 0
     assert out["metadata"]["retrieval_failed"] is True
     assert out["metadata"]["retrieval"]["status"] == "api_error"
+    assert out["metadata"]["retrieval"]["document_ids"] == []
     assert "fixture timeout" in out["metadata"]["retrieval"]["api_request_error"]

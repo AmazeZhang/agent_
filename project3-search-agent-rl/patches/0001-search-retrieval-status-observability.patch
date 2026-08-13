@@ -2,7 +2,7 @@ diff --git a/agent_system/environments/env_package/search/third_party/skyrl_gym/
 index cd3957d..5c150b2 100644
 --- a/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
 +++ b/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
-@@ -94,12 +94,27 @@ class SearchEnv(BaseTextEnv):
+@@ -94,12 +94,28 @@ class SearchEnv(BaseTextEnv):
                  observations=[], reward=reward, done=done, metadata={"data_source": self.data_source, "tool_calling": False}, postprocessed_action=action
              )
  
@@ -16,7 +16,7 @@ index cd3957d..5c150b2 100644
 +            # metadata record. The request log remains the detailed evidence.
 +            retrieval_metadata = {
 +                key: raw_retrieval_metadata.get(key)
-+                for key in ("query", "status", "api_request_error", "total_results")
++                for key in ("query", "status", "api_request_error", "total_results", "document_ids")
 +            }
          except Exception as e:
              error = str(e)
@@ -26,11 +26,12 @@ index cd3957d..5c150b2 100644
 +                "status": "tool_exception",
 +                "api_request_error": error,
 +                "total_results": 0,
++                "document_ids": [],
 +            }
  
          # Wrap the observation properly as a message
          if observation:
-@@ -117,6 +132,10 @@ class SearchEnv(BaseTextEnv):
+@@ -117,6 +133,10 @@ class SearchEnv(BaseTextEnv):
              "tool_name": "search",
              "tool_input": query,
              "data_source": self.data_source,
@@ -41,7 +42,7 @@ index cd3957d..5c150b2 100644
          }
  
          # Update chat history
-@@ -129,4 +148,4 @@ class SearchEnv(BaseTextEnv):
+@@ -129,4 +149,4 @@ class SearchEnv(BaseTextEnv):
              done=done,
              metadata=info,
              postprocessed_action=action,
@@ -62,7 +63,7 @@ index e061e16..07bda23 100644
  
          # Extract base URL for session sharing
          parsed_url = urlparse(self.search_url)
-@@ -182,6 +185,12 @@ class SearchToolGroup(ToolGroup):
+@@ -182,6 +185,13 @@ class SearchToolGroup(ToolGroup):
      def search(self, query: str) -> str:
          # NOTE(shu): add warning messages here?
          if query is None:
@@ -71,11 +72,44 @@ index e061e16..07bda23 100644
 +                "status": "invalid_query",
 +                "api_request_error": "query is None",
 +                "total_results": 0,
++                "document_ids": [],
 +            }
              return ""
  
          query = query.strip()
-@@ -251,4 +260,5 @@ class SearchToolGroup(ToolGroup):
+@@ -205,6 +215,7 @@ class SearchToolGroup(ToolGroup):
+             "api_response": None,
+             "status": "unknown",
+             "total_results": 0,
++            "document_ids": [],
+             "formatted_result": None,
+         }
+ 
+@@ -223,15 +234,23 @@ class SearchToolGroup(ToolGroup):
+                 if raw_results:
+                     pretty_results = []
+                     total_results = 0
++                    document_ids = []
+                     for retrieval in raw_results:
+                         formatted = _passages2string(retrieval)
+                         pretty_results.append(formatted)
+                         total_results += len(retrieval) if isinstance(retrieval, list) else 1
++                        if isinstance(retrieval, list):
++                            document_ids.extend(
++                                str(item.get("document", {}).get("id"))
++                                for item in retrieval
++                                if item.get("document", {}).get("id") is not None
++                            )
+ 
+                     final_result = "\n---\n".join(pretty_results)
+                     result_text = json.dumps({"result": final_result})
+                     metadata["status"] = "success"
+                     metadata["total_results"] = total_results
++                    metadata["document_ids"] = document_ids
+                     metadata["formatted_result"] = final_result
+                     if self.log_requests:
+                         logger.info(f"Batch search: Successful, got {total_results} total results")
+@@ -251,4 +270,5 @@ class SearchToolGroup(ToolGroup):
              result_text = json.dumps({"result": "Unknown API state (no response and no error message)."})
              logger.error("Batch search: Unknown API state.")
  

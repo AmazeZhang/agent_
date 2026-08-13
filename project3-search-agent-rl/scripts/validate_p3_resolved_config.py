@@ -18,6 +18,7 @@ def nested(config: dict, dotted: str):
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("config", type=Path)
+    parser.add_argument("--mode", choices=("one-step", "resume-step2"), default="one-step")
     args = parser.parse_args()
     config = yaml.safe_load(args.config.read_text())
 
@@ -46,12 +47,21 @@ def main() -> None:
         "env.search.timeout": 180,
         "trainer.n_gpus_per_node": 1,
         "trainer.nnodes": 1,
+        "trainer.total_epochs": 1,
         "trainer.total_training_steps": 1,
         "trainer.save_freq": 1,
         "trainer.test_freq": -1,
         "trainer.resume_mode": "disable",
         "ray_init.num_cpus": 32,
     }
+    if args.mode == "resume-step2":
+        expected.update(
+            {
+                "trainer.total_epochs": 2,
+                "trainer.total_training_steps": 2,
+                "trainer.resume_mode": "resume_path",
+            }
+        )
     mismatches = {}
     for key, wanted in expected.items():
         actual = nested(config, key)
@@ -65,6 +75,13 @@ def main() -> None:
         mismatches["trainer.logger"] = {"expected": ["console"], "actual": nested(config, "trainer.logger")}
     if "fixture" in nested(config, "env.search.search_url").lower():
         mismatches["fixture_retriever"] = {"expected": False, "actual": True}
+    if args.mode == "resume-step2":
+        resume_path = Path(nested(config, "trainer.resume_from_path"))
+        if not resume_path.is_absolute() or resume_path.name != "global_step_1":
+            mismatches["trainer.resume_from_path"] = {
+                "expected": "absolute path ending in global_step_1",
+                "actual": str(resume_path),
+            }
 
     report = {
         "status": "pass" if not mismatches else "fail",

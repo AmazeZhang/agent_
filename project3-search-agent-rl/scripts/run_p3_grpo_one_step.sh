@@ -19,6 +19,9 @@ model_path="${project_data}/models/Qwen2.5-1.5B-Instruct"
 dataset_dir="${project_data}/datasets/searchr1-smoke"
 retriever_url="${PROJECT3_RETRIEVER_URL:-http://127.0.0.1:18080/retrieve}"
 run_dir="${PROJECT3_RUN_DIR:-${project_data}/dry-run/p3-grpo-one-step}"
+resume_from="${PROJECT3_RESUME_FROM:-}"
+total_training_steps="${PROJECT3_TOTAL_TRAINING_STEPS:-1}"
+total_epochs="${PROJECT3_TOTAL_EPOCHS:-1}"
 
 for required_path in "$python_bin" "$model_path" "$dataset_dir/train.parquet" "$dataset_dir/test.parquet"; do
   if [[ ! -e "$required_path" ]]; then
@@ -26,6 +29,21 @@ for required_path in "$python_bin" "$model_path" "$dataset_dir/train.parquet" "$
     exit 11
   fi
 done
+
+if [[ ! "$total_training_steps" =~ ^[1-9][0-9]*$ || ! "$total_epochs" =~ ^[1-9][0-9]*$ ]]; then
+  echo "training steps and epochs must be positive integers" >&2
+  exit 16
+fi
+if [[ -n "$resume_from" ]]; then
+  if [[ "$resume_from" != /* || ! -d "$resume_from/actor" || ! -f "$resume_from/data.pt" ]]; then
+    echo "resume checkpoint must be an absolute global_step directory with actor/ and data.pt: ${resume_from}" >&2
+    exit 17
+  fi
+  if [[ ! "$(basename -- "$resume_from")" =~ ^global_step_[0-9]+$ ]]; then
+    echo "resume checkpoint basename must be global_step_N: ${resume_from}" >&2
+    exit 18
+  fi
+fi
 
 if [[ ! "$retriever_url" =~ ^http://127\.0\.0\.1:[0-9]{1,5}/retrieve$ ]]; then
   echo "retriever URL must be an IPv4 loopback /retrieve endpoint: ${retriever_url}" >&2
@@ -98,26 +116,34 @@ overrides=(
   "env.search.log_requests=true"
   "trainer.logger=['console']"
   "trainer.project_name=search_r1_repro"
-  "trainer.experiment_name=p3_grpo_one_step_qwen25_15b_lora32_seed0"
+  "trainer.experiment_name=p3_grpo_incremental_qwen25_15b_lora32_seed0"
   "trainer.n_gpus_per_node=1"
   "trainer.nnodes=1"
-  "trainer.total_epochs=1"
-  "trainer.total_training_steps=1"
+  "trainer.total_epochs=${total_epochs}"
+  "trainer.total_training_steps=${total_training_steps}"
   "trainer.val_before_train=false"
   "trainer.test_freq=-1"
   "trainer.save_freq=1"
-  "trainer.resume_mode=disable"
   "trainer.default_local_dir=${run_dir}/checkpoints"
   "trainer.rollout_data_dir=${run_dir}/rollouts"
   "ray_init.num_cpus=32"
   "hydra.run.dir=${run_dir}/hydra"
 )
 
+if [[ -n "$resume_from" ]]; then
+  overrides+=("trainer.resume_mode=resume_path" "trainer.resume_from_path=${resume_from}")
+else
+  overrides+=("trainer.resume_mode=disable")
+fi
+
 export PYTHONNOUSERSITE=1
 export TOKENIZERS_PARALLELISM=false
 # This pinned veRL generation documents V1 as an explicit opt-in. Keep the
 # baseline on its V0 hybrid-engine path instead of inheriting vLLM defaults.
 export VLLM_USE_V1=0
+# Ray 2.43.0 crashed in TaskEventBuffer::FlushEvents while the completed GPU
+# actor was being terminated. Zero is Ray's own disable value for this buffer.
+export RAY_task_events_report_interval_ms=0
 export PYTHONPATH="${vendor_dir}:${project_dir}${PYTHONPATH:+:${PYTHONPATH}}"
 
 if [[ "$mode" == "print-config" ]]; then
@@ -134,11 +160,14 @@ if [[ "${CUDA_VISIBLE_DEVICES:-}" != "1" ]]; then
   exit 14
 fi
 
-patch_file="${project_dir}/patches/0001-search-retrieval-status-observability.patch"
-if ! git -C "$vendor_dir" apply --reverse --check "$patch_file" 2>/dev/null; then
-  echo "required observability patch is not applied; run scripts/apply_project_patches.sh before training" >&2
-  exit 15
-fi
+for patch_file in \
+  "${project_dir}/patches/0001-search-retrieval-status-observability.patch" \
+  "${project_dir}/patches/0002-structured-rollout-audit.patch"; do
+  if ! git -C "$vendor_dir" apply --reverse --check "$patch_file" 2>/dev/null; then
+    echo "required patch is not applied: $(basename -- "$patch_file")" >&2
+    exit 15
+  fi
+done
 
 "$python_bin" - "$retriever_url" <<'PY'
 import json

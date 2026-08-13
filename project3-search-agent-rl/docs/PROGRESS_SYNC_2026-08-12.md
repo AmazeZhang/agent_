@@ -112,6 +112,11 @@
 51. Run共8个问题、16条轨迹、21条Action，Reward均值0.125，不能据此声称质量提升；
 52. 保存后Ray Worker在关闭阶段Segfault，顶层exit 0但不能称为干净退出；
 53. 独立实验审计为WARN：单步更新成立，恢复、Token Mask和结构化Retriever证据待补。
+54. P3-C加入逐记录Token Loss Mask、Retriever状态和Document ID的原子审计JSONL；
+55. 两份项目Patch在干净veRL提交上顺序/反向应用，并与当前vendor代码比较一致；
+56. 定位退出异常为Ray 2.43.0 TaskEventBuffer关闭路径，CPU-only禁用缓冲探针正常退出；
+57. 恢复配置确认从Global Step 1加载Actor/Optimizer/DataLoader，以第二Epoch执行Step 2；
+58. Mask单元测试2项、Search联合回归14项通过；Hydra确认`resume_path`、Step 2、Epoch 2，尚未启动GPU训练。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
