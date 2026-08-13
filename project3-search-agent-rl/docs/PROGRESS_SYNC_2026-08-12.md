@@ -84,6 +84,11 @@
 24. 全量Corpus为14,393,573,105 bytes、21,015,324行、0无效JSON行；
 25. 源分片与压缩包全部保留，无partial或进程残留，准备总耗时457.55秒；
 26. 详细结果见`docs/P25_PREPARATION_COMPLETION_2026-08-13.md`，下一步为CPU FAISS实际加载。
+27. P2.5-D实际加载为`IndexFlatIP(d=768, ntotal=21,015,324)`，耗时39.24秒；
+28. 本地E5编码8条耗时0.78秒，CPU全库Top-3搜索耗时6.27秒；
+29. 全量21,015,324个Corpus ID均与行号一致，24个返回文档全部可映射；
+30. 验收tmux自然结束、内存释放、无GPU/进程残留，详细结果见
+    `docs/P25_CPU_VALIDATION_COMPLETION_2026-08-13.md`。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
