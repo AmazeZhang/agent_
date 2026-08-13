@@ -13,6 +13,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -63,7 +64,16 @@ def require_empty_or_resumable(root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
 
 
-def curl_download(repo_id: str, repo_type: str, revision: str, filename: str, destination: Path) -> None:
+def curl_download(
+    repo_id: str,
+    repo_type: str,
+    revision: str,
+    filename: str,
+    destination: Path,
+    expected_size: int | None,
+    max_outer_attempts: int,
+    max_stalled_attempts: int,
+) -> None:
     if destination.exists():
         print(f"reuse_existing={destination}", flush=True)
         return
@@ -71,34 +81,79 @@ def curl_download(repo_id: str, repo_type: str, revision: str, filename: str, de
     partial = destination.with_name(destination.name + ".partial")
     repo_prefix = "datasets/" if repo_type == "dataset" else ""
     url = f"https://huggingface.co/{repo_prefix}{repo_id}/resolve/{revision}/{quote(filename, safe='/')}"
-    subprocess.run(
-        [
-            "curl",
-            "--fail",
-            "--location",
-            "--retry",
-            "10",
-            "--retry-all-errors",
-            "--retry-delay",
-            "5",
-            "--connect-timeout",
-            "30",
-            "--continue-at",
-            "-",
-            "--output",
-            str(partial),
-            url,
-        ],
-        check=True,
-    )
-    partial.replace(destination)
+    stalled_attempts = 0
+    for outer_attempt in range(1, max_outer_attempts + 1):
+        size_before = partial.stat().st_size if partial.exists() else 0
+        if expected_size is not None:
+            if size_before == expected_size:
+                partial.replace(destination)
+                return
+            if size_before > expected_size:
+                raise RuntimeError(
+                    f"partial file exceeds expected size for {filename}: {size_before} > {expected_size}"
+                )
+        print(
+            f"download_attempt={outer_attempt}/{max_outer_attempts} "
+            f"file={filename} resume_from={size_before}",
+            flush=True,
+        )
+        result = subprocess.run(
+            [
+                "curl",
+                "--fail",
+                "--location",
+                "--retry",
+                "5",
+                "--retry-all-errors",
+                "--retry-delay",
+                "5",
+                "--connect-timeout",
+                "30",
+                "--continue-at",
+                "-",
+                "--output",
+                str(partial),
+                url,
+            ],
+            check=False,
+        )
+        size_after = partial.stat().st_size if partial.exists() else 0
+        print(
+            f"download_attempt_result={outer_attempt} file={filename} "
+            f"curl_exit={result.returncode} size_before={size_before} size_after={size_after}",
+            flush=True,
+        )
+        if expected_size is not None and size_after == expected_size:
+            partial.replace(destination)
+            return
+        if result.returncode == 0:
+            if expected_size is not None and size_after != expected_size:
+                raise RuntimeError(
+                    f"curl reported success with wrong size for {filename}: {size_after} != {expected_size}"
+                )
+            partial.replace(destination)
+            return
+        if size_after > size_before:
+            stalled_attempts = 0
+        else:
+            stalled_attempts += 1
+            if stalled_attempts >= max_stalled_attempts:
+                raise RuntimeError(
+                    f"download made no progress for {stalled_attempts} attempts: {filename}"
+                )
+        time.sleep(min(outer_attempt * 5, 60))
+    raise RuntimeError(f"download exhausted {max_outer_attempts} outer attempts: {filename}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--transport", choices=("curl", "huggingface"), default="curl")
+    parser.add_argument("--max-outer-attempts", type=int, default=100)
+    parser.add_argument("--max-stalled-attempts", type=int, default=5)
     args = parser.parse_args()
+    if args.max_outer_attempts < 1 or args.max_stalled_attempts < 1:
+        parser.error("retry attempt limits must be positive integers")
     root = args.output_root.resolve()
     require_empty_or_resumable(root)
     free_bytes = shutil.disk_usage(root).free
@@ -110,12 +165,39 @@ def main() -> int:
     model_dir = root / "model" / "e5-base-v2"
     if args.transport == "curl":
         for filename in ("part_aa", "part_ab"):
-            curl_download(INDEX_REPO, "dataset", INDEX_REVISION, filename, index_dir / filename)
+            relative = f"index-download/{filename}"
+            curl_download(
+                INDEX_REPO,
+                "dataset",
+                INDEX_REVISION,
+                filename,
+                index_dir / filename,
+                EXPECTED[relative][0],
+                args.max_outer_attempts,
+                args.max_stalled_attempts,
+            )
         curl_download(
-            CORPUS_REPO, "dataset", CORPUS_REVISION, "wiki-18.jsonl.gz", corpus_dir / "wiki-18.jsonl.gz"
+            CORPUS_REPO,
+            "dataset",
+            CORPUS_REVISION,
+            "wiki-18.jsonl.gz",
+            corpus_dir / "wiki-18.jsonl.gz",
+            EXPECTED["corpus-download/wiki-18.jsonl.gz"][0],
+            args.max_outer_attempts,
+            args.max_stalled_attempts,
         )
         for filename in MODEL_FILES:
-            curl_download(MODEL_REPO, "model", MODEL_REVISION, filename, model_dir / filename)
+            relative = f"model/e5-base-v2/{filename}"
+            curl_download(
+                MODEL_REPO,
+                "model",
+                MODEL_REVISION,
+                filename,
+                model_dir / filename,
+                EXPECTED.get(relative, (None, None))[0],
+                args.max_outer_attempts,
+                args.max_stalled_attempts,
+            )
     else:
         for filename in ("part_aa", "part_ab"):
             hf_hub_download(

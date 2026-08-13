@@ -104,3 +104,27 @@ Hugging Face API在2026-08-12返回：
 
 curl试传32秒得到约303MiB，稳定在约10MiB/s，随后为切换到tmux而正常中断。该partial文件
 将被后续tmux会话续传，不重复下载已完成字节。
+
+## 8. 首次tmux下载退出与恢复方案（2026-08-13）
+
+首次tmux续传从323,710,976 bytes开始，推进至6,561,538,522 bytes后，CDN连接反复出现
+`OpenSSL SSL_read unexpected eof`。curl内部重试10次耗尽并以56退出，Python随之退出，
+tmux会话自然结束。验收时：
+
+- `part_aa.partial`保留6,561,538,522 bytes，约占完整`part_aa`的15.3%；
+- 没有最终`part_aa`，没有`download-complete.json`；
+- `part_ab`、Corpus和E5模型尚未开始；
+- 没有下载进程或GPU占用；data盘仍约3.1TiB可用。
+
+处理方式是恢复而不是删除重下。下载器新增有界外层恢复循环：
+
+1. 每轮重新请求固定revision URL，避免复用失效的CDN签名或连接；
+2. 每轮从`.partial`当前精确字节执行Range续传；
+3. 记录attempt、curl退出码、续传前后字节；
+4. 只要字节增加就重置“无进展”计数；
+5. 默认最多100轮、连续5轮无字节增长才失败，并采用最高60秒退避；
+6. 已知大文件在达到Manifest精确大小后才原子改名；
+7. 全部资源下载完仍逐文件计算SHA256，未通过时不生成完成标记。
+
+恢复会话继续设置`CUDA_VISIBLE_DEVICES=''`，不使用任何GPU。新日志追加到原日志，保留首次
+失败证据而不覆盖。

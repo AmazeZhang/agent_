@@ -69,6 +69,9 @@
 9. 发现当前Hugging Face Xet客户端下载保持0 bytes，未产生完成文件；
 10. 增加显式curl Range续传、`.partial`和成功后原子改名，试传约303MiB稳定；
 11. 大文件下载将放入独立tmux会话，不依赖交互终端，完成后仍执行SHA256门禁。
+12. 首次tmux下载因CDN TLS unexpected EOF在6,561,538,522 bytes退出，partial完整保留；
+13. 下载器增加最多100轮外层Range恢复、连续5轮无增长熔断和逐轮字节审计；
+14. 采用恢复续传，不删除或重新下载已有约6.56GB，恢复日志以追加方式保留失败证据。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
