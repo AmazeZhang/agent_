@@ -105,6 +105,13 @@
 44. Hydra完整解析成功，32项关键配置断言通过，0 mismatch；
 45. 非受管启动、GPU0映射和未应用Patch分别由exit 13/14/15拒绝；
 46. P3-A未启动Ray或GPU训练，详细审计见`docs/P3_GRPO_ONE_STEP_CONFIG_AUDIT_2026-08-13.md`。
+47. P3-B Attempt A发现Ray Socket路径超过107字节，失败Run保留且修复为短`mktemp`路径；
+48. Attempt B完成Ray/FSDP/LoRA初始化，但0.35显存预算不能创建vLLM KV Cache；
+49. Attempt C在物理GPU1完成1次真实Actor Update，`grad_norm=0.300`并保存Global Step 1；
+50. LoRA-B共20,643,840个元素全部非零，模型、Optimizer、Adapter和状态文件均已保存；
+51. Run共8个问题、16条轨迹、21条Action，Reward均值0.125，不能据此声称质量提升；
+52. 保存后Ray Worker在关闭阶段Segfault，顶层exit 0但不能称为干净退出；
+53. 独立实验审计为WARN：单步更新成立，恢复、Token Mask和结构化Retriever证据待补。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
@@ -166,6 +173,7 @@ CUDA_VISIBLE_DEVICES='' PYTHONPATH="$PWD/vendor/verl-agent:$PWD" \
 1. P2.5真实资源下载、准备、CPU加载和localhost HTTP门禁均已完成；
 2. 禁止使用Ground-Truth Fixture训练；
 3. P3-A固定veRL版本下的Hydra单步配置审计已完成；
-4. P3-B仅使用物理GPU1，通过tmux和`run_managed.sh`启动一次真实参数更新；
-5. 完成Checkpoint保存、Reward到Loss与Token Mask审计；
-6. 单独执行Checkpoint恢复Step，之后才讨论5/20步晋级。
+4. P3-B物理GPU1真实单步参数更新与Checkpoint保存已完成；
+5. 补充Token级Loss Mask和结构化Retriever状态持久化；
+6. 处理Ray/vLLM退出段Segfault并单独执行Checkpoint恢复Step；
+7. 上述门禁通过后才讨论5/20步晋级。

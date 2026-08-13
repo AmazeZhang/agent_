@@ -1,0 +1,44 @@
+{
+  "audit_skill": "experiment-audit",
+  "verdict": "WARN",
+  "reason_code": "one_step_scope_and_shutdown_crash",
+  "summary": "A genuine one-step veRL GRPO update was saved, but recovery and token-mask evidence are missing and the Ray worker segfaulted during shutdown.",
+  "audited_input_hashes": {
+    "rollouts/1.jsonl": "sha256:42a24abc5b29fbd729b6c6301c30da1a2905abd515445b9773d481ba77edaa5e",
+    "stdout.log": "sha256:c1dffe7c7729b79d48be8f856b06a4be886fbfe770e1d02a362bbaff7b307944",
+    "stderr.log": "sha256:f1efffa8c4c720c36fb59751960c28599c545c1e7528dc5729063451c7d4ce91",
+    "lora_adapter": "sha256:d84d48d73223e2235646e118cce30427989e2b56bc079cf3834d7330230c2186",
+    "optimizer": "sha256:a32b50a1269650786996183a6af9d8cea3f838b8e993ce0f25d5c2e184c56223",
+    "model_state": "sha256:6a5454c8464fa09917ca8fe20a5c9156391303f28c07289883880b4ebcc340fe"
+  },
+  "trace_path": ".aris/traces/experiment-audit/2026-08-13_run01/",
+  "agent_id": "/root/p3_integrity_audit",
+  "verdict_id": "/root/p3_integrity_audit:2026-08-13_run01",
+  "executor_model": "codex",
+  "executor_family": "openai",
+  "reviewer_model": "codex-fresh-agent-exact-submodel-unavailable",
+  "reviewer_family": "openai",
+  "reviewer_reasoning": "adversarial integrity audit",
+  "review_independence": "same-family",
+  "acceptance_status": "provisional",
+  "generated_at": "2026-08-13T18:06:03+08:00",
+  "date": "2026-08-13",
+  "overall_verdict": "warn",
+  "integrity_status": "warn",
+  "checks": {
+    "gt_provenance": {"status": "pass", "details": "Dataset-derived targets and strict rule-based EM; no fixture leakage."},
+    "score_normalization": {"status": "pass", "details": "No self-normalized quality metric."},
+    "result_existence": {"status": "warn", "details": "Update and checkpoint exist; recovery untested and worker shutdown segfaulted."},
+    "dead_code": {"status": "warn", "details": "Retriever metadata and token loss masks were not persisted in run artifacts."},
+    "scope": {"status": "warn", "details": "One seed, eight questions, sixteen trajectories, one update, no validation."},
+    "eval_type": "real_gt_training_reward_no_heldout_evaluation"
+  },
+  "claims": [
+    {"id": "C1", "impact": "supported_with_shutdown_qualifier"},
+    {"id": "C2", "impact": "unsupported"},
+    {"id": "C3", "impact": "not_yet_verified"},
+    {"id": "C4", "impact": "static_support_run_evidence_insufficient"},
+    {"id": "C5", "impact": "unsupported"},
+    {"id": "C6", "impact": "contradicted"}
+  ]
+}

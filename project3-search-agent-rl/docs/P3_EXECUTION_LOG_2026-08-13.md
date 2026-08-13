@@ -63,3 +63,50 @@ Try increasing `gpu_memory_utilization` when initializing the engine.
    Hybrid Engine基线，Attempt C显式设置`VLLM_USE_V1=0`；
 4. Token上限2304、Eager模式、Cache Engine释放、Actor/Optimizer/Reference Offload均保持；
 5. 新Run使用后缀`c`，不复用Attempt B。
+
+## Attempt C：单步更新完成，退出段有警告
+
+- Run ID：`p3-grpo-1step-qwen15b-s0-20260813c`
+- 时间：2026-08-13 17:37:48至17:40:28（160秒）
+- 顶层退出码：0
+- 训练：1个Global Step、1次Actor Update、Checkpoint保存完成
+
+关键指标：
+
+```text
+grad_norm                    0.300
+pg_loss                     -0.001
+ppo_kl                       0.001
+entropy                      1.256
+reward mean/max/min          0.125 / 1.0 / 0.0
+advantage max/min            1.155 / -1.155
+valid_action_ratio           0.667
+tool_call_count mean         0.312
+step time                    100.164 s
+peak allocated/reserved GPU  20.835 / 23.014 GiB
+throughput                   85.370 token/s
+```
+
+真实性证据：
+
+- 21条Action记录来自8个问题、Group 2的16条轨迹；
+- Score分布为2个`1`、12个`0`、7个`-0.1`；
+- LoRA Adapter有392个张量，LoRA-B的20,643,840个元素全部非零；
+- Scheduler为`last_epoch=1`、`_step_count=2`、最后LR为`3e-6`；
+- 保存模型状态7.26GB、Optimizer 295MB、LoRA Adapter 148MB和Extra/Data State。
+
+主要SHA256：
+
+```text
+model state  6a5454c8464fa09917ca8fe20a5c9156391303f28c07289883880b4ebcc340fe
+optimizer    a32b50a1269650786996183a6af9d8cea3f838b8e993ce0f25d5c2e184c56223
+lora adapter d84d48d73223e2235646e118cce30427989e2b56bc079cf3834d7330230c2186
+rollouts     42a24abc5b29fbd729b6c6301c30da1a2905abd515445b9773d481ba77edaa5e
+```
+
+退出问题：Checkpoint与指标完成后，Ray Worker收到SIGTERM并在关闭阶段Segmentation fault。
+训练顶层仍正常返回0，GPU1、Ray进程和Retriever均已清理。该问题不否定已保存更新，但不能
+表述为干净退出，恢复实验前必须定位或规避。
+
+独立实验完整性审计为`WARN`，见`EXPERIMENT_AUDIT.md`：支持“真实单步更新完成”，不支持
+“完整复现”或“质量提升”；Checkpoint恢复和Token级Mask证据仍待执行。
