@@ -19,13 +19,33 @@ def shutdown_worker_groups(
     timeout_seconds: float = 30,
     actor_state_getter: Any = None,
 ) -> list[str]:
-    """Request one intentional exit per physical Ray actor and wait for it."""
+    """Request one intentional exit per physical worker actor and wait for it."""
     unique_workers: dict[str, Any] = {}
     for worker_group in worker_groups:
         if worker_group is None:
             continue
         for worker in worker_group.workers:
             unique_workers.setdefault(_actor_id(worker), worker)
+
+    return shutdown_actors(
+        unique_workers.values(),
+        ray_api,
+        timeout_seconds=timeout_seconds,
+        actor_state_getter=actor_state_getter,
+    )
+
+
+def shutdown_actors(
+    actors: Iterable[Any],
+    ray_api: Any,
+    *,
+    timeout_seconds: float = 30,
+    actor_state_getter: Any = None,
+) -> list[str]:
+    """Request one intentional exit per unique Ray actor and wait for DEAD."""
+    unique_workers: dict[str, Any] = {}
+    for actor in actors:
+        unique_workers.setdefault(_actor_id(actor), actor)
 
     if not unique_workers:
         return []

@@ -137,3 +137,31 @@ GPU融合Actor `fa957ef6d25e3680b052d6da01000000`确实在Ray原始日志中以
 单元测试、py_compile、逆向检查和`/tmp/p3patch-taskrunner.47Fkmc`干净树顺序重放。
 
 当前状态更新为“GPU Worker退出已通过，TaskRunner退出修复完成但等待Attempt F物理GPU1复验”。
+
+## 8. Attempt F物理GPU1复验结果：WARN
+
+- Run ID：`p3-grpo-shutdown-gate-qwen15b-s0-20260813f`
+- 时间：2026-08-13 19:50:52至19:53:27
+- tmux顶层退出码：0
+- Step 2：`grad_norm=0.266`，单步88.213秒，吞吐95.949 token/s
+- 训练证据：Checkpoint、38,549字节普通rollout和522,081字节audit均完整
+- 主Actor：GPU Worker和CPU TaskRunner均为`INTENDED_USER_EXIT`并进入`DEAD`
+- 清理：GPU1回到18MiB，仅GPU0保留GNOME桌面进程；训练/Ray进程无残留
+
+但严格扫描所有Ray core日志发现PID 492695仍出现一次SIGTERM/SYSTEM_ERROR。它不是vLLM引擎或
+训练Worker，而是名为`WorkerGroupRegisterCenter`的veRL子Actor。该Actor由GPU Worker创建，
+保存rank到node ID映射；GPU Worker退出时最后一个引用被释放，Ray引用计数回收它。Ray最终把
+其disconnect写为`INTENDED_SYSTEM_EXIT`，也没有产生`RAY_WORKER_FAILURE`事件，但core日志的
+中间状态仍包含SIGTERM/SYSTEM_ERROR。因此按预先规定的“无SIGTERM/SYSTEM_ERROR”门禁，Attempt F
+仍不能判整体干净退出。
+
+## 9. Attempt G前的第三层修复
+
+- 为`WorkerGroupRegisterCenter`增加`graceful_shutdown()`；
+- Trainer先按WorkerGroup名称获取RegisterCenter句柄并按Actor ID去重；
+- 先主动退出全部RegisterCenter并等待GCS `DEAD`，再退出GPU Worker；
+- 完整顺序变为`RegisterCenter → GPU Worker → TaskRunner → Driver/Ray`。
+
+更新后8项单元测试、py_compile、0003逆向检查通过。另执行真实Ray CPU父子Actor探针：父Actor
+创建命名子Actor，依次主动退出子/父并扫描core日志；两个Actor均进入DEAD，
+`actor_system_error_logs=[]`。当前等待Attempt G物理GPU1最终复验。

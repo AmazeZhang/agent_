@@ -151,3 +151,17 @@ rollouts     42a24abc5b29fbd729b6c6301c30da1a2905abd515445b9773d481ba77edaa5e
 
 随后已补充TaskRunner的主动退出和DEAD等待，使顺序变为“GPU Worker → TaskRunner → Driver/Ray”。
 更新后的0003补丁、7项测试、py_compile和干净树重放通过，等待Attempt F验证。
+
+## Attempt F：主Actor均主动退出，RegisterCenter仍WARN
+
+- Run ID：`p3-grpo-shutdown-gate-qwen15b-s0-20260813f`
+- 时间：19:50:52至19:53:27，tmux退出0
+- Step 2：`grad_norm=0.266`、单步88.213秒、Checkpoint和JSONL完整
+- GPU Worker与TaskRunner：均`INTENDED_USER_EXIT`且GCS DEAD
+- 遗留：`WorkerGroupRegisterCenter`因最后引用释放被Ray回收，core日志仍含SIGTERM/SYSTEM_ERROR；
+  虽无`RAY_WORKER_FAILURE`事件，严格门禁仍判WARN
+- 资源：GPU1回到18MiB，GPU0未使用，无训练/Ray进程残留
+
+第三层修复已把RegisterCenter纳入显式退出和DEAD等待，完整顺序为
+`RegisterCenter → GPU Worker → TaskRunner → Driver/Ray`。8项测试和真实CPU Ray父子Actor探针
+通过，后者扫描结果为`actor_system_error_logs=[]`，等待Attempt G复验。

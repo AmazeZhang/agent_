@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from types import SimpleNamespace
 
-from searchr1_repro.training_lifecycle import shutdown_worker_groups
+from searchr1_repro.training_lifecycle import shutdown_actors, shutdown_worker_groups
 
 
 class FakeRemoteMethod:
@@ -57,6 +57,18 @@ class TrainingLifecycleTest(unittest.TestCase):
 
     def test_empty_groups_are_a_noop(self):
         self.assertEqual(shutdown_worker_groups([None], FakeRay()), [])
+
+    def test_direct_actor_shutdown_is_deduplicated(self):
+        worker = FakeWorker("actor-a")
+        self.assertEqual(
+            shutdown_actors(
+                [worker, worker],
+                FakeRay(),
+                actor_state_getter=lambda _: {"State": "DEAD"},
+            ),
+            ["actor-a"],
+        )
+        self.assertEqual(worker.graceful_shutdown.calls, 1)
 
     def test_acknowledged_actor_must_reach_dead_state(self):
         worker = FakeWorker("actor-a")

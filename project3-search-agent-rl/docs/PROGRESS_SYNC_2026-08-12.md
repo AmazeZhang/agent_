@@ -203,3 +203,8 @@ Actor ID去重调用`ray.actor.exit_actor()`，等待退出任务并通过GCS确
 `INTENDED_USER_EXIT`；但Ray关闭时CPU TaskRunner仍被SIGTERM回收，整体门禁保持WARN。现已增加
 TaskRunner主动退出与GCS DEAD确认，形成“GPU Worker → TaskRunner → Driver/Ray”的完整顺序，
 等待Attempt F复验。
+
+Attempt F确认GPU Worker和TaskRunner均已`INTENDED_USER_EXIT`，但进一步扫描发现内部
+`WorkerGroupRegisterCenter`仍被引用计数回收并在core日志留下SIGTERM/SYSTEM_ERROR，故继续WARN。
+现已将它加入主动退出，顺序扩展为“RegisterCenter → GPU Worker → TaskRunner → Driver/Ray”；
+8项测试和真实Ray父子Actor无SYSTEM_ERROR探针通过，等待Attempt G最终复验。

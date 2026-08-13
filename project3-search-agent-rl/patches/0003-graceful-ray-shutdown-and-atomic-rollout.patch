@@ -1,3 +1,17 @@
+diff --git a/verl/single_controller/base/register_center/ray.py b/verl/single_controller/base/register_center/ray.py
+--- a/verl/single_controller/base/register_center/ray.py
++++ b/verl/single_controller/base/register_center/ray.py
+@@ -33,6 +33,10 @@ class WorkerGroupRegisterCenter:
+     def get_worker_info(self) -> Dict[int, str]:
+         return self.workers_info
+ 
++    def graceful_shutdown(self):
++        """Exit before the owning worker so Ray does not reference-kill this actor."""
++        ray.actor.exit_actor()
++
+ 
+ def create_worker_group_register_center(name, info):
+     return WorkerGroupRegisterCenter.options(name=name).remote(info)
 diff --git a/verl/single_controller/base/worker.py b/verl/single_controller/base/worker.py
 --- a/verl/single_controller/base/worker.py
 +++ b/verl/single_controller/base/worker.py
@@ -96,7 +110,7 @@ diff --git a/verl/trainer/ppo/ray_trainer.py b/verl/trainer/ppo/ray_trainer.py
  import uuid
  from collections import defaultdict
  from contextlib import contextmanager
-@@ -655,13 +654,24 @@ class RayPPOTrainer:
+@@ -655,13 +654,35 @@ class RayPPOTrainer:
              if len(v) == n:
                  base_data[k] = v
  
@@ -113,12 +127,23 @@ diff --git a/verl/trainer/ppo/ray_trainer.py b/verl/trainer/ppo/ray_trainer.py
  
 +    def shutdown_workers(self, timeout_seconds=30):
 +        """Intentionally stop each physical Ray worker once, including colocated roles."""
-+        from searchr1_repro.training_lifecycle import shutdown_worker_groups
++        from searchr1_repro.training_lifecycle import shutdown_actors, shutdown_worker_groups
 +
 +        worker_groups = [
 +            getattr(self, name, None)
 +            for name in ("actor_rollout_wg", "critic_wg", "ref_policy_wg", "rm_wg")
 +        ]
++        register_centers = []
++        for worker_group in worker_groups:
++            if worker_group is None:
++                continue
++            actor_name = f"{worker_group.name_prefix}_register_center"
++            try:
++                register_centers.append(ray.get_actor(actor_name))
++            except ValueError:
++                pass
++        register_center_ids = shutdown_actors(register_centers, ray, timeout_seconds=timeout_seconds)
++        print(f"Gracefully stopped {len(register_center_ids)} WorkerGroup register center(s): {register_center_ids}")
 +        actor_ids = shutdown_worker_groups(worker_groups, ray, timeout_seconds=timeout_seconds)
 +        print(f"Gracefully stopped {len(actor_ids)} physical Ray worker actor(s): {actor_ids}")
 +
