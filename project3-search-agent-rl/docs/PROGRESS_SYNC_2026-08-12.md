@@ -99,6 +99,12 @@
 38. 16条延迟P50为4.240秒、P95为4.366秒、最大4.370秒；
 39. 服务收到定向Ctrl-C后完整优雅退出，端口和tmux关闭，无GPU或Python进程残留；
 40. P2.5-E完成，详细结果见`docs/P25_HTTP_RETRIEVER_COMPLETION_2026-08-13.md`。
+41. P3-A核对固定veRL提交、CUDA 12.4、Driver 595.45.04和8×4090D状态；
+42. 将8卡7B上游Search脚本翻译为物理GPU1、1.5B LoRA32、Group 2的一步GRPO配置；
+43. 固定8条训练问题、16条轨迹、最多32次环境动作和180秒CPU Retriever超时；
+44. Hydra完整解析成功，32项关键配置断言通过，0 mismatch；
+45. 非受管启动、GPU0映射和未应用Patch分别由exit 13/14/15拒绝；
+46. P3-A未启动Ray或GPU训练，详细审计见`docs/P3_GRPO_ONE_STEP_CONFIG_AUDIT_2026-08-13.md`。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
@@ -159,7 +165,7 @@ CUDA_VISIBLE_DEVICES='' PYTHONPATH="$PWD/vendor/verl-agent:$PWD" \
 
 1. P2.5真实资源下载、准备、CPU加载和localhost HTTP门禁均已完成；
 2. 禁止使用Ground-Truth Fixture训练；
-3. 翻译并审计固定veRL版本下可执行的Hydra单步配置；
-4. P3训练仅使用物理GPU1，通过tmux和`run_managed.sh`启动；
-5. 首次只做1个非零参数更新、Checkpoint保存/重载和Reward到Loss审计；
-6. 训练启动时向用户提供tmux attach、日志查看和安全停止指令。
+3. P3-A固定veRL版本下的Hydra单步配置审计已完成；
+4. P3-B仅使用物理GPU1，通过tmux和`run_managed.sh`启动一次真实参数更新；
+5. 完成Checkpoint保存、Reward到Loss与Token Mask审计；
+6. 单独执行Checkpoint恢复Step，之后才讨论5/20步晋级。
