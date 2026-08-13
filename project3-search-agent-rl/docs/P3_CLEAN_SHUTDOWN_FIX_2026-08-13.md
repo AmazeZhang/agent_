@@ -96,8 +96,9 @@ audit原子写和普通JSONL禁止覆盖。
 
 1. 顶层退出码为0，Global Step 2 Checkpoint完整；
 2. 日志出现`Gracefully stopped 1 physical Ray worker actor`；
-3. Ray日志中该Worker为`INTENDED_USER_EXIT`，且无`SYSTEM_ERROR`、unexpected worker failure、
-   SIGTERM或Segmentation fault；
+3. Ray日志中训练Actor为`INTENDED_USER_EXIT`，且Actor/训练Worker无`SYSTEM_ERROR`、unexpected
+   worker failure、SIGTERM或Segmentation fault；Raylet/GCS/Dashboard的`EXPECTED_TERMINATION`
+   SIGTERM单独统计并允许；
 4. 普通`2.jsonl`和`2.audit.jsonl`均存在且不是partial；
 5. 运行结束后GPU1无本项目计算进程、Retriever端口和本Run Ray进程均释放；
 6. GPU0在整个实验中不进入可见设备列表。
@@ -165,3 +166,14 @@ GPU融合Actor `fa957ef6d25e3680b052d6da01000000`确实在Ray原始日志中以
 更新后8项单元测试、py_compile、0003逆向检查通过。另执行真实Ray CPU父子Actor探针：父Actor
 创建命名子Actor，依次主动退出子/父并扫描core日志；两个Actor均进入DEAD，
 `actor_system_error_logs=[]`。当前等待Attempt G物理GPU1最终复验。
+
+## 10. Attempt G结果：Actor级门禁通过，整体审计WARN
+
+Attempt G完成Global Step 1→2恢复更新、Checkpoint和两类Rollout。RegisterCenter、GPU Worker、
+TaskRunner依次主动退出，均为`INTENDED_USER_EXIT`且进入DEAD；Actor/训练Worker日志无
+SYSTEM_ERROR、unexpected failure、SIGTERM或Segmentation fault，资源完整释放。
+
+独立审计指出Raylet/GCS/Dashboard正常关闭仍使用`EXPECTED_TERMINATION` SIGTERM，因此不能使用
+“全部Ray日志无SIGTERM”的绝对表述。准确结论为“Actor/训练Worker级干净退出门禁通过”，整体
+实验因基础设施信号限定和smoke范围保持WARN。完整结果见
+`docs/P3_CLEAN_SHUTDOWN_COMPLETION_2026-08-13.md`。

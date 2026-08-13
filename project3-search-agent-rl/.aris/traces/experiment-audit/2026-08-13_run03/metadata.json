@@ -1,0 +1,11 @@
+{
+  "skill": "experiment-audit",
+  "run": "2026-08-13_run03",
+  "audited_run_id": "p3-grpo-shutdown-gate-qwen15b-s0-20260813g",
+  "reviewer_agent": "/root/p3_attempt_g_audit",
+  "review_independence": "same-family",
+  "acceptance_status": "provisional",
+  "overall_verdict": "WARN",
+  "reason_code": "literal_no_sigterm_gate_failed_expected_ray_daemon_sigterm_scope_limited_and_tracker_stale",
+  "generated_at": "2026-08-13T20:05:30+08:00"
+}

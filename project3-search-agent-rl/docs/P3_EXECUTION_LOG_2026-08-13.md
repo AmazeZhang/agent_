@@ -165,3 +165,17 @@ rollouts     42a24abc5b29fbd729b6c6301c30da1a2905abd515445b9773d481ba77edaa5e
 第三层修复已把RegisterCenter纳入显式退出和DEAD等待，完整顺序为
 `RegisterCenter → GPU Worker → TaskRunner → Driver/Ray`。8项测试和真实CPU Ray父子Actor探针
 通过，后者扫描结果为`actor_system_error_logs=[]`，等待Attempt G复验。
+
+## Attempt G：Actor/训练Worker级干净退出通过
+
+- Run ID：`p3-grpo-shutdown-gate-qwen15b-s0-20260813g`
+- 时间：19:57:42至20:00:16，tmux退出0
+- Step 2：`grad_norm=0.275`、87.623秒、96.596 token/s
+- 证据：Checkpoint、21条普通Rollout、21条audit完整且原子落盘
+- 退出：RegisterCenter、GPU Worker、TaskRunner依次`INTENDED_USER_EXIT`并DEAD
+- 反证扫描：Actor/训练Worker无SYSTEM_ERROR、RAY_WORKER_FAILURE、unexpected failure、SIGTERM、
+  Segmentation fault
+- 资源：GPU1回到18MiB；训练/Ray PID消失；Retriever精确Ctrl-C后端口和PID释放
+- 审计：WARN；Ray基础设施正常shutdown仍有EXPECTED_TERMINATION SIGTERM，且实验无held-out评测
+
+详细结果见`docs/P3_CLEAN_SHUTDOWN_COMPLETION_2026-08-13.md`。

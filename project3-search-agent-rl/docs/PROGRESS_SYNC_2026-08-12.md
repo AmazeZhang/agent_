@@ -208,3 +208,9 @@ Attempt F确认GPU Worker和TaskRunner均已`INTENDED_USER_EXIT`，但进一步�
 `WorkerGroupRegisterCenter`仍被引用计数回收并在core日志留下SIGTERM/SYSTEM_ERROR，故继续WARN。
 现已将它加入主动退出，顺序扩展为“RegisterCenter → GPU Worker → TaskRunner → Driver/Ray”；
 8项测试和真实Ray父子Actor无SYSTEM_ERROR探针通过，等待Attempt G最终复验。
+
+Attempt G最终复验已完成：Global Step 1→2更新、Checkpoint和两类Rollout完整；RegisterCenter、
+GPU Worker、TaskRunner均主动退出并进入DEAD，Actor/训练Worker无SYSTEM_ERROR、unexpected
+failure、SIGTERM或段错误，资源释放。独立审计保持WARN，因为Ray基础设施正常关闭仍使用
+EXPECTED_TERMINATION SIGTERM，且8题单seed smoke不构成完整复现或质量评测。下一阶段可讨论
+5步工程晋级，但held-out validation和baseline前禁止质量提升声明。
