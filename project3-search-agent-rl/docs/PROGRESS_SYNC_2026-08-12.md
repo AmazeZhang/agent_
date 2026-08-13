@@ -92,6 +92,13 @@
 31. P2.5-E实现行偏移随机访问Corpus，避免上游Arrow副本；
 32. CPU服务固定监听`127.0.0.1`、限制Top-k、串行锁保护模型与FAISS；
 33. 小型FAISS/HTTP契约测试通过，8→16执行计划见`docs/P25_HTTP_RETRIEVER_PLAN_2026-08-13.md`。
+34. 专用CPU环境已克隆到data盘，关键依赖自检通过且`torch.cuda.is_available()==false`；
+35. 全量Corpus偏移表构建完成，21,015,324行，大小168,122,728 bytes，耗时12.15秒；
+36. localhost服务加载真实`IndexFlatIP`耗时40.15秒，健康检查向量数与Corpus行数一致；
+37. 8条与16条真实HTTP Top-3验证分别8/8和16/16成功，均为0错误；
+38. 16条延迟P50为4.240秒、P95为4.366秒、最大4.370秒；
+39. 服务收到定向Ctrl-C后完整优雅退出，端口和tmux关闭，无GPU或Python进程残留；
+40. P2.5-E完成，详细结果见`docs/P25_HTTP_RETRIEVER_COMPLETION_2026-08-13.md`。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
@@ -103,6 +110,8 @@
 /media/imc/data/project3-search-agent-rl/datasets/searchr1-upstream
 /media/imc/data/project3-search-agent-rl/datasets/searchr1-smoke
 /media/imc/data/project3-search-agent-rl/envs/searchr1-repro-cu124
+/media/imc/data/project3-search-agent-rl/envs/searchr1-retriever-cpu
+/media/imc/data/project3-search-agent-rl/indexes/searchr1-wiki18-e5
 /media/imc/data/project3-search-agent-rl/models/Qwen2.5-1.5B-Instruct
 /media/imc/data/project3-search-agent-rl/runs/p2-qwen15b-fixture-*
 ```
@@ -148,12 +157,9 @@ CUDA_VISIBLE_DEVICES='' PYTHONPATH="$PWD/vendor/verl-agent:$PWD" \
 
 ## 下一步：P2.5与P3
 
-1. 运行固定下载脚本并核验约70GB源文件的大小与SHA256；
-2. 保留源分片/压缩包，安全拼接索引和解压Corpus；
-3. 建立隔离CPU Retriever环境，验证FAISS维度、Corpus行数和ID对齐；
-4. 用CPU真实Corpus检查无答案泄漏的8/16检索结果、延迟和失败分类；
-5. 禁止使用Ground-Truth Fixture训练；
-6. 真实Retriever门禁通过后，翻译并审计可执行的veRL Hydra单步配置；
-7. P3训练仅使用物理GPU1，通过tmux和`run_managed.sh`启动；
-8. 首次只做1个非零参数更新、Checkpoint保存/重载和Reward到Loss审计；
-9. 训练启动时向用户提供tmux attach、日志查看和安全停止指令。
+1. P2.5真实资源下载、准备、CPU加载和localhost HTTP门禁均已完成；
+2. 禁止使用Ground-Truth Fixture训练；
+3. 翻译并审计固定veRL版本下可执行的Hydra单步配置；
+4. P3训练仅使用物理GPU1，通过tmux和`run_managed.sh`启动；
+5. 首次只做1个非零参数更新、Checkpoint保存/重载和Reward到Loss审计；
+6. 训练启动时向用户提供tmux attach、日志查看和安全停止指令。

@@ -1,7 +1,7 @@
 # P2.5-E本机CPU HTTP Retriever计划
 
 - 日期：2026-08-13
-- 状态：代码与小型服务测试完成，真实服务待执行
+- 状态：已完成，结果见`docs/P25_HTTP_RETRIEVER_COMPLETION_2026-08-13.md`
 - 服务地址：仅`127.0.0.1:18080`
 - GPU：完全隐藏
 
@@ -71,9 +71,9 @@ P2.5只需要验证真实检索HTTP链路，因此采用功能等价、边界更
 /media/imc/data/project3-search-agent-rl/envs/searchr1-retriever-cpu
 ```
 
-克隆后生成完整`pip freeze --all`和关键版本Manifest。所有命令设置`PYTHONNOUSERSITE=1`，
-不修改原`paretotool-retriever`环境。关键依赖记录在
-`configs/requirements-retriever-cpu.txt`。
+克隆后生成完整`pip freeze --all`锁文件。所有命令设置`PYTHONNOUSERSITE=1`，不修改原
+`paretotool-retriever`环境。直接依赖和完整锁分别记录在
+`configs/requirements-retriever-cpu.txt`与`configs/requirements-retriever-cpu-lock.txt`。
 
 ## 4. 执行顺序
 
