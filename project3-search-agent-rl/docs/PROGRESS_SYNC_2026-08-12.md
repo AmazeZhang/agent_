@@ -214,3 +214,7 @@ GPU Worker、TaskRunner均主动退出并进入DEAD，Actor/训练Worker无SYSTE
 failure、SIGTERM或段错误，资源释放。独立审计保持WARN，因为Ray基础设施正常关闭仍使用
 EXPECTED_TERMINATION SIGTERM，且8题单seed smoke不构成完整复现或质量评测。下一阶段可讨论
 5步工程晋级，但held-out validation和baseline前禁止质量提升声明。
+
+五步受控晋级计划已制定：从Attempt G `global_step_2`恢复到Step 5，只新增三次更新，继续使用
+8题smoke、物理GPU1和CPU Wiki-18，不扩大到全量数据或多卡。预计5–7分钟、数据盘新增约23GiB。
+计划和通过门禁见`docs/P3_FIVE_STEP_PROMOTION_PLAN_2026-08-13.md`。

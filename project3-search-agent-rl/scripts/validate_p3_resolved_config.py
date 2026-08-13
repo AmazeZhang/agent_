@@ -18,7 +18,7 @@ def nested(config: dict, dotted: str):
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("config", type=Path)
-    parser.add_argument("--mode", choices=("one-step", "resume-step2"), default="one-step")
+    parser.add_argument("--mode", choices=("one-step", "resume-step2", "resume-step5"), default="one-step")
     args = parser.parse_args()
     config = yaml.safe_load(args.config.read_text())
 
@@ -62,6 +62,14 @@ def main() -> None:
                 "trainer.resume_mode": "resume_path",
             }
         )
+    elif args.mode == "resume-step5":
+        expected.update(
+            {
+                "trainer.total_epochs": 5,
+                "trainer.total_training_steps": 5,
+                "trainer.resume_mode": "resume_path",
+            }
+        )
     mismatches = {}
     for key, wanted in expected.items():
         actual = nested(config, key)
@@ -75,11 +83,12 @@ def main() -> None:
         mismatches["trainer.logger"] = {"expected": ["console"], "actual": nested(config, "trainer.logger")}
     if "fixture" in nested(config, "env.search.search_url").lower():
         mismatches["fixture_retriever"] = {"expected": False, "actual": True}
-    if args.mode == "resume-step2":
+    if args.mode in ("resume-step2", "resume-step5"):
         resume_path = Path(nested(config, "trainer.resume_from_path"))
-        if not resume_path.is_absolute() or resume_path.name != "global_step_1":
+        expected_step = "global_step_1" if args.mode == "resume-step2" else "global_step_2"
+        if not resume_path.is_absolute() or resume_path.name != expected_step:
             mismatches["trainer.resume_from_path"] = {
-                "expected": "absolute path ending in global_step_1",
+                "expected": f"absolute path ending in {expected_step}",
                 "actual": str(resume_path),
             }
 
