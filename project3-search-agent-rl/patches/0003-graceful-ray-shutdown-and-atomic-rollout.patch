@@ -21,6 +21,18 @@ diff --git a/verl/single_controller/base/worker.py b/verl/single_controller/base
 diff --git a/verl/trainer/main_ppo.py b/verl/trainer/main_ppo.py
 --- a/verl/trainer/main_ppo.py
 +++ b/verl/trainer/main_ppo.py
+@@ -18,9 +18,11 @@ import os
+ import os
+ 
++from types import SimpleNamespace
++
+ import hydra
+ import ray
+ from omegaconf import OmegaConf
+ 
+ from verl.trainer.ppo.ray_trainer import RayPPOTrainer
+ from verl.trainer.ppo.reward import load_reward_manager
+ from verl.trainer.constants_ppo import get_ppo_ray_runtime_env
 @@ -32,6 +32,7 @@ def main(config):
  
  
@@ -29,7 +41,7 @@ diff --git a/verl/trainer/main_ppo.py b/verl/trainer/main_ppo.py
      # Check if Ray is not initialized
      if not ray.is_initialized():
          # Initialize Ray with a local cluster configuration
-@@ -46,9 +47,14 @@ def run_ppo(config) -> None:
+@@ -46,9 +47,20 @@ def run_ppo(config) -> None:
          ray_init_kwargs = OmegaConf.create({**ray_init_kwargs, "runtime_env": runtime_env})
          print(f"ray init kwargs: {ray_init_kwargs}")
          ray.init(**OmegaConf.to_container(ray_init_kwargs))
@@ -40,12 +52,18 @@ diff --git a/verl/trainer/main_ppo.py b/verl/trainer/main_ppo.py
 +    try:
 +        ray.get(runner.run.remote(config))
 +    finally:
-+        if initialized_here:
-+            ray.shutdown()
++        try:
++            from searchr1_repro.training_lifecycle import shutdown_worker_groups
++
++            actor_ids = shutdown_worker_groups([SimpleNamespace(workers=[runner])], ray)
++            print(f"Gracefully stopped TaskRunner actor: {actor_ids}")
++        finally:
++            if initialized_here:
++                ray.shutdown()
  
  
  @ray.remote(num_cpus=1)  # please make sure main_task is not scheduled on head
-@@ -184,8 +190,15 @@ class TaskRunner:
+@@ -184,8 +196,19 @@ class TaskRunner:
              envs=envs,
              val_envs=val_envs,
          )
@@ -60,6 +78,10 @@ diff --git a/verl/trainer/main_ppo.py b/verl/trainer/main_ppo.py
 +                    environment_manager.close()
 +            finally:
 +                trainer.shutdown_workers()
++
++    def graceful_shutdown(self):
++        """Exit the orchestration actor before the driver shuts down Ray."""
++        ray.actor.exit_actor()
  
  
  def create_rl_dataset(data_paths, data_config, tokenizer, processor):

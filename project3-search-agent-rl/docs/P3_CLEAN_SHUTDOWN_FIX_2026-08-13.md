@@ -103,3 +103,37 @@ audit原子写和普通JSONL禁止覆盖。
 6. GPU0在整个实验中不进入可见设备列表。
 
 任何一项失败都保留为WARN并记录原始日志，不删除、改写或美化失败证据。
+
+## 6. Attempt E物理GPU1复验结果：WARN
+
+- Run ID：`p3-grpo-shutdown-gate-qwen15b-s0-20260813e`
+- 时间：2026-08-13 19:43:42至19:46:27
+- tmux顶层退出码：0
+- 设备：仅物理GPU1；GPU0保持GNOME桌面基线约387MiB
+- 恢复与训练：Global Step 1恢复到Step 2，`grad_norm=0.288`，单步88.716秒
+- 检索：3次真实请求均首次成功，各返回Top-3
+- 证据：`2.jsonl` 38,549字节，`2.audit.jsonl` 522,081字节，无partial
+- Checkpoint：模型约7.26GB、Optimizer约296MB、LoRA Adapter约148MB及Extra/Data State均存在
+- 清理：tmux退出0，GPU1回到18MiB，训练/Ray进程均释放
+
+GPU融合Actor `fa957ef6d25e3680b052d6da01000000`确实在Ray原始日志中以
+`INTENDED_USER_EXIT`和exit code 0退出，并进入`DEAD`。但是CPU编排Actor `TaskRunner`
+在其`run()`返回后仍然存活；Driver随即调用`ray.shutdown()`，Ray用SIGTERM回收TaskRunner，
+仍产生一条`RAY_WORKER_FAILURE / SYSTEM_ERROR`。因此Attempt E不能通过整体干净退出门禁。
+
+关键区别是：这次`SYSTEM_ERROR`不再来自占用GPU显存的Worker，而来自CPU TaskRunner生命周期。
+它不影响已完成的Step 2和Checkpoint，但仍必须如实保留为退出WARN。
+
+## 7. Attempt F前的第二层修复
+
+在Driver中增加显式TaskRunner退出：
+
+1. `ray.get(runner.run.remote(config))`完成；
+2. 调用`runner.graceful_shutdown.remote()`；
+3. 等待引用完成并通过GCS确认TaskRunner为`DEAD`；
+4. 最后才调用`ray.shutdown()`关闭Driver和本地Ray集群。
+
+`TaskRunner.graceful_shutdown()`同样使用`ray.actor.exit_actor()`。更新后的0003补丁再次通过7项
+单元测试、py_compile、逆向检查和`/tmp/p3patch-taskrunner.47Fkmc`干净树顺序重放。
+
+当前状态更新为“GPU Worker退出已通过，TaskRunner退出修复完成但等待Attempt F物理GPU1复验”。

@@ -198,3 +198,8 @@ Actor ID去重调用`ray.actor.exit_actor()`，等待退出任务并通过GCS确
 
 当前准确状态是“代码和CPU/Ray预验证通过，等待物理GPU1恢复复验”，尚未把退出WARN改判为
 通过。详细记录见`docs/P3_CLEAN_SHUTDOWN_FIX_2026-08-13.md`。
+
+首次物理GPU1复验Attempt E完成Step 2、Checkpoint和JSONL证据，GPU融合Worker已变为
+`INTENDED_USER_EXIT`；但Ray关闭时CPU TaskRunner仍被SIGTERM回收，整体门禁保持WARN。现已增加
+TaskRunner主动退出与GCS DEAD确认，形成“GPU Worker → TaskRunner → Driver/Ray”的完整顺序，
+等待Attempt F复验。

@@ -138,3 +138,16 @@ rollouts     42a24abc5b29fbd729b6c6301c30da1a2905abd515445b9773d481ba77edaa5e
 - 状态：尚未进行GPU复验，不提前宣称Attempt E通过。
 
 实现和门禁详见`docs/P3_CLEAN_SHUTDOWN_FIX_2026-08-13.md`。
+
+## Attempt E：GPU Worker主动退出通过，TaskRunner退出仍WARN
+
+- Run ID：`p3-grpo-shutdown-gate-qwen15b-s0-20260813e`
+- 时间：19:43:42至19:46:27，tmux退出0
+- Step 2：`training/global_step=2`、`grad_norm=0.288`、Checkpoint与两种JSONL完整
+- GPU Worker：`INTENDED_USER_EXIT`、exit code 0、GCS状态DEAD
+- 遗留问题：Driver `ray.shutdown()`时CPU TaskRunner仍存活，被SIGTERM回收并记为`SYSTEM_ERROR`
+- 资源：GPU1恢复18MiB，GPU0未使用，训练与Ray进程全部释放
+- 判定：WARN；不能宣称整体干净退出
+
+随后已补充TaskRunner的主动退出和DEAD等待，使顺序变为“GPU Worker → TaskRunner → Driver/Ray”。
+更新后的0003补丁、7项测试、py_compile和干净树重放通过，等待Attempt F验证。
