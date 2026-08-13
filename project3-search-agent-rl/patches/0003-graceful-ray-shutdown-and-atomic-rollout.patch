@@ -1,0 +1,105 @@
+diff --git a/verl/single_controller/base/worker.py b/verl/single_controller/base/worker.py
+--- a/verl/single_controller/base/worker.py
++++ b/verl/single_controller/base/worker.py
+@@ -217,6 +217,16 @@ class Worker(WorkerHelper):
+         """
+         return self.fused_worker_dict.get(worker_name, None)
+ 
++    def graceful_shutdown(self):
++        """Exit this Ray actor as an intentional user-requested shutdown."""
++        import torch.distributed as dist
++
++        try:
++            if dist.is_available() and dist.is_initialized():
++                dist.destroy_process_group()
++        finally:
++            ray.actor.exit_actor()
++
+     def _setup_env_cuda_visible_devices(self):
+         from verl.utils.ray_utils import ray_noset_visible_devices
+ 
+diff --git a/verl/trainer/main_ppo.py b/verl/trainer/main_ppo.py
+--- a/verl/trainer/main_ppo.py
++++ b/verl/trainer/main_ppo.py
+@@ -32,6 +32,7 @@ def main(config):
+ 
+ 
+ def run_ppo(config) -> None:
++    initialized_here = False
+     # Check if Ray is not initialized
+     if not ray.is_initialized():
+         # Initialize Ray with a local cluster configuration
+@@ -46,9 +47,14 @@ def run_ppo(config) -> None:
+         ray_init_kwargs = OmegaConf.create({**ray_init_kwargs, "runtime_env": runtime_env})
+         print(f"ray init kwargs: {ray_init_kwargs}")
+         ray.init(**OmegaConf.to_container(ray_init_kwargs))
++        initialized_here = True
+ 
+     runner = TaskRunner.remote()
+-    ray.get(runner.run.remote(config))
++    try:
++        ray.get(runner.run.remote(config))
++    finally:
++        if initialized_here:
++            ray.shutdown()
+ 
+ 
+ @ray.remote(num_cpus=1)  # please make sure main_task is not scheduled on head
+@@ -184,8 +190,15 @@ class TaskRunner:
+             envs=envs,
+             val_envs=val_envs,
+         )
+-        trainer.init_workers()
+-        trainer.fit()
++        try:
++            trainer.init_workers()
++            trainer.fit()
++        finally:
++            try:
++                for environment_manager in (envs, val_envs):
++                    environment_manager.close()
++            finally:
++                trainer.shutdown_workers()
+ 
+ 
+ def create_rl_dataset(data_paths, data_config, tokenizer, processor):
+diff --git a/verl/trainer/ppo/ray_trainer.py b/verl/trainer/ppo/ray_trainer.py
+--- a/verl/trainer/ppo/ray_trainer.py
++++ b/verl/trainer/ppo/ray_trainer.py
+@@ -17,7 +17,6 @@ This trainer supports model-agonistic model initialization with huggingface
+ """
+ 
+-import json
+ import os
+ import uuid
+ from collections import defaultdict
+ from contextlib import contextmanager
+@@ -655,13 +654,24 @@ class RayPPOTrainer:
+             if len(v) == n:
+                 base_data[k] = v
+ 
+-        with open(filename, "w") as f:
+-            for i in range(n):
+-                entry = {k: v[i] for k, v in base_data.items()}
+-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
++        from searchr1_repro.training_audit import dump_jsonl_records
++
++        records = [{k: v[i] for k, v in base_data.items()} for i in range(n)]
++        dump_jsonl_records(records, filename)
+ 
+         print(f"Dumped generations to {filename}")
+ 
++    def shutdown_workers(self, timeout_seconds=30):
++        """Intentionally stop each physical Ray worker once, including colocated roles."""
++        from searchr1_repro.training_lifecycle import shutdown_worker_groups
++
++        worker_groups = [
++            getattr(self, name, None)
++            for name in ("actor_rollout_wg", "critic_wg", "ref_policy_wg", "rm_wg")
++        ]
++        actor_ids = shutdown_worker_groups(worker_groups, ray, timeout_seconds=timeout_seconds)
++        print(f"Gracefully stopped {len(actor_ids)} physical Ray worker actor(s): {actor_ids}")
++
+     def _maybe_log_val_generations(self, inputs, outputs, scores):
+         """Log a table of validation samples to the configured logger (wandb or swanlab)"""
+ 

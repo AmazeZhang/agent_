@@ -23,6 +23,23 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def dump_jsonl_records(records: list[dict[str, Any]], output_path: str | Path) -> Path:
+    output = Path(output_path)
+    if output.exists():
+        raise FileExistsError(f"refusing to overwrite JSONL evidence: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    partial = output.with_suffix(output.suffix + ".partial")
+    if partial.exists():
+        raise FileExistsError(f"stale JSONL evidence partial exists: {partial}")
+    with partial.open("x", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(_jsonable(record), ensure_ascii=False, separators=(",", ":")) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    partial.replace(output)
+    return output
+
+
 def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, multi_turn: bool) -> list[dict[str, Any]]:
     prompts = batch["prompts"].detach().cpu()
     responses = batch["responses"].detach().cpu()
@@ -78,18 +95,5 @@ def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, mult
 
 
 def dump_rollout_audit(batch, output_path: str | Path, *, multi_turn: bool) -> Path:
-    output = Path(output_path)
-    if output.exists():
-        raise FileExistsError(f"refusing to overwrite rollout audit: {output}")
-    output.parent.mkdir(parents=True, exist_ok=True)
     records = build_rollout_audit_records(batch.batch, batch.non_tensor_batch, multi_turn=multi_turn)
-    partial = output.with_suffix(output.suffix + ".partial")
-    if partial.exists():
-        raise FileExistsError(f"stale rollout audit partial exists: {partial}")
-    with partial.open("x", encoding="utf-8") as handle:
-        for record in records:
-            handle.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
-    partial.replace(output)
-    return output
+    return dump_jsonl_records(records, output_path)

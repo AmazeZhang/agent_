@@ -188,3 +188,13 @@ CUDA_VISIBLE_DEVICES='' PYTHONPATH="$PWD/vendor/verl-agent:$PWD" \
 5. 补充Token级Loss Mask和结构化Retriever状态持久化；
 6. 处理Ray/vLLM退出段Segfault并单独执行Checkpoint恢复Step；
 7. 上述门禁通过后才讨论5/20步晋级。
+
+## 2026-08-13：Ray干净退出修复预验证
+
+Checkpoint恢复实验暴露的退出WARN已完成代码级修复：显式关闭环境与Torch process group，按
+Actor ID去重调用`ray.actor.exit_actor()`，等待退出任务并通过GCS确认`DEAD`，最后由Driver
+关闭其自行初始化的Ray。普通rollout JSONL也改为独占partial写入、fsync、原子rename和拒绝
+覆盖。7项单元测试、真实Ray 2.43 CPU Actor探针、0001至0003干净补丁重放均通过。
+
+当前准确状态是“代码和CPU/Ray预验证通过，等待物理GPU1恢复复验”，尚未把退出WARN改判为
+通过。详细记录见`docs/P3_CLEAN_SHUTDOWN_FIX_2026-08-13.md`。

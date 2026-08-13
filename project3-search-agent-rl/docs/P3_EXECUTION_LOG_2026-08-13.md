@@ -126,3 +126,15 @@ rollouts     42a24abc5b29fbd729b6c6301c30da1a2905abd515445b9773d481ba77edaa5e
 
 详细结果见`docs/P3_CHECKPOINT_RESUME_COMPLETION_2026-08-13.md`。本阶段证明工程恢复链路，
 不证明完整复现或质量提升。
+
+## Attempt E准备：Ray干净退出和JSONL证据保护
+
+- 根因：`trainer.fit()`后未显式停止Ray Worker，Driver退出时Ray用SIGTERM被动回收；
+- 修复：环境close、Torch process group销毁、物理Actor去重主动退出、GCS DEAD确认、Driver
+  `ray.shutdown()`；
+- 证据保护：普通rollout和audit统一使用独占partial、fsync、原子rename并拒绝覆盖；
+- 兼容性：放弃依赖Dashboard HTTP且在本机返回502的State API，使用Ray 2.43 GCS actor table；
+- 预验证：7项单元测试、真实CPU-only Ray Actor退出探针、干净veRL补丁重放通过；
+- 状态：尚未进行GPU复验，不提前宣称Attempt E通过。
+
+实现和门禁详见`docs/P3_CLEAN_SHUTDOWN_FIX_2026-08-13.md`。

@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import numpy as np
 import torch
 
-from searchr1_repro.training_audit import build_rollout_audit_records, dump_rollout_audit
+from searchr1_repro.training_audit import build_rollout_audit_records, dump_jsonl_records, dump_rollout_audit
 
 
 class TrainingAuditTest(unittest.TestCase):
@@ -52,6 +52,15 @@ class TrainingAuditTest(unittest.TestCase):
             self.assertEqual(saved, records)
             with self.assertRaises(FileExistsError):
                 dump_rollout_audit(SimpleNamespace(batch=batch, non_tensor_batch=metadata), output, multi_turn=True)
+
+    def test_generic_jsonl_dump_is_atomic_and_non_overwriting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "2.jsonl"
+            dump_jsonl_records([{"value": np.int64(7)}], output)
+            self.assertEqual(json.loads(output.read_text()), {"value": 7})
+            self.assertFalse(Path(f"{output}.partial").exists())
+            with self.assertRaises(FileExistsError):
+                dump_jsonl_records([{"value": 8}], output)
 
 
 if __name__ == "__main__":
