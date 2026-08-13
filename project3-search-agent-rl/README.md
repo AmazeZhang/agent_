@@ -1,5 +1,10 @@
 # 项目三：Search Agent RL
 
+> **交接安全门禁：** 任何人或AI在启动、停止、恢复、下载、清理或扩容实验前，必须先完整阅读
+> [`AGENTS.md`](AGENTS.md)和
+> [`docs/EXPERIMENT_SAFETY.md`](docs/EXPERIMENT_SAFETY.md)。物理GPU0永久禁用；禁止全局
+> `pkill`/`killall`/`ray stop --force`；所有GPU训练必须使用新Run ID、tmux和受管脚本。
+
 本项目研究多轮搜索智能体中稀疏奖励如何经由 Advantage Estimation 和 Policy Loss 更新
 模型策略。主框架使用 `verl-agent` 集成的 Search-R1 环境，算法主线为：
 
@@ -39,10 +44,11 @@ vendor/verl-agent/
 - [`docs/DEVELOPMENT_SPEC_2026-08-11.md`](docs/DEVELOPMENT_SPEC_2026-08-11.md)：时间表、模块接口、验收门槛和服务器实验流程；
 - [`configs/experiment_profiles.yaml`](configs/experiment_profiles.yaml)：Smoke、开发、主实验和完整实验的初始资源配置。
 
-当前状态为`P1完成 / P2待执行`：隔离环境、版本锁、安全门禁以及数据→Fixture Retriever→
-SearchEnv→严格EM的模型无关CPU闭环已通过；尚未下载模型，尚未完成模型驱动的Search-R1
-功能复现，也未启动训练。配置文件中的数值只是首轮实验起点，必须经过单卡Smoke和20 Step
-吞吐测量后才能升级配置。
+当前状态为：真实Wiki-18 Retriever、Qwen2.5-1.5B LoRA、veRL GRPO单卡训练、Checkpoint恢复
+和Global Step 2→5短程工程闭环已经跑通；Actor生命周期与资源释放已验证。实验仍为8题、seed 0
+且未执行held-out evaluation，Step 4/5训练batch reward和success为0，因此尚未完成效果复现，
+不得声称质量提升。最新状态见五步完成报告和实验审计；扩大到20 Step前应先完成同条件held-out
+评测、baseline和多seed设计。
 
 服务器准备完成后先运行只读预检，不直接启动训练：
 
