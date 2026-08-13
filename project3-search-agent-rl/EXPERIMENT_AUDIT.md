@@ -1,4 +1,4 @@
-# P3 One-Step Experiment Audit
+# P3 Checkpoint Resume Experiment Audit
 
 - Date: 2026-08-13
 - Auditor: fresh Codex reviewer（exact submodel unavailable）
@@ -7,78 +7,80 @@
 - Overall verdict: **WARN**
 - Integrity status: **warn**
 
-未发现伪造Ground Truth、用模型自身最大值归一化成绩或虚构Optimizer Step。本次证据支持
-“真实veRL GRPO单步参数更新完成”，但只是一轮Smoke，不支持完整复现或质量提升结论。
+未发现伪造Ground Truth、用模型预测统计自归一化成绩、虚构Checkpoint或虚构Optimizer Update。
+本次证据支持Checkpoint恢复、第二个Global Actor Update、运行时Loss Mask和真实Wiki-18结构化
+检索证据；不支持“干净退出”“完整Search-R1复现”或“质量提升”。
 
 ## A. Ground Truth Provenance：PASS
 
-- Ground Truth来自Search-R1数据记录，经Search环境传入规则Reward，不由模型输出生成；
-- Reward使用最终`<answer>`与数据集target的严格归一化Exact Match；
-- 实际Run调用真实Wiki-18服务，未引用Ground-Truth Fixture；
-- Retriever日志记录3次成功Top-3请求。
-
-证据：`search_r1_like_qa_em.py:66-86,96-128`、`env.py:29-56`、
-`scripts/run_p3_grpo_one_step.sh:143-155`和Run的`stderr.log:54-62`。
+- 8条训练记录来自NQ/HotpotQA数据，Target位于数据集`reward_model/env_kwargs`字段；
+- `SearchEnv`使用外部数据Target，规则Reward对最终`<answer>`做归一化Exact Match；
+- Run实际使用21,015,324向量的Wiki-18 Retriever，Document ID为数字Corpus ID；
+- 已知Ground-Truth-derived Fixture只用于P1测试，未进入本Run。
 
 ## B. Score Normalization：PASS
 
-- 原始Terminal Reward为0/1，非法动作另加-0.1；
-- GRPO组内均值/标准差是算法的Advantage计算，不是对外质量指标归一化；
-- Run保存原始Reward统计：均值0.125、最大1、最小0；含惩罚的Score范围为-0.1到1；
-- 未发现用模型自身最大值作为指标分母。
+- Reward为原始规则分数，Action Score分布为2个`1.0`、12个`0.0`、7个`-0.1`；
+- 21条Action的均值为0.0619047614，与日志`critic/score/mean=0.062`一致；
+- Episode Reward均值0.125使用16条Trajectory作为分母，标签明确；
+- GRPO组内Advantage标准化是算法步骤，不是对外质量指标自归一化。
 
 ## C. Result Existence and Numeric Fidelity：WARN
 
 已核验：
 
-- `metadata.env`为`exit_code=0`，总训练步数为1；
-- Actor Update耗时25.397秒，`grad_norm=0.300`、`pg_loss=-0.001`、`global_step=1`；
-- LoRA-B共20,643,840个元素全部非零；
-- Scheduler为`last_epoch=1`、`_step_count=2`、最后LR为`3e-6`；
-- 模型、Optimizer、Extra State、Dataloader State和LoRA Adapter均存在；
-- 21条Action记录对应8个问题、Group 2的16条轨迹，不是21条独立轨迹。
+- Hydra配置为`resume_path=.../global_step_1`、总Step 2、总Epoch 2；
+- 日志明确加载Step 1模型、Optimizer和Extra State，并恢复DataLoader；
+- Step 2为`grad_norm=0.283`，保存完整Checkpoint且Tracker内容为2；
+- Scheduler由`last_epoch=1/_step_count=2`推进至`2/3`；
+- Step 1/2 Optimizer均有421个State Entry，392个LoRA参数状态的内部Adam计数3→6；
+- 392/392个Adapter张量变化，LoRA-B共20,643,840个元素全部非零；
+- Step 1/2 Adapter SHA256不同，Step 2为`2de259...c6d2`；
+- 两份Step 2 Rollout均存在且各有21行。
 
-警告：Checkpoint保存和Step Metrics完成后，Ray Worker收到SIGTERM，并在关闭阶段发生
-Segmentation fault。顶层exit 0表示训练主流程返回成功，不代表基础设施完全干净。崩溃发生在
-结果落盘后，不否定已经保存的更新，但Checkpoint仍须实际恢复验证。
+警告：`metadata.env`记录顶层exit 0，但Ray在结果保存后将GPU Worker的SIGTERM退出记录为
+`SYSTEM_ERROR`和unexpected worker death，不能把exit 0解释为基础设施干净退出。
 
 ## D. Dead Code and Observability：WARN
 
-Retrieval Patch在内存中生成`retrieval/retrieval_failed`信息，但当前Rollout Dump只持久化
-`input/output/score/step`，本次`reward_extra_infos_dict`为空。因此：
+运行时证据通过：
 
-- Retriever成功有服务日志证据；
-- 没有结构化的逐轨迹Retriever状态证据；
-- 静态代码表明检索Observation进入下一步Prompt、Actor Loss只作用于Response；
-- 本次没有保存Token ID、边界和Loss Mask，不能宣称Token Mask已实测通过。
+- 21条记录、8个Group UID、16个Trajectory UID、Env Step为16/5；
+- 21/21的2048 Token Prompt Policy Mask全零；
+- Policy Loss Token总数2629，等于Active Response Token总数；
+- 本Run`multi_turn=false`，审计与`dp_actor`实际使用同一Response Attention Mask；
+- 3次成功检索保存9个数字Document ID；
+- 2次空查询保存`invalid_query`、错误文本、空ID和`retrieval_failed=true`。
+
+剩余警告：审计JSONL采用独占、fsync和原子改名，但普通Generation Dump仍用覆盖写；同Step重跑
+理论上可能先覆盖普通Dump，再被审计Dump拒绝。没有证据表明本Run发生过覆盖。
 
 ## E. Scope：WARN
 
-- 8个训练问题、16条轨迹、21条Action、最多2个环境Step；
-- 单Seed、单次Optimizer Update；
-- `test_freq=-1`且最终Validation为None；
-- 只支持训练闭环Smoke，不支持收敛、泛化、鲁棒性或质量提升结论。
+- 8个训练问题、16条Trajectory、21条Action、最多2个环境步骤；
+- 单Seed，仅新增一个Global Actor Update；
+- `val_before_train=false`、`test_freq=-1`，Final Validation为None；
+- 只支持恢复和训练闭环工程证据，不支持收敛、泛化、鲁棒性、质量提升或完整复现。
 
 ## F. Evaluation Type：PASS
 
-分类为`real_gt`训练Reward，但没有执行Held-out Evaluation。环境是程序化交互，目标答案来自
-数据集而非模型或人工本轮生成。
+分类为`real_gt_training_reward_no_heldout_evaluation`。Target来自数据集，环境为程序化交互，
+没有执行Held-out评估。
 
 ## Claim Impact
 
 | Claim | Verdict |
 |---|---|
-| C1：真实veRL GRPO单步Optimizer Update完成 | Supported，必须注明退出段Worker崩溃 |
-| C2：Search-R1训练复现完整完成 | Unsupported |
-| C3：Checkpoint可恢复 | 尚未验证，必须实际Resume |
-| C4：Retrieved Observation Token不参与Loss | 静态支持，Run证据不足 |
-| C5：本次训练带来质量提升 | Unsupported |
-| C6：基础设施干净退出 | Contradicted；GPU清理成功但Worker关闭崩溃 |
+| C1：从Global Step 1恢复到Global Step 2完成 | Supported |
+| C2：第二个Global Actor Update真实发生且Adapter变化 | Supported；须说明内部含3次Mini-batch Adam Step |
+| C3：检索Observation/Prompt Token不参与Policy Loss | Supported for this run |
+| C4：真实Wiki状态/Document ID持久化且失败可区分 | Supported |
+| C5：基础设施干净退出 | Contradicted / FAIL |
+| C6：Search-R1完整复现或质量提升 | Unsupported / FAIL |
 
 ## Action Items
 
-1. 在下一Run保存Token级Prompt/Response/Loss Mask审计Trace；
-2. 把Retrieval状态写入结构化Rollout Evidence；
-3. 使用Checkpoint实际恢复一个Step；
-4. 定位Ray/vLLM Worker关闭时的SIGTERM Segfault；
-5. 上述三项通过前不进入5/20 Step，也不报告质量改进。
+1. 修复Ray Worker退出，要求不再出现`SYSTEM_ERROR`、unexpected worker death或强制SIGTERM；
+2. 普通Generation Dump也改为独占、fsync、原子改名；
+3. 保持“第二个Global Actor Update”的精确表述，不把内部3个Adam Step说成3个Global Step；
+4. 完成Held-out Evaluation、多Seed和更长训练后，才讨论质量或完整复现。

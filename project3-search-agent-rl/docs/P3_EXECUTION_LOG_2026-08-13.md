@@ -110,3 +110,19 @@ rollouts     42a24abc5b29fbd729b6c6301c30da1a2905abd515445b9773d481ba77edaa5e
 
 独立实验完整性审计为`WARN`，见`EXPERIMENT_AUDIT.md`：支持“真实单步更新完成”，不支持
 “完整复现”或“质量提升”；Checkpoint恢复和Token级Mask证据仍待执行。
+
+## Attempt D：Checkpoint恢复到Global Step 2完成，退出仍WARN
+
+- Run ID：`p3-grpo-resume-step2-qwen15b-s0-20260813d`
+- 时间：2026-08-13 18:38:59至18:41:37
+- 顶层退出码：0
+- 恢复：明确加载Step 1模型、Optimizer、Extra State和DataLoader State
+- 更新：`training/global_step=2`、`grad_norm=0.283`，保存Global Step 2
+- 连续性：Scheduler推进1→2，392/392个Adapter张量继续变化
+- Mask：21/21记录Prompt Loss Token为0，Policy Token总数2629
+- Retriever：3次成功Top-3共9个真实Wiki ID，2次空查询被标记为`invalid_query`
+- 退出：TaskEventBuffer Segfault消失，但Ray仍把SIGTERM关闭Worker记为`SYSTEM_ERROR`
+- 清理：GPU1、Ray、训练Python、Retriever端口和服务均已释放
+
+详细结果见`docs/P3_CHECKPOINT_RESUME_COMPLETION_2026-08-13.md`。本阶段证明工程恢复链路，
+不证明完整复现或质量提升。

@@ -1,0 +1,10 @@
+{
+  "audit_skill": "experiment-audit",
+  "agent_id": "/root/p3_resume_integrity_audit",
+  "review_independence": "same-family",
+  "acceptance_status": "provisional",
+  "overall_verdict": "WARN",
+  "generated_at": "2026-08-13T18:53:16+08:00",
+  "audited_run": "/media/imc/data/project3-search-agent-rl/runs/p3-grpo-resume-step2-qwen15b-s0-20260813d",
+  "report": "reviewer_report.md"
+}

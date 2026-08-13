@@ -117,6 +117,12 @@
 56. 定位退出异常为Ray 2.43.0 TaskEventBuffer关闭路径，CPU-only禁用缓冲探针正常退出；
 57. 恢复配置确认从Global Step 1加载Actor/Optimizer/DataLoader，以第二Epoch执行Step 2；
 58. Mask单元测试2项、Search联合回归14项通过；Hydra确认`resume_path`、Step 2、Epoch 2，尚未启动GPU训练。
+59. P3-C在物理GPU1从Global Step 1恢复并完成Global Step 2，`grad_norm=0.283`；
+60. Scheduler推进到`last_epoch=2`，392/392个LoRA张量变化，Checkpoint Tracker为2；
+61. 21条运行时Mask记录全部Prompt Loss为0，5条检索Observation Prompt同样通过；
+62. 3次真实Wiki-18检索保存9个Document ID，2次空查询被类型化为`invalid_query`；
+63. Ray TaskEventBuffer Segfault已消失，但SIGTERM关闭Worker仍被记为`SYSTEM_ERROR`，退出门禁WARN；
+64. GPU1、Ray/Python和CPU Retriever全部定向清理；独立完整性审计总体WARN，不支持质量/完整复现结论。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
