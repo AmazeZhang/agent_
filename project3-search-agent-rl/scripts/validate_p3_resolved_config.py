@@ -37,7 +37,7 @@ def main() -> None:
         "actor_rollout_ref.rollout.name": "vllm",
         "actor_rollout_ref.rollout.n": 1,
         "actor_rollout_ref.rollout.tensor_model_parallel_size": 1,
-        "actor_rollout_ref.rollout.gpu_memory_utilization": 0.35,
+        "actor_rollout_ref.rollout.gpu_memory_utilization": 0.6,
         "actor_rollout_ref.ref.fsdp_config.param_offload": True,
         "env.env_name": "search",
         "env.max_steps": 2,

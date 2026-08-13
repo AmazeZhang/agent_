@@ -36,3 +36,30 @@ OSError: AF_UNIX path length cannot exceed 107 bytes
 5. 修复后使用新Run ID后缀`b`，不重用Attempt A。
 
 该修复不改变veRL算法、模型、数据、GPU映射或训练超参数，只修正进程运行目录长度。
+
+## Attempt B：vLLM KV Cache门禁失败
+
+- Run ID：`p3-grpo-1step-qwen15b-s0-20260813b`
+- 时间：2026-08-13 17:34（Asia/Shanghai）
+- 退出码：1
+- 已通过：Ray初始化、数据8/16行、配置校验、Qwen模型加载、LoRA注入、FSDP和NCCL初始化
+- 失败点：vLLM初始化KV Cache，尚未生成Rollout或执行Backward
+
+错误：
+
+```text
+ValueError: No available memory for the cache blocks.
+Try increasing `gpu_memory_utilization` when initializing the engine.
+```
+
+安全验收：GPU1恢复18MiB、无计算进程；Ray live目录已归档到Run目录，大小约1.1MiB；
+未产生Checkpoint，Retriever继续健康运行。
+
+原因与修正：
+
+1. 规划值0.35低于Actor模型驻留后的vLLM最低KV Cache预算；
+2. 固定上游的Search及其他训练示例统一使用0.60，因此Attempt C改为0.60；
+3. 当前veRL文档将vLLM V1描述为显式opt-in，但环境默认进入了V1路径；为贴近该提交的
+   Hybrid Engine基线，Attempt C显式设置`VLLM_USE_V1=0`；
+4. Token上限2304、Eager模式、Cache Engine释放、Actor/Optimizer/Reference Offload均保持；
+5. 新Run使用后缀`c`，不复用Attempt B。

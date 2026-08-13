@@ -78,7 +78,7 @@ overrides=(
   "actor_rollout_ref.rollout.mode=sync"
   "actor_rollout_ref.rollout.n=1"
   "actor_rollout_ref.rollout.tensor_model_parallel_size=1"
-  "actor_rollout_ref.rollout.gpu_memory_utilization=0.35"
+  "actor_rollout_ref.rollout.gpu_memory_utilization=0.6"
   "actor_rollout_ref.rollout.enforce_eager=true"
   "actor_rollout_ref.rollout.free_cache_engine=true"
   "actor_rollout_ref.rollout.enable_chunked_prefill=false"
@@ -115,6 +115,9 @@ overrides=(
 
 export PYTHONNOUSERSITE=1
 export TOKENIZERS_PARALLELISM=false
+# This pinned veRL generation documents V1 as an explicit opt-in. Keep the
+# baseline on its V0 hybrid-engine path instead of inheriting vLLM defaults.
+export VLLM_USE_V1=0
 export PYTHONPATH="${vendor_dir}:${project_dir}${PYTHONPATH:+:${PYTHONPATH}}"
 
 if [[ "$mode" == "print-config" ]]; then

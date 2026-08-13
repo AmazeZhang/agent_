@@ -65,7 +65,7 @@ Hydra Core   1.3.2
 | Token | Prompt 2048，Response 256 | 与规划Profile一致 |
 | Actor | mini-batch 8，micro-batch 1 | 单卡保守显存配置 |
 | Offload | Actor参数/优化器/Reference均开启 | 优先避免OOM |
-| Rollout | vLLM、TP=1、显存比例0.35 | 只使用映射后的逻辑GPU0=物理GPU1 |
+| Rollout | vLLM V0、TP=1、显存比例0.60 | 使用上游基线值，只映射逻辑GPU0=物理GPU1 |
 | Retriever | CPU Wiki-18 Top-3 | 不用Fixture、不占GPU |
 | Retriever timeout | 180秒 | 全库Flat串行检索队列可能超过默认60秒 |
 | 训练长度 | `total_training_steps=1` | 明确只做一次更新 |
