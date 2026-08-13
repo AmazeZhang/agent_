@@ -1,0 +1,10 @@
+# Direct runtime dependencies for the P2.5 CPU retriever.
+# The executed environment is cloned and fully frozen in its data-disk manifest.
+faiss-cpu==1.8.0
+fastapi==0.139.2
+numpy==1.26.4
+pydantic==2.13.4
+requests==2.34.2
+torch==2.4.0+cpu
+transformers==4.47.1
+uvicorn==0.51.0

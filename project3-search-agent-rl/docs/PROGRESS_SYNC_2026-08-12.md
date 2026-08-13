@@ -89,6 +89,9 @@
 29. 全量21,015,324个Corpus ID均与行号一致，24个返回文档全部可映射；
 30. 验收tmux自然结束、内存释放、无GPU/进程残留，详细结果见
     `docs/P25_CPU_VALIDATION_COMPLETION_2026-08-13.md`。
+31. P2.5-E实现行偏移随机访问Corpus，避免上游Arrow副本；
+32. CPU服务固定监听`127.0.0.1`、限制Top-k、串行锁保护模型与FAISS；
+33. 小型FAISS/HTTP契约测试通过，8→16执行计划见`docs/P25_HTTP_RETRIEVER_PLAN_2026-08-13.md`。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
