@@ -72,6 +72,10 @@
 12. 首次tmux下载因CDN TLS unexpected EOF在6,561,538,522 bytes退出，partial完整保留；
 13. 下载器增加最多100轮外层Range恢复、连续5轮无增长熔断和逐轮字节审计；
 14. 采用恢复续传，不删除或重新下载已有约6.56GB，恢复日志以追加方式保留失败证据。
+15. 2026-08-13 13:24完成全部约70GB源资源下载；
+16. 两个索引分片、压缩Corpus和E5权重的精确大小与SHA256全部匹配固定Manifest；
+17. 下载完成标记已生成，tmux自然结束且无Python/curl/GPU进程残留；
+18. P2.5-B完成，详细验收见`docs/P25_DOWNLOAD_COMPLETION_2026-08-13.md`。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
