@@ -179,3 +179,19 @@ rollouts     42a24abc5b29fbd729b6c6301c30da1a2905abd515445b9773d481ba77edaa5e
 - 审计：WARN；Ray基础设施正常shutdown仍有EXPECTED_TERMINATION SIGTERM，且实验无held-out评测
 
 详细结果见`docs/P3_CLEAN_SHUTDOWN_COMPLETION_2026-08-13.md`。
+
+## Attempt H：从Step 2恢复并完成五步工程晋级
+
+- Run ID：`p3-grpo-resume-step5-qwen15b-s0-20260813h`
+- 时间：21:23:28至21:29:24，tmux退出0
+- 恢复：明确加载Attempt G Step 2的model、optimizer、extra/data state
+- 更新：连续完成Global Step 3、4、5，三个Checkpoint结构完整且Adapter/Optimizer/Scheduler连续变化
+- 证据：21/22/24条普通与audit Rollout原子落盘，无partial；全部Prompt loss token为0
+- 检索：10次成功请求、30个唯一数字Wiki ID；另有9个`invalid_query`被结构化记录
+- 退出：RegisterCenter、GPU Worker、TaskRunner均`INTENDED_USER_EXIT`并DEAD；Ray daemon只有
+  正常`EXPECTED_TERMINATION`
+- 资源：GPU1回到18MiB，GPU0未用于训练；训练/Ray/Retriever PID和端口均释放
+- 质量信号：Step 3 reward/success为0.125，Step 4/5均为0；无validation
+- 审计：`WARN`；支持五步短程工程稳定性，不支持质量提升或完整复现
+
+详细结果见`docs/P3_FIVE_STEP_PROMOTION_COMPLETION_2026-08-13.md`。

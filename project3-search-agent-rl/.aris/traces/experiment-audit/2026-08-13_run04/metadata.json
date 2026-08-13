@@ -1,0 +1,11 @@
+{
+  "skill": "experiment-audit",
+  "run": "2026-08-13_run04",
+  "audited_run_id": "p3-grpo-resume-step5-qwen15b-s0-20260813h",
+  "reviewer_agent": "/root/p3_step5_audit",
+  "review_independence": "same-family",
+  "acceptance_status": "provisional",
+  "overall_verdict": "WARN",
+  "reason_code": "step5_engineering_run_verified_but_no_heldout_eval_single_seed_zero_reward_steps_and_trackers_stale",
+  "generated_at": "2026-08-13T21:45:00+08:00"
+}

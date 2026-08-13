@@ -218,3 +218,10 @@ EXPECTED_TERMINATION SIGTERM，且8题单seed smoke不构成完整复现或质�
 五步受控晋级计划已制定：从Attempt G `global_step_2`恢复到Step 5，只新增三次更新，继续使用
 8题smoke、物理GPU1和CPU Wiki-18，不扩大到全量数据或多卡。预计5–7分钟、数据盘新增约23GiB。
 计划和通过门禁见`docs/P3_FIVE_STEP_PROMOTION_PLAN_2026-08-13.md`。
+
+五步受控晋级Attempt H现已完成：从Attempt G Step 2准确恢复，新增Step 3、4、5三次真实更新，
+三个Checkpoint、六个Rollout证据、Prompt loss mask、typed retrieval metadata和Actor生命周期均通过
+核验；GPU1、Ray与Retriever资源已安全释放。独立审计为`WARN`：Step 4/5任务reward和success为0，
+且未执行held-out validation，因此只能认定短程工程闭环通过，不能声称质量提升、收敛、泛化或
+完整复现。完成报告见`docs/P3_FIVE_STEP_PROMOTION_COMPLETION_2026-08-13.md`；下一步优先建立
+Step 2与Step 5的同条件held-out评测和多seed/baseline，而不是盲目扩大到20步。
