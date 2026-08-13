@@ -80,6 +80,10 @@
 20. TAR内唯一JSONL成员大小14,393,573,105 bytes，抽样字段为`id/contents`；
 21. 新增非覆盖、保留源文件、逐行JSON校验和原子完成的P2.5-C准备器；
 22. 三项小型准备器测试通过，执行计划见`docs/P25_PREPARATION_PLAN_2026-08-13.md`。
+23. P2.5-C完成：拼接索引64,559,075,373 bytes，SHA256为`69c98463...d166`；
+24. 全量Corpus为14,393,573,105 bytes、21,015,324行、0无效JSON行；
+25. 源分片与压缩包全部保留，无partial或进程残留，准备总耗时457.55秒；
+26. 详细结果见`docs/P25_PREPARATION_COMPLETION_2026-08-13.md`，下一步为CPU FAISS实际加载。
 
 对应文档：`docs/P25_RESOURCE_AUDIT_2026-08-12.md`。
 
