@@ -83,7 +83,8 @@ fi
 for patch_file in \
   "${project_dir}/patches/0001-search-retrieval-status-observability.patch" \
   "${project_dir}/patches/0002-structured-rollout-audit.patch" \
-  "${project_dir}/patches/0003-graceful-ray-shutdown-and-atomic-rollout.patch"; do
+  "${project_dir}/patches/0003-graceful-ray-shutdown-and-atomic-rollout.patch" \
+  "${project_dir}/patches/0004-search-prompt-and-format-reward.patch"; do
   if ! git -C "$vendor_dir" apply --reverse --check "$patch_file" 2>/dev/null; then
     echo "required patch is not applied: $(basename -- "$patch_file")" >&2
     exit 15

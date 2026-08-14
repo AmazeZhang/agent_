@@ -352,3 +352,35 @@ GPU0 仅桌面进程 354 MiB，未触碰）。旧 8-13 tmux 会话与历史产�
 lr 3e-6、5 步、GPU1、真实 retriever）。预注册判据：训练 reward 出现非零、eval 搜索调用率
 ≥50%、无效动作率 < 18.4%、EM 方向为正；不满足则按序调 lr/n/epochs/response 上限，不追加
 20 步、不直接扩大数据。CPU 部分（补丁 0004 + wrapper + 测试）待批准后实施。
+
+### 2026-08-14（续）：最小修正实验 CPU 部分完成
+
+按已批准方案实施完毕，未占 GPU：
+
+1. **补丁 0004**（`patches/0004-search-prompt-and-format-reward.patch`）两处增量：
+   - `envs.py::_sync_reset` 前置 `SEARCH_PROMPT_PREFIX`（系统指令 + "Imagine" few-shot 示例，
+     训练与评测共用同条件）；
+   - skyrl `SearchEnv._get_reward` 传 `format_score=0.1`（Search-R1 原版格式奖励），
+     intermediate steps 仍零奖励。
+2. **生成方式**：vendor 工作树内 apply 0001–0003 → 提交为 base → 复制编辑后文件 →
+   `git diff` 得到仅含 0004 增量的补丁；已验证 0001→0002→0003→0004 可在干净 HEAD
+   依序应用，且主工作树 `git apply --reverse --check` 通过。
+3. **wrapper**：`scripts/run_p3_grpo_fix_exp.sh`（复制 Attempt H 配置，仅改
+   `rollout.n=4`、实验名、补丁门禁含 0004）；`apply_project_patches.sh` 与
+   `run_p3_eval_heldout.sh` 门禁循环加入 0004。
+4. **测试**：`tests/test_patch_0004.py` 5/5 通过；全量 CPU 套件
+   （排除已知缺 faiss 的 test_p25_cpu_retriever_service.py）50 passed。
+
+**遇到的问题与解决：**
+
+1. 手写 patch 在 apply 时报 corrupt（空白/上下文不符）——弃用手写，改 worktree
+   base-commit diff 法生成，结果干净且可逆检查通过。
+2. `git diff` 一次捕获了 8 个文件（0001–0003 未提交的改动混入）——只 diff 两个目标文件，
+   并确保 base commit 在复制编辑文件之前建立（曾有一次先 `git add -A` 导致 diff 为空）。
+3. 测试 fixture 契约错误：`SearchEnv.ground_truth` 必须是 `{"target": [...]}` 字典
+   （env kwargs 传递的契约），测试起初传 `["x"]` list 触发 utils.py:94
+   `TypeError: list indices must be integers, not str`；修正三处 fixture 后 5/5 通过。
+
+**下一步（待 GPU 批准）**：`run_p3_grpo_fix_exp.sh` 训练 5 步（run ID
+`p3-grpo-fix-n4-prompt-fmt-s0-20260814a`），然后 heldout-32 三模型对比
+（base / old step5 / new step5'），对照预注册标准验收。

@@ -1,0 +1,52 @@
+diff --git a/agent_system/environments/env_package/search/envs.py b/agent_system/environments/env_package/search/envs.py
+index 751db4b..bc82bbf 100644
+--- a/agent_system/environments/env_package/search/envs.py
++++ b/agent_system/environments/env_package/search/envs.py
+@@ -20,7 +20,22 @@ from typing import Any, Dict, List, Tuple
+ import gym
+ import numpy as np
+ from omegaconf import DictConfig, ListConfig
+-from copy import deepcopy 
++from copy import deepcopy
++
++# Search-R1 style search-protocol instruction prepended to every question
++# (training and evaluation share this env code path, so both see it).
++SEARCH_PROMPT_PREFIX = (
++    "You are an AI assistant. If you are not certain about the answer to a "
++    "question, you should search the web by outputting <search>query</search>. "
++    "After reading the returned passages, give the final answer inside "
++    "<answer>...</answer>.\n\n"
++    "Example:\n"
++    'Question: who wrote the song "Imagine"?\n'
++    "<search>who wrote the song Imagine</search>\n"
++    "Search results: Imagine is a song by John Lennon, released in 1971.\n"
++    "<answer>John Lennon</answer>\n\n"
++    "Now answer the following question:\n"
++)
+ 
+ 
+ class SearchMultiProcessEnv(gym.Env):
+@@ -79,7 +94,7 @@ class SearchMultiProcessEnv(gym.Env):
+             "data_source": kwargs.get("data_source", "unknown")
+         }
+         env.reset(extras)
+-        obs = kwargs["question"]
++        obs = SEARCH_PROMPT_PREFIX + kwargs["question"]
+         info = {'data_source': kwargs.get("data_source", "unknown")}
+         return obs, info
+     
+diff --git a/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py b/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
+index 715f116..bb3110b 100644
+--- a/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
++++ b/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
+@@ -50,7 +50,9 @@ class SearchEnv(BaseTextEnv):
+         if done:
+             # Concat all chat history into a single string and compute reward
+             chat_history_str = "".join([item["content"] for item in self.chat_history])
+-            return compute_score(chat_history_str, self.ground_truth)
++            # format_score=0.1: reward well-formed <search>/<answer> structure
++            # even when the answer is wrong (Search-R1 paper setting).
++            return compute_score(chat_history_str, self.ground_truth, format_score=0.1)
+         else:
+             # No reward for intermediate steps for Search tasks
+             return 0
