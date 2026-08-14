@@ -674,3 +674,59 @@ apply_chat_template + truncation 2048），token ids 直传引擎。
 **注意**：LoRA 权重真正加载到 vLLM 引擎需要 GPU → 这一步是 GPU smoke 门禁
 run 本身（加载失败 run 直接 abort）。GPU 状态一律以 run_managed.sh /
 preflight.sh 门禁输出为准，不主动查询 GPU0。
+
+## 2026-08-14（续）：vLLM 原生评测完成 — backend 差异定位，正式 backend = vLLM
+
+**GPU 两阶段门禁全部通过**（preflight 门禁输出确认，不主动查询 GPU0）：
+- smoke-16 × 2（Base + train64nqh8）：退出 status 0、16 条 episodes、SHA 核对、
+  泄漏 0、cleanup `physical_gpu=1 compute_processes=none`（显存回基线）。
+- smoke 即验证了 LoRA 加载路径的 GPU 侧：`enable_lora=True`、max_lora_rank=32、
+  adapter LORA r=32 7 targets 加载成功（无 tokenizer 警告属预期，用 base tokenizer）。
+
+**heldout-32 vLLM 原生贪心结果（正式数字，与训练 rollout 同引擎路径）**：
+
+| 模型 | HF EM | vLLM EM | vLLM 搜索 | HF↔vLLM 字节一致 | 归一化编辑距离 |
+|---|---|---|---|---|---|
+| Base | 2/32 | **3/32** | 6（HF 11） | 0/32 | 0.650 |
+| step5old | 2/32 | **5/32** | 6（HF 11） | 0/32 | 0.653 |
+| train64nqh8 | 2/32 | **5/32** | 5（HF 9） | 0/32 | 0.648 |
+
+（对比存档：`analysis/hf-vs-vllm-heldout32-20260814/{base,step5old,train64nqh8}.json`）
+
+**判定（按用户规则：vLLM 明显不同 → 定位差异）**：
+1. 定位：新增最小诊断 run（`scripts/diag_hf_vllm_gen.py`，同 8 题、同进程、无 env）
+   → **纯 LLM 生成即分歧**：8/8 题在前 14–76 字符处措辞级分歧后雪崩式分叉。
+   差异源在生成层：HF（eager attention + tf32-off + bf16）vs vLLM V0
+   （FlashAttention，训练 rollout 同配置）的算子/数值差异，env/projection/
+   retriever/数据门禁全部排除（两遍完全一致）。
+2. LoRA 在 vLLM 后端真实生效：base vs train64nqh8 输出字节一致仅 19/32
+   （13 题被 LoRA 改变），EM flips 2 全部 0→1 正向。
+3. **正式 eval backend = vLLM**：与训练 rollout 同引擎（V0、bf16、FA、
+   gpu_mem 0.6、max_model_len 2304、enforce_eager）。HF eval 是与训练路径
+   数值不一致的第三方后端，其 2/32 是 backend 特有数字。
+
+**结论转变（backend 选择改变训练有效性判断）**：
+- HF 下：训练模型与 base 持平（2/32 vs 2/32）→ 曾判定"无提升"。
+- vLLM（训练同路径）下：训练模型 5/32 vs base 3/32 → **LoRA 有 +2 EM 的
+  初步正向效果**（32 题小样本，Wilson 95% 区间宽，属初步证据非断言）。
+- 搜索率 vLLM 下更低（5–6 vs HF 9–11）但 EM 更高：vLLM 下模型更倾向直接
+  `<answer>` 且答对率更高，是生成差异的连锁效应（非策略行为改变）。
+- 与诊断结论呼应：reward 语义正确、LoRA 生效；vLLM 后端下 LoRA 跨过了 EM
+  边界（5 vs 3）。根因拆解（训练规模小、中间步 credit 平坦）仍然成立，但
+  "策略不搜索"应修正为"贪心解码下搜索收益有限、直接作答反而更稳"。
+
+**问题与解决（本轮 4 个运行级 bug）**：
+1. `return_tensors="pt"` + padding=False 批量长度不一 → 改 ragged list
+   （`return_tensors=None`），vLLM 引擎内部自行 batching。
+2. vLLM 0.8.5 `LLM` 无 `shutdown()` → `del llm` + gc（释放引擎 GPU 分配）。
+3. `LoRARequest(path=...)` 参数不存在（`path` 是只读 property）→
+   `lora_path=`（0.8.5 字段）。
+4. tmux server 环境不透传 `PROJECT3_EVAL_*`（start_tmux_run 只带
+   DATA_ROOT/MIN_FREE_GIB）→ pane 内 `bash -c 'export ...; exec ...'`
+   显式设置（首跑 base run 时 adapter=None 暴露此问题）。
+
+**下一步（用户指示的拆线）**：
+- 线 1 官方宽松语义（`<(search|answer)>(.*?)</\1>` 取第一、invalid 环境提示
+  重试无惩罚）→ Search-R1 复现基线（对照官方论文数字）。
+- 线 2 严格投影 + 每行 invalid 惩罚 → 我们的 fork 改进/对照实验（可继续
+  训练规模与 credit 整形路线）。
