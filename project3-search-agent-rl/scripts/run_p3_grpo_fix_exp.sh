@@ -9,6 +9,8 @@
 #   - experiment name marks the fix set
 # Round 2 (2026-08-14, preregistered ladder): PROJECT3_FIX_EXP_LR=1e-5
 # (default 3e-6 keeps round 1 reproducible).
+# Round 3 (2026-08-14, preregistered ladder): PROJECT3_FIX_EXP_N=8
+# (default 4 keeps rounds 1-2 reproducible). No further rounds auto-run.
 # NOTE: actor_rollout_ref.rollout.n MUST stay 1 (hard fork assertion in
 # verl/trainer/main_ppo.py:173; GRPO is achieved via env.rollout.n).
 # See docs/P3_MINIMAL_FIX_EXPERIMENT_2026-08-14.md for pre-registered criteria.
@@ -36,6 +38,7 @@ resume_from="${PROJECT3_RESUME_FROM:-}"
 total_training_steps="${PROJECT3_TOTAL_TRAINING_STEPS:-5}"
 total_epochs="${PROJECT3_TOTAL_EPOCHS:-5}"
 fix_exp_lr="${PROJECT3_FIX_EXP_LR:-3e-6}"
+fix_exp_n="${PROJECT3_FIX_EXP_N:-4}"
 
 for required_path in "$python_bin" "$model_path" "$dataset_dir/train.parquet" "$dataset_dir/test.parquet"; do
   if [[ ! -e "$required_path" ]]; then
@@ -125,15 +128,16 @@ overrides=(
   "env.seed=0"
   "env.max_steps=2"
   "env.history_length=2"
-  # Minimal corrective variable: GRPO group size 2 -> 4 (patch 0004 plan).
-  "env.rollout.n=4"
+  # Minimal corrective variable: GRPO group size (round 1: 2 -> 4;
+  # round 3: 4 -> 8). Fork reads group_n from env.rollout.n (env_manager.py:609).
+  "env.rollout.n=${fix_exp_n}"
   "env.search.search_url=${retriever_url}"
   "env.search.topk=3"
   "env.search.timeout=180"
   "env.search.log_requests=true"
   "trainer.logger=['console']"
   "trainer.project_name=search_r1_repro"
-  "trainer.experiment_name=p3_grpo_fix_lr${fix_exp_lr}_n4_prompt_fmt_qwen25_15b_lora32_seed0"
+  "trainer.experiment_name=p3_grpo_fix_lr${fix_exp_lr}_n${fix_exp_n}_prompt_fmt_qwen25_15b_lora32_seed0"
   "trainer.n_gpus_per_node=1"
   "trainer.nnodes=1"
   "trainer.total_epochs=${total_epochs}"
