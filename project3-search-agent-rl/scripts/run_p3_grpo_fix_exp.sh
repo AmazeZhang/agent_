@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Minimal corrective experiment for P3 (patch 0004): search-protocol prompt
-# instruction, format reward 0.1, and GRPO group size n=4.
+# instruction, format reward 0.1, and GRPO group size n=4 (env.rollout.n).
 #
 # Fixed variables are identical to Attempt H (run_p3_grpo_one_step.sh) except:
-#   - actor_rollout_ref.rollout.n: 1 -> 4
+#   - env.rollout.n: 2 -> 4  (GRPO group size; in this fork group_n is read
+#     from env.rollout.n, see agent_system/environments/env_manager.py:609)
 #   - patch gate includes 0004 (env prompt + format reward)
 #   - experiment name marks the fix set
+# NOTE: actor_rollout_ref.rollout.n MUST stay 1 (hard fork assertion in
+# verl/trainer/main_ppo.py:173; GRPO is achieved via env.rollout.n).
 # See docs/P3_MINIMAL_FIX_EXPERIMENT_2026-08-14.md for pre-registered criteria.
 set -euo pipefail
 
@@ -102,8 +105,9 @@ overrides=(
   "actor_rollout_ref.actor.fsdp_config.optimizer_offload=true"
   "actor_rollout_ref.rollout.name=vllm"
   "actor_rollout_ref.rollout.mode=sync"
-  # Minimal corrective variable: GRPO group size 1 -> 4 (patch 0004 plan).
-  "actor_rollout_ref.rollout.n=4"
+  # Fork hard constraint (main_ppo.py:173): actor_rollout_ref.rollout.n==1,
+  # GRPO group size is set via env.rollout.n below (Attempt H used 2).
+  "actor_rollout_ref.rollout.n=1"
   "actor_rollout_ref.rollout.tensor_model_parallel_size=1"
   "actor_rollout_ref.rollout.gpu_memory_utilization=0.6"
   "actor_rollout_ref.rollout.enforce_eager=true"
@@ -118,7 +122,8 @@ overrides=(
   "env.seed=0"
   "env.max_steps=2"
   "env.history_length=2"
-  "env.rollout.n=2"
+  # Minimal corrective variable: GRPO group size 2 -> 4 (patch 0004 plan).
+  "env.rollout.n=4"
   "env.search.search_url=${retriever_url}"
   "env.search.topk=3"
   "env.search.timeout=180"

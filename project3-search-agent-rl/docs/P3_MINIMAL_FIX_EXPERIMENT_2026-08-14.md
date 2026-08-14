@@ -1,9 +1,15 @@
 # P3 最小修正实验：Prompt 指令 + 格式奖励 + GRPO group size
 
 日期：2026-08-14。基于 `P3_CONFIG_DIAGNOSIS_2026-08-14.md` 的根因判定
-（prompt 无搜索协议指令 / reward 稀疏无格式分 / GRPO n=1）设计的最小修正实验。
+（prompt 无搜索协议指令 / reward 稀疏无格式分 / GRPO 组内 reward 全零）设计的
+最小修正实验。
 **本实验仍使用 8 行 smoke train，目的是验证"修正后的配置能否让模型学会搜索行为"，**
 不扩大数据、不追加 20 步。
+
+> 修订（2026-08-14 GPU 启动时发现）：fork 硬断言
+> `actor_rollout_ref.rollout.n==1`（`verl/trainer/main_ppo.py:173`），GRPO 组大小
+> 由 `env.rollout.n` 控制（`env_manager.py:609`）。Attempt H 为 `env.rollout.n=2`
+> （组大小 2，非 1）。因此变量 3 的改动点改为 **`env.rollout.n: 2 → 4`**。
 
 ## 实验变量（同时启用三项，但每项独立可审计）
 
@@ -11,7 +17,7 @@
 |---|---|---|---|---|
 | 1 | Prompt 指令 | 问题文本前加系统指令 + 1 个 few-shot 搜索示例 | `agent_system/.../search/envs.py::_sync_reset`（训练与评测共用同一环境代码，自动同条件） | 根因 #1 |
 | 2 | 格式奖励 | `compute_score` 传 `format_score=0.1` | `skyrl_gym/envs/search/env.py::_get_reward` | 根因 #2，Search-R1 原版 0.1 |
-| 3 | GRPO group size | `actor_rollout_ref.rollout.n=4` | 新 wrapper override | 根因 #3，组基线恢复 |
+| 3 | GRPO group size | `env.rollout.n: 2 → 4`（fork 组大小在 env 侧；`actor_rollout_ref.rollout.n` 必须保持 1） | 新 wrapper override | 根因 #3，组基线恢复 |
 
 Prompt 文案（沿用 Search-R1 风格，中文数据集同样适用）：
 
@@ -39,13 +45,16 @@ retriever、veRL commit `20bd331b…` + 补丁 0001–0004。
 1. 写补丁 `patches/0004-search-prompt-and-format-reward.patch`（两个改动点），
    按 0001–0003 流程 apply 到 vendor/verl-agent；
 2. 新增 wrapper `scripts/run_p3_grpo_fix_exp.sh`（复制 one_step，追加
-   `actor_rollout_ref.rollout.n=4` override，其余门禁不变）；
+   `env.rollout.n=4` override，其余门禁不变）；
 3. CPU 测试：env 返回文本包含指令与 few-shot、格式 reward=0.1 生效、
    原 33 项相关套件不回归；
-4. GPU 阶段（待批准）：预检 → 启动 retriever → 训练 5 步
-   （Run ID `p3-grpo-fix-n4-prompt-fmt-s0-20260814a`）→ 检查训练 reward 曲线
-   出现非零值 → 用同一 heldout-32 管道评测 Base / old Step 5 / new Step 5′
-   （Run ID `p3-eval-heldout32-fix-base-s0-20260814b` 等三组）→ 对比报告。
+4. GPU 阶段（已批准）：预检 → 启动 retriever → 训练 5 步
+   （Run ID `p3-grpo-fix-n4-prompt-fmt-s0-20260814a`；2026-08-14 首次启动因
+   `actor_rollout_ref.rollout.n=4` 触发 fork 硬断言 exit 1，修正为
+   `env.rollout.n=4` 后以新 Run ID `p3-grpo-fix-n4-prompt-fmt-s0-20260814b` 重跑；
+   失败的 a 目录保留不删）→ 检查训练 reward 曲线出现非零值 → 用同一
+   heldout-32 管道评测 Base / old Step 5 / new Step 5′
+   （Run ID `p3-eval-heldout32-fix-base-s0-20260814c` 等三组）→ 对比报告。
 
 ## 预注册判据（训练 5 步后核对，全部满足才进入下一步）
 
@@ -57,7 +66,7 @@ retriever、veRL commit `20bd331b…` + 补丁 0001–0004。
 | EM 方向 | new Step5′ ≥ 2/32 且与 base 的不一致对方向为正；任何"明确提升"必须先 vLLM 原生复核 |
 
 **失败判据**：训练 reward 仍全 0 → 检查补丁/配置并停止；行为指标无改善 →
-按预注册顺序调 lr（1e-5）、rollout.n（8）、epochs（10）、max_response（512）
+按预注册顺序调 lr（1e-5）、env.rollout.n（8）、epochs（10）、max_response（512）
 形成第二轮最小实验；仍无信号才考虑扩大数据规模。任何情况下不追加 20 步。
 
 ## 边界声明

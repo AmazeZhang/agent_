@@ -28,21 +28,26 @@ obs = kwargs["question"]          # 模型第一轮收到的就是原始问题�
 后果：训练期 rollout audit（Attempt H epoch 3–5）24/24 条 **reward 全为 0**，
 没有任何正信号可以学习。
 
-### 3. GRPO group size n=1，退化为无基线 REINFORCE
+### 3. GRPO 组内 reward 全零 → advantage 恒为零，只剩 KL
 
-hydra 解析配置（run h `.hydra/config.yaml`）：`actor_rollout_ref.rollout.n = 1`。
+本 fork（verl+env）对 `actor_rollout_ref.rollout.n` 有硬断言（
+`verl/trainer/main_ppo.py:173`：`n==1`，"achieve GRPO by env.rollout.n"）；GRPO
+组大小实际由 `agent_system/environments/env_manager.py:609` 读取
+`config.env.rollout.n` 作为 `group_n`。Attempt H 配置 `env.rollout.n=2` →
+组大小 2（**并非 1**）。
 
-`verl/trainer/ppo/core_algos.py::compute_grpo_outcome_advantage`：
+`verl/trainer/ppo/core_algos.py::compute_grpo_outcome_advantage`（组大小 >1 时）：
 
 ```python
-if len(id2score[idx]) == 1:
-    id2mean[idx] = torch.tensor(0.0)
-    id2std[idx] = torch.tensor(1.0)
-    # advantage = (score - 0) / (1 + eps) = 原始 reward
+id2mean[idx] = torch.mean(torch.tensor(id2score[idx]))
+id2std[idx] = torch.std(...)
+scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + 1e-6)
 ```
 
-组大小 1 → advantage 退化为原始 reward（无组内基线、无归一化）。当 batch 内全部
-reward=0（epoch 3–5 实况），**所有 advantage=0，策略更新只剩 KL 正则项**。
+当组内 reward 全 0（epoch 3–5 实况）：mean=0、std=0 → **advantage=(0−0)/(0+1e−6)=0**，
+所有 advantage 恒为零，策略更新只剩 KL 正则项。诊断结论（无 RL 信号）与 n=1 版
+一致，但机制是"组内全零 reward 归一化后为零"，而非单样本组退化。修复杠杆不变：
+组内需要有非零 reward（format_score）且组大小合理（≥4）。
 
 ### 4. 优化预算极小
 
@@ -64,7 +69,7 @@ warmup=0、`max_response_length=256`、训练采样 temperature=1.0。
 |---|---|---|---|
 | 1 | **Prompt 无搜索协议指令/few-shot** | `obs = kwargs["question"]`；三模型贪心几乎不搜索 | 系统指令 + few-shot |
 | 2 | **Reward 稀疏且无格式奖励** | epoch 3–5 全 0；format_score=0.0 未启用 | format_score=0.1（Search-R1 设定） |
-| 3 | **GRPO group size n=1** | hydra n=1；advantage=原始 reward | rollout.n=4–8 |
+| 3 | **GRPO 组内 reward 全零 → advantage 恒零** | 组大小 2（env.rollout.n=2）+ epoch 3–5 全 0 reward → mean=0/std=0；fork 硬断言 actor_rollout_ref.rollout.n==1（组在 env 侧） | env.rollout.n=4 + format_score |
 | 4 | 优化预算极小（8 行 × 5 步 × 3e-6） | hydra/命令审计 | 暂不改，隔离变量 |
 
 判定路线：先做"最小修正实验"（1+2+3 组合），在 smoke 规模验证搜索行为是否被学会，
