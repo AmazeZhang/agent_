@@ -628,3 +628,49 @@ temperature。
 **资源**：诊断全程 CPU 只读；retriever 会话 `p3-fix3b-retriever-20260814`
 继续运行（vLLM 评测可能复用）。`scripts/analyze_p3_action_reward_diag.py`
 本轮升级，随文档提交。
+
+## 2026-08-14（续）：vLLM 原生评测准备（CPU 阶段）完成
+
+**目标（用户批准的两级门禁，第一部分）**：准备 vLLM 原生贪心评测脚本，禁止
+optimizer/backward；固定 temperature=0、相同 heldout SHA、env、projection、
+Retriever；验证 Base 与 LoRA 加载路径。
+
+**交付（本 commit）**：
+- `scripts/run_p3_eval_vllm.py` — HF 评测孪生脚本，唯一差异是解码后端：
+  vLLM 原生引擎 + `SamplingParams(temperature=0)` greedy；LoRA 用 vLLM 原生
+  `LoRARequest` 加载 PEFT 目录（inference-only，无优化器状态）。全部门禁
+  （受管运行 / 单卡 / GPU0 禁 / Retriever health 21015324 / SHA / 泄漏）与
+  HF 版逐条一致。
+- `scripts/run_p3_eval_vllm.sh` — 受管 wrapper（镜像 heldout wrapper），
+  export `VLLM_USE_V1=0`（与训练 rollout 同一 V0 引擎路径）。
+- `scripts/compare_hf_vllm_eval.py` — HF↔vLLM 逐题对比（CPU 纯分析）：
+  EM、搜索率、无效动作、原始动作文本字节一致 + 归一化编辑距离；不比速度。
+
+**引擎 parity（与 run_p3_grpo_fix_exp.sh 训练 rollout 对齐）**：
+`VLLM_USE_V1=0`（脚本 gate，非 "0" 即 abort）、dtype=bfloat16、
+tensor_parallel_size=1、gpu_memory_utilization=0.6、enforce_eager=True、
+max_model_len=2304。tokenizer 输入侧与 HF 版字节级一致（同一
+apply_chat_template + truncation 2048），token ids 直传引擎。
+
+**问题与解决**：
+1. vLLM 0.8.5.post1 的 `LoRARequest` 不在顶层命名空间（`vllm.LoRARequest`
+   ImportError）→ 从 `vllm.lora.request` 导入（实测可导入、`LLM.generate`
+   接受 `lora_request` 参数）。
+2. adapter_config.json 的 target_modules 是展开后的 7 个 Qwen2 投影
+   （q/k/v/o/gate/up/down_proj），非 "all-linear" 字符串 → vLLM 原生
+   LoRA loader 支持模块名列表；r=32、alpha=32（alpha/r=1，无缩放差异）、
+   base_model_name_or_path 与 --model 一致，全部通过 `validate_adapter_for_vllm`。
+
+**CPU 验证结果（全部通过）**：
+- 静态审查：无 torch.optim / ray / main_ppo import、无 backward() 调用点
+- 引擎 parity gate：`VLLM_USE_V1=0` ✓、vLLM 0.8.5.post1 记录进结果
+- 真实 train64nqh8 adapter（global_step_8）校验通过：LORA、r=32、7 targets
+- 真实数据门禁：heldout32=32 条泄漏 0 / SHA `1f8caca3…` 核对一致；
+  smoke=16 条泄漏 0 / SHA 一致
+- 纯函数冒烟：aggregate_metrics / action_quality（mixed + `<answer />`
+  自闭合陷阱）/ offline_rescore 全部正确
+- 对比脚本合成数据：4 题 EM 2/3、flips 各 1、字节一致 2 全部命中
+
+**注意**：LoRA 权重真正加载到 vLLM 引擎需要 GPU → 这一步是 GPU smoke 门禁
+run 本身（加载失败 run 直接 abort）。GPU 状态一律以 run_managed.sh /
+preflight.sh 门禁输出为准，不主动查询 GPU0。
