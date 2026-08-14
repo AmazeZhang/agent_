@@ -434,3 +434,31 @@ env.rollout.n（8）→ epochs（10）→ max_response（512），不追加 20 �
 **资源验收**：训练与三个 eval 后，GPU 八卡全部回基线（GPU1 18 MiB 0%）、无
 python 残留、retriever 以精确 Ctrl-C 停止（会话 `p3-fix-retriever-20260814`），
 端口 18080 释放。所有 run 目录（含失败启动 a 与错误数据 c/d/e）保留未删。
+
+### 2026-08-14（续）：第二轮最小修正实验（lr 1e-5）执行完成
+
+**训练（run `p3-grpo-fix-lr1e5-n4-prompt-fmt-s0-20260814a`，lr 1e-5，5 步）**：
+exit 0。reward/mean 全非零（0.172/0.087/0.134/0.112/0.162），step1 与第一轮
+完全一致（seed/数据/LoRA 初始化确定性复现），tool_calls 0.375–0.562，
+grad_norm 0.478–0.718（略高于第一轮，lr 更大）。step5 无效动作率 48%（较第一轮
+44% 略差）。wrapper 的 lr 已参数化（`PROJECT3_FIX_EXP_LR`，默认 3e-6 保持第一轮
+可复现），experiment_name 内嵌 lr。
+
+**heldout-32 eval（run `p3-eval-heldout32-fix2-step5new-s0-20260814a`）**：
+step5new2 EM 2/32 —— 与 base/step5old **同一批 2 道题**（2wiki 1 + nq 1），
+McNemar 不一致对 = 0，p = 1.0。无效动作率 24.4%（略优于第一轮 26.8%，仍 >
+18.4% 预注册线）；no_search 22/32（搜索率 31%，< 50% 预注册线）。
+
+**预注册判据第二轮核对**：训练 reward 非零 ✓；搜索率 ≥50% ✗（31%）；无效动作
+<18.4% ✗（24.4%）；EM 方向 ✗（零差异）。
+
+**结论**：lr 3e-6 → 1e-5 无实质改变（两轮 eval 结果高度雷同：EM 2/32 同一批题、
+搜索率 31%、无效动作 24–27%）。按预注册阶梯进入第三轮：`env.rollout.n=8`
+（组大小翻倍，advantage 归一化基线更稳），随后才是 epochs 10 / max_response 512。
+仍未决定是否扩大数据——8 行 smoke × 5 步预算可能已达该预算下的天花板，第三轮
+若仍无信号，将重新审视"先扩大数据规模"路线（预注册失败路线允许：仍无信号才
+考虑扩大数据）。
+
+**资源验收**：GPU 八卡回基线（GPU1 18 MiB 0%）、无 python 残留、retriever 以
+精确 Ctrl-C 停止（会话 `p3-fix2-retriever-20260814`）、端口 18080 释放。所有
+run 目录保留未删。
