@@ -573,3 +573,58 @@ answer 合规 100%；数据 SHA `1f8caca3…` 核对 True。对比报告：
 **资源验收**：训练与评测 exit 0，GPU1 回基线（cleanup.log compute_processes=none），
 run 目录全保留；retriever 会话 `p3-fix3b-retriever-20260814` 继续运行（下一步
 排查如需复用）。
+
+## 2026-08-14：动作格式 + 奖励路径 CPU 只读诊断完成（6 项全查）
+
+用户批准的 6 项只读诊断全部完成（无 GPU、无训练、无 vLLM 评测）。产物：
+`/media/imc/data/project3-search-agent-rl/diag-action-reward-20260814/{diagnosis.md,diagnosis.json}`，
+分析脚本 `scripts/analyze_p3_action_reward_diag.py`（本轮升级为 env 精确重建，
+377/377 行完全复现，mismatch=0）。
+
+**1/6 + 6/6. LoRA 是否真正改变输出（base vs train64nqh8，同一批 32 题）**：
+字节一致 13/32（40.6%）、平均编辑距离 0.183、第一步一致 14/32、有效性翻转 2、
+**EM 翻转 0**。→ LoRA 确实改变了输出与动作分布，但未跨过任何 EM 判定边界；
+训练更新真实生效，只是没有转化为答案正确率。
+
+**2/6. mixed/duplicate 为何判无效**：`projection.py` 规则 = 动作同时含
+`<search>` 与 `<answer>` 标签（mixed）或任一标签 ≥2 次（duplicate）→
+`valids=0`，训练时该行扣 -0.1。模型常见输出模式正是
+`<think>+<search>+<answer> 一步完成`（搜答混合），因此大量被判 mixed。
+**注意 `<answer />` 自闭合标签**：不含 `<answer>` 子串 → 标签计数不判 mixed、
+`_is_done` 也不认（无 `</answer>`）→ 该步不终止并继续搜索/直到 max_turns。
+官方 Search-R1 无 mixed/duplicate 规则（取第一个标签执行，invalid 重试无惩罚）。
+
+**3/6. 官方 vs fork 解析器**：
+- `extract_solution`：官方 `len(matches) <= 1 → None`（prompt+response 含 few-shot
+  示例 = 2 个 answer 块）；fork `len(matches) < 1 → None`（chat_history 仅投影后
+  actions，无示例）→ fork ≥1 是必要适配，语义自洽；
+- 动作解析：官方宽松（`<(search|answer)>(.*?)</\1>` 取第一个、invalid 环境提示
+  重试不终止无惩罚）；fork 严格（trim 到第一个闭合标签、mixed/duplicate 判无效、
+  -0.1/行惩罚）→ **fork 特有训练信号设计，非 bug**。
+
+**4/6. 奖励路径精确重建（关键）**：逐 (traj, step) 行按 env 语义重放：
+SearchEnvironmentManager.step **先投影再传给 env**（chat_history 只含投影后
+动作 + 搜索观察）→ done 步 compute_score 取历史最后一个 answer 块 →
+`gather_rollout_data` 把 episode_rewards（累计值 = 最终 compute_score）写入
+该 traj 每一行 → EpisodeRewardManager 放到每行最后 token →
+`apply_invalid_action_penalty` 按行扣 0.1×该行 invalid。公式：
+`recorded_score == episode_rewards - 0.1*(0 if row_valid else 1)`。
+**377/377 行重建一致，mismatch=0**（早期 18 条/73 条 mismatch 全部归因于重建
+脚本未建模投影先于 env、episode 累计按行写入、按行惩罚三层语义，非训练实现问题）。
+精确分解：256 个 episode（8 步 × 32 行）中最终 EM 25（9.8%）、仅格式分 186
+（72.7%）、无 answer 45（17.6%）；377 行中 invalid 147（39.0%）→ 惩罚单元 147。
+
+**5/6. heldout 失败分类（train64nqh8）**：no_search 23（69%）、searched_then_wrong
+8、searched_then_correct 1、format_error 0、invalid_action_only 0。→ 贪心模式下
+**69% 的题完全不搜索**是 EM 卡 2/32 的主因（训练用采样、评测用 HF 贪心）。
+
+**结论（按用户指示决策）**：解析/奖励语义**完全正确，无偏差，无需修复**。训练
+低效的原因不在实现，而在：(a) 规模（64 行 × 8 步 × 1.5B LoRA 远小于 Search-R1
+原版）；(b) 评测用 HF 贪心 vs 训练采样（69% 不搜索）；(c) 中间步 credit 平坦
+（每行都拿最终 episode reward，搜索步与答案步信号无区分）。→ 下一步按用户
+指示：**用 verl/vLLM 原生贪心评测排除 HF backend 差异**，不修实现、不改训练
+temperature。
+
+**资源**：诊断全程 CPU 只读；retriever 会话 `p3-fix3b-retriever-20260814`
+继续运行（vLLM 评测可能复用）。`scripts/analyze_p3_action_reward_diag.py`
+本轮升级，随文档提交。
