@@ -462,3 +462,33 @@ McNemar 不一致对 = 0，p = 1.0。无效动作率 24.4%（略优于第一轮 
 **资源验收**：GPU 八卡回基线（GPU1 18 MiB 0%）、无 python 残留、retriever 以
 精确 Ctrl-C 停止（会话 `p3-fix2-retriever-20260814`）、端口 18080 释放。所有
 run 目录保留未删。
+
+### 2026-08-14（续）：第三轮最小修正实验（env.rollout.n=8）执行完成，smoke-8 触顶判定
+
+**训练（run `p3-grpo-fix-n8-prompt-fmt-s0-20260814a`，n=8，5 步）**：exit 0。
+reward/mean 全非零（0.103–0.172）；step1 再次与前两轮逐项一致（reward 0.172、
+valid_action 0.696、tool_calls 0.438、grad_norm 0.488——seed/数据/LoRA 确定性
+完全复现）；step2–5 tool_calls 0.44–0.59、valid_action 0.52–0.61，与前两轮无
+实质差异。wrapper 的组大小已参数化（`PROJECT3_FIX_EXP_N`，默认 4）。
+
+**heldout-32 eval（run `p3-eval-heldout32-fix3-step5new-s0-20260814a`）**：
+step5new3 EM 2/32 —— 三轮一致，**仍是同一批 2 道题**（2wiki 1 + nq 1），
+McNemar 不一致对 = 0，p = 1.0。无效动作率 29.3%（三轮无改善趋势：26.8% →
+24.4% → 29.3%）；no_search 22/32（搜索率 31%，三轮恒定）。
+
+**三轮汇总**：
+
+| 轮 | 变量 | EM | 搜索率 | 无效动作率 |
+|---|---|---|---|---|
+| 1 | n=4, lr 3e-6 | 2/32 | 31% | 26.8% |
+| 2 | lr 1e-5 | 2/32 | 31% | 24.4% |
+| 3 | n=8 | 2/32 | 31% | 29.3% |
+
+**结束条件触发（用户预注册判定）**：搜索率 <50%、无效动作 >18.4%、heldout 零
+配对改善 → **停止 smoke-8 调参，判定小数据预算触顶，转向扩大训练集**。按用户
+指令不自动继续 epochs=10 / max_response=512。扩大训练集的具体方案（数据规模、
+保留变量组合、预算）待用户批准后执行。
+
+**资源验收**：GPU 八卡回基线（GPU1 18 MiB 0%）、无 python 残留、retriever 精确
+Ctrl-C 停止（会话 `p3-fix3-retriever-20260814`）、端口 18080 释放。三轮全部 run
+目录保留未删。
