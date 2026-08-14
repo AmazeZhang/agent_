@@ -330,3 +330,25 @@ results.json 的 decoding_note 中声明）。
 **资源验收（Gate 4）**：Retriever 仅以精确 Ctrl-C 停止（tmux 会话 `p3-eval-retriever-20260814`），
 端口 18080 无监听、无 python retriever/评测进程；八卡显存全部回基线（GPU1 18 MiB，0% util；
 GPU0 仅桌面进程 354 MiB，未触碰）。旧 8-13 tmux 会话与历史产物未做任何删除。
+
+## 2026-08-14：训练配置根因排查完成，最小修正实验方案已定
+
+只读排查（未占 GPU、未改代码）确认 Step 4/5 零 reward 与"搜索未学会"的根因链，详见
+`docs/P3_CONFIG_DIAGNOSIS_2026-08-14.md`：
+
+1. **Prompt 无搜索协议指令**：env `_sync_reset` 只把原始问题文本给模型，无系统指令/few-shot；
+   heldout-32 三模型未搜索直接作答占比 24–28/32。
+2. **Reward 稀疏且无格式奖励**：只有最终严格 EM，`format_score=0.0` 从未启用；训练期
+   epoch 3–5 rollout 审计 24/24 条 reward 全为 0。
+3. **GRPO group size n=1**：hydra 解析 `actor_rollout_ref.rollout.n=1`，verl 对单样本组用
+   mean=0/std=1，advantage 退化为原始 reward；batch 全 0 时策略只剩 KL 漂移。
+4. 训练期温度 1.0 采样其实会输出 `<search>`（epoch5: 9/24），但贪心 eval 坍缩回直接作答，
+   且零奖励从未强化该格式；无效动作（混合/重复标签）训练后期增多与之印证。
+
+**最小修正实验方案（`docs/P3_MINIMAL_FIX_EXPERIMENT_2026-08-14.md`）**：三项变量同时启用但
+独立可审计 —— (1) env prompt 加系统指令 + 1 个 few-shot 搜索示例（改
+`search/envs.py::_sync_reset`，训练评测共用同条件）；(2) `format_score=0.1`（Search-R1 原版）；
+(3) `rollout.n=4` 恢复 GRPO 组基线。固定变量与 Attempt H 完全一致（8 行 smoke、LoRA r32、
+lr 3e-6、5 步、GPU1、真实 retriever）。预注册判据：训练 reward 出现非零、eval 搜索调用率
+≥50%、无效动作率 < 18.4%、EM 方向为正；不满足则按序调 lr/n/epochs/response 上限，不追加
+20 步、不直接扩大数据。CPU 部分（补丁 0004 + wrapper + 测试）待批准后实施。
