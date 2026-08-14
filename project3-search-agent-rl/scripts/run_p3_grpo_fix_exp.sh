@@ -77,6 +77,10 @@ if (( $# != 0 )); then
   exit 2
 fi
 
+# Self-check: resolved experimental values must be visible on the first
+# stdout line of every run (guard against tmux env passthrough loss).
+echo "[FIX_EXP] resolved: fix_exp_lr=${fix_exp_lr} fix_exp_n=${fix_exp_n} total_training_steps=${total_training_steps} total_epochs=${total_epochs}"
+
 overrides=(
   "algorithm.adv_estimator=grpo"
   "algorithm.norm_adv_by_std_in_grpo=true"
