@@ -1,0 +1,620 @@
+{
+  "decoding_backend": [
+    "hf-transformers-greedy"
+  ],
+  "decoding_backends_consistent": true,
+  "decoding_note": "decoding_backend=hf-transformers-greedy (temperature 0). Same across all three models, but not byte-identical to the vLLM rollout path used in training; re-verify with verl/vLLM native eval before claiming clear improvement.",
+  "labels": [
+    "base",
+    "step2",
+    "step5"
+  ],
+  "matched_em": {
+    "base": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "step2": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "step5": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "mcnemar": {
+    "base<->step2": {
+      "n00_both_wrong": 31,
+      "n01_second_only": 1,
+      "n10_first_only": 0,
+      "n11_both_right": 0,
+      "n_discordant": 1,
+      "p_value": 1.0
+    },
+    "base<->step5": {
+      "n00_both_wrong": 32,
+      "n01_second_only": 0,
+      "n10_first_only": 0,
+      "n11_both_right": 0,
+      "n_discordant": 0,
+      "p_value": 1.0
+    },
+    "step2<->step5": {
+      "n00_both_wrong": 31,
+      "n01_second_only": 0,
+      "n10_first_only": 1,
+      "n11_both_right": 0,
+      "n_discordant": 1,
+      "p_value": 1.0
+    }
+  },
+  "models": {
+    "base": {
+      "action_stats": {
+        "duplicate_tag_steps": 2,
+        "invalid_action_ratio": 0.08333333333333333,
+        "invalid_actions": 3,
+        "mixed_tag_steps": 1,
+        "total_steps": 36
+      },
+      "adapter": null,
+      "answer_compliance_rate": 0.96875,
+      "artifacts": {
+        "episodes.jsonl": "65ca088eaa34a62b077fd9c72844303cbb4138101f1945598269e0d2845b011e",
+        "results.json": "02d59b4d3ff07d20c361917fa15b6b959151c7aa6c6f313620ad8dce3b4c2543"
+      },
+      "data_files": {
+        "hash_verified_against_manifest": true,
+        "path": "/media/imc/data/project3-search-agent-rl/datasets/searchr1-heldout32/heldout.parquet",
+        "sha256": "1f8caca3255928baeac2aafb1b1c25445533426664a9d85c5519a4d6fab6d62f"
+      },
+      "dir": "/media/imc/data/project3-search-agent-rl/runs/p3-eval-heldout32-base-s0-20260814d",
+      "elapsed_seconds": 29.763902506994782,
+      "em": 0,
+      "em_ci_95": [
+        0.0,
+        0.1071827150573635
+      ],
+      "em_rate": 0.0,
+      "failures": {
+        "answer_format": 1,
+        "invalid_action": 1,
+        "no_search": 28,
+        "retrieved_but_wrong": 2
+      },
+      "n": 32,
+      "peak_gpu_memory_allocated_bytes": 5813268992,
+      "per_source": {
+        "2wikimultihopqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "em_rate": 0.0,
+          "n": 4,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "bamboogle": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.6576
+          ],
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "hotpotqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.3244
+          ],
+          "em_rate": 0.0,
+          "n": 8,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "musique": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.6576
+          ],
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "nq": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.3244
+          ],
+          "em_rate": 0.0,
+          "n": 8,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "popqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "em_rate": 0.0,
+          "n": 4,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "triviaqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "em_rate": 0.0,
+          "n": 4,
+          "success": 0,
+          "success_rate": 0.0
+        }
+      },
+      "retrieval": {
+        "api_error_rate": 0.0,
+        "executed_searches": 4,
+        "invalid_query_rate": 0.25,
+        "statuses": {
+          "invalid_query": 1,
+          "success": 3
+        }
+      },
+      "retriever_health": {
+        "corpus_rows": 21015324,
+        "dimension": 768,
+        "index_class": "IndexFlatIP",
+        "status": "ready",
+        "vectors": 21015324
+      },
+      "run_id": "p3-eval-heldout32-base-s0-20260814d",
+      "success": 0,
+      "success_ci_95": [
+        0.0,
+        0.1071827150573635
+      ],
+      "success_rate": 0.0
+    },
+    "step2": {
+      "action_stats": {
+        "duplicate_tag_steps": 1,
+        "invalid_action_ratio": 0.23076923076923078,
+        "invalid_actions": 9,
+        "mixed_tag_steps": 6,
+        "total_steps": 39
+      },
+      "adapter": {
+        "adapter_config.json": "36f3a64193ea1941d9e7674426b42932796835a5fc9b637b7aca62f7cc427b46",
+        "adapter_model.safetensors": "6cf057bcf3f76ef89c947e5d3e3049acaabe4d7e3fadcccba0ee316c3866453d",
+        "path": "/media/imc/data/project3-search-agent-rl/runs/p3-grpo-shutdown-gate-qwen15b-s0-20260813g/checkpoints/global_step_2/actor/lora_adapter"
+      },
+      "answer_compliance_rate": 0.96875,
+      "artifacts": {
+        "episodes.jsonl": "fc70769c1ce1adc534997e5203599d5f10f2163c94f8489f7f12540e797f9ecf",
+        "results.json": "45c2484963f255e74a05e4b239f4d8345d329f4912c66906efee8b436ecf4542"
+      },
+      "data_files": {
+        "hash_verified_against_manifest": true,
+        "path": "/media/imc/data/project3-search-agent-rl/datasets/searchr1-heldout32/heldout.parquet",
+        "sha256": "1f8caca3255928baeac2aafb1b1c25445533426664a9d85c5519a4d6fab6d62f"
+      },
+      "dir": "/media/imc/data/project3-search-agent-rl/runs/p3-eval-heldout32-step2-s0-20260814e",
+      "elapsed_seconds": 49.02730871399399,
+      "em": 1,
+      "em_ci_95": [
+        0.005537717362550945,
+        0.15744607800372734
+      ],
+      "em_rate": 0.03125,
+      "failures": {
+        "answer_format": 1,
+        "invalid_action": 5,
+        "no_search": 24,
+        "retrieved_but_wrong": 1
+      },
+      "n": 32,
+      "peak_gpu_memory_allocated_bytes": 8294176256,
+      "per_source": {
+        "2wikimultihopqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "em_rate": 0.0,
+          "n": 4,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "bamboogle": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.6576
+          ],
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "hotpotqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.3244
+          ],
+          "em_rate": 0.0,
+          "n": 8,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "musique": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.6576
+          ],
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "nq": {
+          "em": 1,
+          "em_ci_95": [
+            0.0224,
+            0.4709
+          ],
+          "em_rate": 0.125,
+          "n": 8,
+          "success": 1,
+          "success_rate": 0.125
+        },
+        "popqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "em_rate": 0.0,
+          "n": 4,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "triviaqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "em_rate": 0.0,
+          "n": 4,
+          "success": 0,
+          "success_rate": 0.0
+        }
+      },
+      "retrieval": {
+        "api_error_rate": 0.0,
+        "executed_searches": 7,
+        "invalid_query_rate": 0.42857142857142855,
+        "statuses": {
+          "invalid_query": 3,
+          "success": 4
+        }
+      },
+      "retriever_health": {
+        "corpus_rows": 21015324,
+        "dimension": 768,
+        "index_class": "IndexFlatIP",
+        "status": "ready",
+        "vectors": 21015324
+      },
+      "run_id": "p3-eval-heldout32-step2-s0-20260814e",
+      "success": 1,
+      "success_ci_95": [
+        0.005537717362550945,
+        0.15744607800372734
+      ],
+      "success_rate": 0.03125
+    },
+    "step5": {
+      "action_stats": {
+        "duplicate_tag_steps": 2,
+        "invalid_action_ratio": 0.18421052631578946,
+        "invalid_actions": 7,
+        "mixed_tag_steps": 5,
+        "total_steps": 38
+      },
+      "adapter": {
+        "adapter_config.json": "88651572a208b8a9c11fdb0c2753a82582445cd13174d18c092c82cbeebeac51",
+        "adapter_model.safetensors": "85ee90752a55d0fb5330ddd82a59f406fbfaeb1ee696dc4f519f45ae6388a24c",
+        "path": "/media/imc/data/project3-search-agent-rl/runs/p3-grpo-resume-step5-qwen15b-s0-20260813h/checkpoints/global_step_5/actor/lora_adapter"
+      },
+      "answer_compliance_rate": 1.0,
+      "artifacts": {
+        "episodes.jsonl": "4fc94c4bd0e7a66a03661cfc31c40fac0d1c6b0fbff93935491236e2b410f172",
+        "results.json": "bdcf8b1be4cbb8bdd7c6a456a67a6fe8af3560ce01a05d37387f8719c416ff6c"
+      },
+      "data_files": {
+        "hash_verified_against_manifest": true,
+        "path": "/media/imc/data/project3-search-agent-rl/datasets/searchr1-heldout32/heldout.parquet",
+        "sha256": "1f8caca3255928baeac2aafb1b1c25445533426664a9d85c5519a4d6fab6d62f"
+      },
+      "dir": "/media/imc/data/project3-search-agent-rl/runs/p3-eval-heldout32-step5-s0-20260814f",
+      "elapsed_seconds": 48.837582581996685,
+      "em": 0,
+      "em_ci_95": [
+        0.0,
+        0.1071827150573635
+      ],
+      "em_rate": 0.0,
+      "failures": {
+        "invalid_action": 5,
+        "no_search": 26,
+        "retrieved_but_wrong": 1
+      },
+      "n": 32,
+      "peak_gpu_memory_allocated_bytes": 8294176256,
+      "per_source": {
+        "2wikimultihopqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "em_rate": 0.0,
+          "n": 4,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "bamboogle": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.6576
+          ],
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "hotpotqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.3244
+          ],
+          "em_rate": 0.0,
+          "n": 8,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "musique": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.6576
+          ],
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "nq": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.3244
+          ],
+          "em_rate": 0.0,
+          "n": 8,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "popqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "em_rate": 0.0,
+          "n": 4,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "triviaqa": {
+          "em": 0,
+          "em_ci_95": [
+            0.0,
+            0.4899
+          ],
+          "em_rate": 0.0,
+          "n": 4,
+          "success": 0,
+          "success_rate": 0.0
+        }
+      },
+      "retrieval": {
+        "api_error_rate": 0.0,
+        "executed_searches": 6,
+        "invalid_query_rate": 0.3333333333333333,
+        "statuses": {
+          "invalid_query": 2,
+          "success": 4
+        }
+      },
+      "retriever_health": {
+        "corpus_rows": 21015324,
+        "dimension": 768,
+        "index_class": "IndexFlatIP",
+        "status": "ready",
+        "vectors": 21015324
+      },
+      "run_id": "p3-eval-heldout32-step5-s0-20260814f",
+      "success": 0,
+      "success_ci_95": [
+        0.0,
+        0.1071827150573635
+      ],
+      "success_rate": 0.0
+    }
+  },
+  "n_questions": 32,
+  "parameters": {
+    "history_length": 2,
+    "max_input_tokens": 2048,
+    "max_new_tokens": 256,
+    "max_steps": 2,
+    "seed": 0,
+    "timeout": 180,
+    "topk": 3
+  },
+  "parameters_consistent": true,
+  "questions": [
+    "what channel is celebrity big brother on in the usa?",
+    "who sang smoke gets in your eyes first?",
+    "who made delhi as capital for the first time?",
+    "internet based test of english as a foreign language test?",
+    "what country shares borders with both belarus and romania?",
+    "when did the broncos win the super bowl?",
+    "who sang the song tell me something good?",
+    "who cooks for the president of the united states?",
+    "A private university that beat Georgetown during a basketball tournament is from what U.S. city?",
+    "The man Tony Bennet called \"The Father of Rock and Roll\" once toured with what singer who once auditioned for \"Junior Junction\", and landed a recording contract in her teens?",
+    "Kacha, Sevastopol is a settlement that is part of a sovereign state bordered on the northwest by which country?",
+    "How many rooms are in the hotel that is home to the Cirque du Soleil show Mystere?",
+    "What was the last date the creator of  the NOI was seen by Elijah Muhammad?",
+    "Clone of clones played alongside a band from where?",
+    "Which Independent Spirit Award was an actress, who was in a film directed by Neil LaBute, nominated for?",
+    "Abba Kovner  was a Jewish Hebrew and Yiddish poet, writer and cousin of the youngest and longest surviving signatory of what?",
+    "Who was the screenwriter for ...Y mañana serán mujeres?",
+    "What genre is Demons?",
+    "In what city was Maarten Biesheuvel born?",
+    "Who was the producer of Expectations?",
+    "Where was the director of film Chha Mana Atha Guntha born?",
+    "Who is María De Las Mercedes, Princess Of Asturias's mother-in-law?",
+    "Which film came out first, Stag Night Of The Dead or Winter Of Frozen Dreams?",
+    "Who is Princess Augusta Of Waldeck-Pyrmont's paternal grandfather?",
+    "What weight was Dr Robert Atkins, famous for the Atkins diet when he died?",
+    "A high quality soft warm goat's wool was first made famous in the 14th century in what mountainous region, where the goats were farmed?",
+    "Formula 1 driver Ayrton Senna died while leading the 1994 San Marino Grand Prix at which motor racing circuit?",
+    "What was the previous name of the city of Maputo?",
+    "What is the highest city in the state where Dell ranks sixth by revenue?",
+    "What law was passed by Maria Shriver's husband?",
+    "When did the person who delivered the Gettysburg Address die?",
+    "When did the first prime minister of the Russian Empire come into office?"
+  ],
+  "retriever_note": "real Wiki-18 IndexFlatIP (21,015,324 vectors); ground-truth-derived fixture is prohibited for evaluation",
+  "sources": [
+    "2wikimultihopqa",
+    "bamboogle",
+    "hotpotqa",
+    "musique",
+    "nq",
+    "popqa",
+    "triviaqa"
+  ]
+}

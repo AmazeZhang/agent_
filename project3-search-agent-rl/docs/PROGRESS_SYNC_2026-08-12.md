@@ -275,3 +275,58 @@ Step 2与Step 5的同条件held-out评测和多seed/baseline，而不是盲目�
 任一smoke失败即停止；六个Run结束后做逐题配对分析、精确停止Retriever和资源验收。详细顺序、
 Run ID、停机条件与结论边界见`docs/P3_NEXT_ACTIONS_2026-08-14.md`。本轮仅写计划，未启动GPU、
 Retriever或训练。
+
+## 2026-08-14：Held-out 评测 GPU 阶段执行完成
+
+按 `docs/P3_NEXT_ACTIONS_2026-08-14.md` 完成六个纯评测 Run（全部 exit_code=0、逐 Run 验收通过）：
+
+| Run ID | 模型 | 数据 | EM | success |
+|---|---|---|---|---|
+| p3-eval-smoke-base-s0-20260814a | Base | smoke-16 | 0/16 | 0/16 |
+| p3-eval-smoke-step2-s0-20260814b | Step 2 | smoke-16 | 1/16 | 1/16 |
+| p3-eval-smoke-step5-s0-20260814c | Step 5 | smoke-16 | 2/16 | 2/16 |
+| p3-eval-heldout32-base-s0-20260814d | Base | heldout-32 | 0/32 | 0/32 |
+| p3-eval-heldout32-step2-s0-20260814e | Step 2 | heldout-32 | 1/32 | 1/32 |
+| p3-eval-heldout32-step5-s0-20260814f | Step 5 | heldout-32 | 0/32 | 0/32 |
+
+smoke-16 三个 Run 只作为管线门禁（模型加载、LoRA 挂载、门禁、原子产物均正常），不用于质量声明。
+heldout-32 三组同数据 SHA（`1f8caca3…`）、同 seed/参数/后端（HF greedy, temperature 0）、
+leakage=0、Retriever health `ready`+`vectors=21015324`。
+
+**heldout-32 结果解读（详见 `docs/eval-heldout32-20260814/comparison.md` 与 comparison.json）：**
+
+- EM：base 0/32（95% CI 0.0–10.7%）、step2 1/32（0.6–15.7%）、step5 0/32（0.0–10.7%）；
+  success 与 EM 相同；answer 合规率 96.9%/96.9%/100%。
+- 配对 McNemar：base↔step2、base↔step5、step2↔step5 的不一致对分别为 1/0/1，两尾精确 p 均为 1.0，
+  三组无统计显著差异（32 题小样本，区间大幅重叠）。
+- 失败分类（EM=0 的 episodes）：未搜索直接作答占绝对主导（base 28、step2 24、step5 26）；
+  无效动作 step2/5 各 5 例（base 1 例，混合/重复标签为主）；检索到但答错 2/1/1；检索失败 0；
+  无 answer 格式 1/1/0。
+- 单条 EM（step2 的 nq "celebrity big brother"）是参数记忆命中（CBS），未检索即答对，
+  不能视为搜索行为改善。训练后模型（step2/5）搜索调用次数没有增加，无效动作反而更多。
+
+**结论（按既定判定路线）：Step 5 在 heldout-32 上无一致正向信号，Step 2 仅 1/32 且不显著。**
+因此**不追加 20 步训练**。下一步进入"排查训练配置"分支：围绕 reward（检索成功/信息增益是否进 reward）、
+prompt 动作格式（<think>+<search> 引导、few-shot）、rollout n/group size、学习率与格式奖励，
+设计最小修正实验（如动作格式对齐 + 检索奖励）后重训对照。若后续配置修正产生明确提升，
+再用 verl/vLLM 原生评测复核关键结论（HF greedy 与训练 vLLM rollout 存在 backend 差异，已在
+results.json 的 decoding_note 中声明）。
+
+**遇到的问题与解决：**
+
+1. Retriever 首启失败：`serve_p25_cpu_retriever.py` 在未设 `PYTHONNOUSERSITE=1` 时从
+   `~/.local/lib/python3.10/site-packages` 加载 transformers，与 env 内 importlib 混装导致
+   导入 traceback。解决：按旧会话已验证模式 `env CUDA_VISIBLE_DEVICES='' PYTHONNOUSERSITE=1
+   OMP_NUM_THREADS=24 MKL_NUM_THREADS=24 …` 重启，/health 即返回 ready + 21015324。
+   后续受管评测 wrapper 自带 `PYTHONNOUSERSITE=1` 导出，不受此问题影响。
+2. 一次 adapter 路径"不存在"误报：检查命令用了仓库相对路径，而 runs 在数据盘根下，属检查
+   命令基目录错误，非产物缺失；改用数据盘绝对路径后确认 Step 2/Step 5 adapter 均在位。
+3. 分析脚本首轮测试 3 个断言失败均为测试期望手算错误（Wilson 宽度≈0.35 而非 <0.25；
+   McNemar 平衡不一致对为 3 而非 4；base↔step5 不一致对各 1 → p=1.0 而非 0.5），
+   实现本身正确，修正测试后 12/12 通过。
+4. 资源检查时 pgrep 自匹配问题：进程名模式出现在 pgrep 自身命令行导致误报；改用
+   `ps -eo pid,comm,args` + comm 过滤后确认无 python 残留进程。
+
+**资源验收（Gate 4）**：Retriever 仅以精确 Ctrl-C 停止（tmux 会话 `p3-eval-retriever-20260814`），
+端口 18080 无监听、无 python retriever/评测进程；八卡显存全部回基线（GPU1 18 MiB，0% util；
+GPU0 仅桌面进程 354 MiB，未触碰）。旧 8-13 tmux 会话与历史产物未做任何删除。
