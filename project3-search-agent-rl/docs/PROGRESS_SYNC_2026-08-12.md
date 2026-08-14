@@ -266,3 +266,12 @@ Step 2与Step 5的同条件held-out评测和多seed/baseline，而不是盲目�
 3. 决策记录：smoke manifest 将 smoke 集限定为协议测试、`forbidden_use` 含质量声明
    → 采用两层结构：smoke-16 只做管线门禁（方向信号），heldout-32（新建、去重、
    记录 SHA256）作为 Step 0/2/5 第一轮正式对比证据。
+
+## 2026-08-14：下一阶段已固定（尚未启动GPU）
+
+只读交接检查确认heldout-32、Base/Step 2/Step 5评测代码和Adapter路径均已准备完成；宿主机
+物理GPU1当前为18MiB，数据盘约3.0TiB可用，无评测/Ray/Retriever进程。下一阶段严格串行执行
+三组smoke-16门禁和三组heldout-32对比，均使用HF纯评测、物理GPU1、真实CPU Wiki-18和新Run ID。
+任一smoke失败即停止；六个Run结束后做逐题配对分析、精确停止Retriever和资源验收。详细顺序、
+Run ID、停机条件与结论边界见`docs/P3_NEXT_ACTIONS_2026-08-14.md`。本轮仅写计划，未启动GPU、
+Retriever或训练。
