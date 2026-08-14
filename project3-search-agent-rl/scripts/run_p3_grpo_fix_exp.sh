@@ -7,6 +7,8 @@
 #     from env.rollout.n, see agent_system/environments/env_manager.py:609)
 #   - patch gate includes 0004 (env prompt + format reward)
 #   - experiment name marks the fix set
+# Round 2 (2026-08-14, preregistered ladder): PROJECT3_FIX_EXP_LR=1e-5
+# (default 3e-6 keeps round 1 reproducible).
 # NOTE: actor_rollout_ref.rollout.n MUST stay 1 (hard fork assertion in
 # verl/trainer/main_ppo.py:173; GRPO is achieved via env.rollout.n).
 # See docs/P3_MINIMAL_FIX_EXPERIMENT_2026-08-14.md for pre-registered criteria.
@@ -33,6 +35,7 @@ run_dir="${PROJECT3_RUN_DIR:-${project_data}/dry-run/p3-grpo-fix-exp}"
 resume_from="${PROJECT3_RESUME_FROM:-}"
 total_training_steps="${PROJECT3_TOTAL_TRAINING_STEPS:-5}"
 total_epochs="${PROJECT3_TOTAL_EPOCHS:-5}"
+fix_exp_lr="${PROJECT3_FIX_EXP_LR:-3e-6}"
 
 for required_path in "$python_bin" "$model_path" "$dataset_dir/train.parquet" "$dataset_dir/test.parquet"; do
   if [[ ! -e "$required_path" ]]; then
@@ -91,7 +94,7 @@ overrides=(
   "actor_rollout_ref.model.target_modules=all-linear"
   "actor_rollout_ref.model.enable_gradient_checkpointing=true"
   "actor_rollout_ref.model.use_remove_padding=true"
-  "actor_rollout_ref.actor.optim.lr=3e-6"
+  "actor_rollout_ref.actor.optim.lr=${fix_exp_lr}"
   "actor_rollout_ref.actor.optim.lr_warmup_steps=0"
   "actor_rollout_ref.actor.ppo_mini_batch_size=8"
   "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1"
@@ -130,7 +133,7 @@ overrides=(
   "env.search.log_requests=true"
   "trainer.logger=['console']"
   "trainer.project_name=search_r1_repro"
-  "trainer.experiment_name=p3_grpo_fix_n4_prompt_fmt_qwen25_15b_lora32_seed0"
+  "trainer.experiment_name=p3_grpo_fix_lr${fix_exp_lr}_n4_prompt_fmt_qwen25_15b_lora32_seed0"
   "trainer.n_gpus_per_node=1"
   "trainer.nnodes=1"
   "trainer.total_epochs=${total_epochs}"
