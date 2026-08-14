@@ -225,3 +225,44 @@ EXPECTED_TERMINATION SIGTERM，且8题单seed smoke不构成完整复现或质�
 且未执行held-out validation，因此只能认定短程工程闭环通过，不能声称质量提升、收敛、泛化或
 完整复现。完成报告见`docs/P3_FIVE_STEP_PROMOTION_COMPLETION_2026-08-13.md`；下一步优先建立
 Step 2与Step 5的同条件held-out评测和多seed/baseline，而不是盲目扩大到20步。
+
+## 2026-08-13：Held-out 评测管线（CPU 阶段完成，未启动 GPU）
+
+已拍板：评测集 = smoke-16 管线门禁 + heldout-32 正式对比；实现 = HF 侧轻量评测
+（复用`run_p2_model_search.py`骨架，构造性零训练：无优化器/无 backward/无 Ray）。
+
+1. `scripts/build_p3_heldout_eval.py`（CPU-only）从上游 test 51,713 条确定性抽样32条
+   （SHA256升序+分源配额），排除上游 train 169,615 条、smoke train 8 条、smoke test
+   16 条中出现的规范化问题；拒绝覆盖已有输出；重建两次 `heldout.parquet` 与
+   `records.jsonl` SHA256 完全一致；泄漏计数全为0。产物在
+   `/media/imc/data/project3-search-agent-rl/datasets/searchr1-heldout32/`
+   （heldout.parquet sha256 `1f8caca3…`、records.jsonl `63ddd14a…`、manifest.json）；
+2. `scripts/run_p3_eval_heldout.py`：固定评测参数与训练一致（seed 0、max_steps 2、
+   history 2、topk 3、timeout 180、prompt 2048 / new 256、贪心解码）；启动门禁全部
+   abort（受管运行、单卡非GPU0、Retriever `/health` 且 vectors==21015324、数据SHA256
+   与manifest核对、评测问题∩smoke-train=∅）；逐步证据 JSONL + `results.json` 原子写；
+   指标含总体/分源 EM、success、无效查询率、格式错误率、离线EM复核；
+3. `scripts/run_p3_eval_heldout.sh` 受管 wrapper：commit pin、路径、loopback URL、
+   受管运行、单卡GPU1、补丁应用、EVAL_DATA 合法值与 adapter 目录门禁，与训练同构；
+4. `tests/test_eval_heldout.py` 10项 CPU 测试全绿；相关既有套件 33 passed
+   （test_p25_cpu_retriever_service.py 需 retriever CPU 环境，本环境跳过）；
+5. 详细计划与结果规范见`docs/P3_HELDOUT_EVAL_PLAN_2026-08-13.md`。
+
+本轮**未占用 GPU、未启动真实 Retriever、未训练**。GPU 阶段（preflight → tmux 启动
+真实 Retriever → 6 个受管评测 Run：3模型×smoke-16 + 3模型×heldout-32 → 退出验收 →
+汇总+Wilson置信区间）需另行批准；有明确提升才用 verl/vLLM 原生评测复核并进入
+多seed/更大评测，无提升则排查训练配置，不直接跑20步。
+
+### 遇到的问题与解决（2026-08-13 CPU 阶段）
+
+1. `atomic_write_jsonl` 对 numpy 标量（`np.int64`）抛
+   `TypeError: Object of type int64 is not JSON serializable`：写入前统一经
+   `jsonable()` 归一化（info/observation 本就走 jsonable，写入器现在同样防御性
+   归一化，避免证据文件在写盘阶段静默失败）；修复后 10/10 测试通过。
+2. 全量 `pytest` 收集 `tests/test_p25_cpu_retriever_service.py` 报
+   `ModuleNotFoundError: No module named 'faiss'`：既有环境差异（faiss 只在
+   `searchr1-retriever-cpu` 环境），与本轮改动无关；本环境相关套件 33 passed，
+   该文件按惯例在 retriever CPU 环境运行。
+3. 决策记录：smoke manifest 将 smoke 集限定为协议测试、`forbidden_use` 含质量声明
+   → 采用两层结构：smoke-16 只做管线门禁（方向信号），heldout-32（新建、去重、
+   记录 SHA256）作为 Step 0/2/5 第一轮正式对比证据。
