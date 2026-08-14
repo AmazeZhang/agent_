@@ -536,3 +536,40 @@ n=4、lr=3e-6、train_batch_size=8、8 个 optimizer steps（1 epoch 覆盖 64 �
 
 **资源验收**：训练与评测 exit 0，GPU1 回基线（cleanup.log compute_processes=none），
 run 目录全部保留。train-64 训练（GPU）待批准后执行。
+
+### 2026-08-14（续 3）：train64-nqh（主线扩大训练集）执行完成 —— 无 heldout 改善，转查动作格式/奖励设计
+
+**决策（用户）**：不采用双池混合 train-64 作为主线（32 条来自上游 test，破坏
+Search-R1 跨数据集泛化口径）。主线改为 **train64-nq-hotpot**：仅上游 train，
+NQ 32 + HotpotQA 32，排除 smoke/heldout 问题；混合版保留为备选证据不删除。
+其余 5 源保持纯净，作真正的跨源泛化测试。训练配置批准：batch=8、rollout.n=4、
+lr=3e-6、8 optimizer steps、1 epoch、保留 prompt 修复与 format_score=0.1；
+heldout-32 不变。
+
+**数据集**（`scripts/build_p3_train64.py` 扩展 selection-domain/配额参数，默认
+仍可重建混合版 `029e1a7f`）：主线 `datasets/searchr1-train64-nqh/train.parquet`，
+domain `searchr1-p3-train64-nqh-v1`，SHA `df3464c8…`，64 行（nq 32 + hotpotqa
+32），泄漏 0（smoke/heldout 规范化问题零重叠），跨池重复 0，与混合版问题
+零重叠（新 domain 完全不同的抽样），重建确定性匹配。
+
+**训练（run `p3-grpo-fix-train64-nqh-n4-prompt-fmt-s0-20260814a`，GPU1）**：
+exit 0；自检首行 `[FIX_EXP] resolved: fix_exp_data=train64-nqh fix_exp_lr=3e-6
+fix_exp_n=4 total_training_steps=8 total_epochs=1`；train_files/val_files 解析
+正确（val 用 smoke test.parquet，train64-nqh 无 test.parquet）。8 个 checkpoint
+（步 1–8），每步 ~166-169s（与 smoke n=4 的 ~175s 一致——batch 不变则每步计算量
+不变，印证用户预判）。step1–8 reward/mean 全非零（0.128–0.206）、tool_call
+0.34–0.59、success 0.06–0.13。
+
+**heldout-32 eval（run `p3-eval-heldout32-train64nqh-step8-s0-20260814a`）**：
+train64nqh8 EM **2/32**，与 base/step5old 完全持平；**McNemar 不一致对 = 0**
+（与 base 答对的是同一批 2 道题：2wiki 1 + nq 1），p=1.0；搜索率 31%
+（no_search 22/32，与前几轮一致）；无效动作率 24.4%（仍 > 18.4% 门槛）；
+answer 合规 100%；数据 SHA `1f8caca3…` 核对 True。对比报告：
+`eval-heldout32-train64nqh-20260814/`。
+
+**判定（用户预注册路线）**：扩大训练集（64 行 × 1 epoch）无 heldout 改善 →
+**转查动作格式/奖励设计，不继续堆数据和 epochs**（也不做多 seed / heldout-64）。
+
+**资源验收**：训练与评测 exit 0，GPU1 回基线（cleanup.log compute_processes=none），
+run 目录全保留；retriever 会话 `p3-fix3b-retriever-20260814` 继续运行（下一步
+排查如需复用）。
