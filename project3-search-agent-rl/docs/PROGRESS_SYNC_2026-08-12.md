@@ -384,3 +384,53 @@ lr 3e-6、5 步、GPU1、真实 retriever）。预注册判据：训练 reward �
 **下一步（待 GPU 批准）**：`run_p3_grpo_fix_exp.sh` 训练 5 步（run ID
 `p3-grpo-fix-n4-prompt-fmt-s0-20260814a`），然后 heldout-32 三模型对比
 （base / old step5 / new step5'），对照预注册标准验收。
+
+### 2026-08-14（续）：最小修正实验 GPU 执行完成
+
+**训练（run `p3-grpo-fix-n4-prompt-fmt-s0-20260814b`，5 步，GPU1）**：exit 0。
+对比 Attempt H（reward 全 0），本轮 5 步 `episode/reward/mean` 全部非零
+（0.172/0.137/0.166/0.153/0.184，max 1.0 每步都有答对），`tool_call_count/mean`
+0.44–0.56（约半数轨迹输出 `<search>`，Attempt H 同期为 0），entropy 0.91→0.78
+（策略在收紧）。score 分布：0.1×27 格式对答错、1.0×3 答对、0.9×2 答对+1 无效
+动作、-0.1×6 无效动作惩罚（fork `apply_invalid_action_penalty`，本就生效）。
+
+**heldout-32 三模型 eval（run f/g/h，正确数据）**：base 2/32、step5old 2/32、
+step5new 2/32 —— **三模型答对的完全同一批问题（2wiki 1 + nq 1），McNemar 不一致
+对 = 0，p = 1.0，无方向性差异**。无效动作率 step5new 26.8%（< old 34.9% 但 >
+预注册 18.4%）；no_search 22/32（搜索调用率仅 31%，< 预注册 50%）；answer 合规
+100%（few-shot 指令确实教会了 `<answer>` 标签格式）。
+
+**预注册判据核对**：
+
+| 判据 | 结果 |
+|---|---|
+| 训练 reward 非零（step5 均值 > 0） | ✓ 0.184 |
+| 搜索调用率 ≥ 50%（eval） | ✗ 31% |
+| 无效动作率 < 18.4%（eval） | ✗ 26.8% |
+| EM ≥ 2/32 且方向为正 | △ 2/32 达到下限，但与 base 零差异 |
+
+**结论**：修正实验部分成功（训练信号恢复、搜索行为出现、格式合规），但 8 行
+smoke × 5 步预算下 heldout 无提升。按预注册失败路线进入第二轮：调 lr（1e-5）→
+env.rollout.n（8）→ epochs（10）→ max_response（512），不追加 20 步。
+
+**遇到的问题与解决：**
+
+1. 训练首启 exit 1：fork 硬断言 `actor_rollout_ref.rollout.n==1`
+   （`verl/trainer/main_ppo.py:173`，GRPO 组在 env 侧 `env_manager.py:609`）。
+   修正：改 `env.rollout.n=4`（Attempt H 为 2），`actor_rollout_ref.rollout.n`
+   保持 1。诊断文档 #3 根因表述同步修正（机制是"组内全零 reward → mean=0/std=0
+   → advantage 恒零"，非单样本组退化）。
+2. eval 首轮 c/d/e 三 run 实际加载了 smoke-16（`data_files` 指纹为
+   `searchr1-smoke/test.parquet`、n=16）：外层 `PROJECT3_EVAL_DATA=... bash
+   start_tmux_run.sh` 的环境变量不进入 tmux 会话（tmux server 环境继承），
+   wrapper 落到默认 `smoke`。修正：把 `env PROJECT3_EVAL_DATA=heldout32
+   PROJECT3_EVAL_ADAPTER=...` 放在 `--` 之后的命令里（与 8-13 六个 eval run
+   的 command.txt 一致）。重跑 f/g/h（32 条、数据 SHA `1f8caca3…` 与 manifest
+   一致）。错误 run c/d/e 的产物保留未删。
+3. gpu_guard 拒绝并行：d/e 与 c 同时启动被 `physical GPU 1 already has compute
+   processes` 拒绝（exit 3）；改为串行启动后全部成功。8-13 六个 eval run 实为
+   串行启动，本次并行尝试被正确拦截。
+
+**资源验收**：训练与三个 eval 后，GPU 八卡全部回基线（GPU1 18 MiB 0%）、无
+python 残留、retriever 以精确 Ctrl-C 停止（会话 `p3-fix-retriever-20260814`），
+端口 18080 释放。所有 run 目录（含失败启动 a 与错误数据 c/d/e）保留未删。
