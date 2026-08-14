@@ -9,10 +9,12 @@ must never overlap the heldout eval set).
 
 Pool split (audited 2026-08-14): upstream train.parquet contains only nq +
 hotpotqa; the other five sources exist only in upstream test.parquet.
-Hybrid pools maximize train-split provenance:
-  - train pool (upstream train.parquet): nq 16, hotpotqa 16
-  - test pool (upstream test.parquet): popqa 8, 2wikimultihopqa 8,
-    triviaqa 8, musique 4, bamboogle 4
+Default quotas build the hybrid backup set (nq/hotpotqa from the train
+pool; popqa/2wikimultihopqa/triviaqa/musique/bamboogle from the test
+pool). The mainline train64-nq-hotpot set uses a fresh selection domain
+`searchr1-p3-train64-nqh-v1` with train-pool-only quotas
+nq 32 + hotpotqa 32 (test pool quotas empty), so the other five sources
+stay untouched as a true cross-source generalization test.
 Both pools exclude smoke + heldout normalized questions; the shared
 `seen` set dedupes across pools too (same question in both pools).
 
@@ -20,7 +22,9 @@ Output: datasets/searchr1-train64/train.parquet (schema identical to
 smoke train.parquet) + manifest.json (source hashes, quotas, leakage
 assertions, output SHA256).
 
-Rebuilding must reproduce the same SHA256 (determinism).
+Rebuilding with the same arguments must reproduce the same SHA256
+(determinism). The selection domain is part of the stable key, so
+different domains select different rows.
 """
 
 from __future__ import annotations
@@ -34,6 +38,7 @@ from typing import Any
 import pandas as pd
 
 SELECTION_DOMAIN = "searchr1-p3-train64-v1"
+# Hybrid backup set (kept as alternative evidence, never deleted).
 TRAIN_POOL_QUOTAS: dict[str, int] = {
     "nq": 16,
     "hotpotqa": 16,
@@ -45,7 +50,11 @@ TEST_POOL_QUOTAS: dict[str, int] = {
     "musique": 4,
     "bamboogle": 4,
 }
+# Mainline set: only upstream train split, NQ 32 + HotpotQA 32.
+NQH_SELECTION_DOMAIN = "searchr1-p3-train64-nqh-v1"
+NQH_TRAIN_QUOTAS: dict[str, int] = {"nq": 32, "hotpotqa": 32}
 assert sum(TRAIN_POOL_QUOTAS.values()) + sum(TEST_POOL_QUOTAS.values()) == 64
+assert sum(NQH_TRAIN_QUOTAS.values()) == 64
 
 
 def sha256_file(path: Path) -> str:
@@ -60,8 +69,8 @@ def normalize_question(question: str) -> str:
     return " ".join(question.casefold().split())
 
 
-def stable_key(source: str, question: str, index: int) -> tuple[str, int]:
-    payload = f"{SELECTION_DOMAIN}\0{source}\0{normalize_question(question)}".encode()
+def stable_key(domain: str, source: str, question: str, index: int) -> tuple[str, int]:
+    payload = f"{domain}\0{source}\0{normalize_question(question)}".encode()
     return hashlib.sha256(payload).hexdigest(), index
 
 
@@ -72,6 +81,7 @@ def normalized_question_set(frame: pd.DataFrame) -> set[str]:
 def select_rows(
     frame: pd.DataFrame,
     quotas: dict[str, int],
+    domain: str,
     seen: set[str],
     duplicate_skips: list[str],
 ) -> list[int]:
@@ -85,7 +95,7 @@ def select_rows(
             normalized = normalize_question(question)
             if normalized in seen:
                 continue
-            candidates.append((stable_key(source, question, int(index)), int(index), normalized))
+            candidates.append((stable_key(domain, source, question, int(index)), int(index), normalized))
         candidates.sort()
         source_selected = 0
         for _, index, normalized in candidates:
@@ -135,7 +145,22 @@ def main() -> None:
     parser.add_argument("--smoke-train", type=Path, required=True, help="smoke train.parquet (excluded)")
     parser.add_argument("--heldout", type=Path, required=True, help="heldout-32 heldout.parquet (excluded, leakage guard)")
     parser.add_argument("--out-dir", type=Path, required=True, help="output directory (train64)")
+    parser.add_argument("--selection-domain", default=SELECTION_DOMAIN,
+                        help="selection domain; part of the stable key, so a "
+                             "fresh domain selects different rows")
+    parser.add_argument("--train-quotas", type=json.loads, default=TRAIN_POOL_QUOTAS,
+                        help='JSON dict of train-pool quotas, e.g. \'{"nq": 32, "hotpotqa": 32}\'')
+    parser.add_argument("--test-quotas", type=json.loads, default=TEST_POOL_QUOTAS,
+                        help="JSON dict of test-pool quotas (empty {} disables the test pool)")
     args = parser.parse_args()
+
+    train_quotas = {k: int(v) for k, v in args.train_quotas.items()}
+    test_quotas = {k: int(v) for k, v in args.test_quotas.items()}
+    total = sum(train_quotas.values()) + sum(test_quotas.values())
+    if total != 64:
+        raise SystemExit(f"quota total must be 64, got {total}")
+    if test_quotas and args.selection_domain != SELECTION_DOMAIN:
+        raise SystemExit("test-pool quotas are only allowed with the default hybrid domain")
 
     for path in (args.train_source, args.test_source, args.smoke_train, args.heldout):
         if not path.is_file():
@@ -152,8 +177,8 @@ def main() -> None:
     seen: set[str] = set(smoke_questions | heldout_questions)
     duplicate_skips: list[str] = []
 
-    train_indexes = select_rows(train, TRAIN_POOL_QUOTAS, seen, duplicate_skips)
-    test_indexes = select_rows(test, TEST_POOL_QUOTAS, seen, duplicate_skips)
+    train_indexes = select_rows(train, train_quotas, args.selection_domain, seen, duplicate_skips)
+    test_indexes = select_rows(test, test_quotas, args.selection_domain, seen, duplicate_skips)
     selected = pd.concat(
         [train.loc[train_indexes], test.loc[test_indexes]], ignore_index=True
     )
@@ -161,7 +186,7 @@ def main() -> None:
         raise RuntimeError(f"selected {len(selected)} rows, expected 64")
 
     actual_quotas = selected.groupby("data_source").size().to_dict()
-    expected_quotas = {**TRAIN_POOL_QUOTAS, **TEST_POOL_QUOTAS}
+    expected_quotas = {**train_quotas, **test_quotas}
     if actual_quotas != expected_quotas:
         raise RuntimeError(f"quota mismatch: {actual_quotas}")
 
@@ -206,16 +231,20 @@ def main() -> None:
             "round; not itself a quality claim."
         ),
         "selection": (
-            "per-source quota, ascending SHA256(searchr1-p3-train64-v1\\0source\\0"
+            f"per-source quota, ascending SHA256({args.selection_domain}\\0source\\0"
             "normalized_question), original row index as tiebreaker; excludes "
             "smoke-train (8) and heldout-32 (32) normalized questions; "
             "cross-pool dedupe on normalized question"
         ),
+        "selection_domain": args.selection_domain,
         "pool_split": (
             "upstream train.parquet holds only nq+hotpotqa; the other five "
             "sources exist only in upstream test.parquet (audited 2026-08-14). "
-            "nq/hotpotqa selected from the train pool; popqa/2wikimultihopqa/"
-            "triviaqa/musique/bamboogle from the test pool."
+            "Hybrid backup domain (searchr1-p3-train64-v1): nq/hotpotqa from "
+            "the train pool; the other five sources from the test pool. "
+            "Mainline domain (searchr1-p3-train64-nqh-v1): train pool only, "
+            "nq 32 + hotpotqa 32, test pool quotas empty -- other five "
+            "sources stay untouched as a true cross-source generalization test."
         ),
         "quotas": expected_quotas,
         "code_revisions": {"root": "<set-by-builder>"},
@@ -240,6 +269,7 @@ def main() -> None:
         for record in records:
             stream.write(json.dumps(record) + "\n")
 
+    print(f"selection domain: {args.selection_domain}")
     print(f"selected 64 rows -> {parquet_path}")
     print(f"output sha256: {output_sha}")
     print(f"leakage: smoke={len(overlap_smoke)} heldout={len(overlap_heldout)}")

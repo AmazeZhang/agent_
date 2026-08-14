@@ -11,6 +11,13 @@
 # (default 3e-6 keeps round 1 reproducible).
 # Round 3 (2026-08-14, preregistered ladder): PROJECT3_FIX_EXP_N=8
 # (default 4 keeps rounds 1-2 reproducible). No further rounds auto-run.
+# Data enlargement (2026-08-14, user-approved mainline):
+#   PROJECT3_FIX_EXP_DATA=train64-nqh (only upstream train split, nq 32 +
+#   hotpotqa 32, smoke+heldout excluded) with PROJECT3_TOTAL_TRAINING_STEPS=8
+#   PROJECT3_TOTAL_EPOCHS=1 (8 optimizer steps = 1 epoch over 64 rows, batch 8).
+#   PROJECT3_VAL_DIR overrides the val-file directory (train64-nqh has no
+#   test.parquet; val keeps the smoke test set). The hybrid backup set
+#   (searchr1-train64) is retained as alternative evidence, never deleted.
 # NOTE: actor_rollout_ref.rollout.n MUST stay 1 (hard fork assertion in
 # verl/trainer/main_ppo.py:173; GRPO is achieved via env.rollout.n).
 # See docs/P3_MINIMAL_FIX_EXPERIMENT_2026-08-14.md for pre-registered criteria.
@@ -31,7 +38,14 @@ data_root="${PROJECT3_DATA_ROOT:-/media/imc/data}"
 project_data="${data_root}/project3-search-agent-rl"
 python_bin="${project_data}/envs/searchr1-repro-cu124/bin/python"
 model_path="${project_data}/models/Qwen2.5-1.5B-Instruct"
-dataset_dir="${project_data}/datasets/searchr1-smoke"
+fix_exp_data="${PROJECT3_FIX_EXP_DATA:-smoke}"
+case "$fix_exp_data" in
+  smoke) dataset_dir="${project_data}/datasets/searchr1-smoke" ;;
+  train64-nqh) dataset_dir="${project_data}/datasets/searchr1-train64-nqh" ;;
+  *) echo "unknown PROJECT3_FIX_EXP_DATA: ${fix_exp_data}" >&2; exit 20 ;;
+esac
+# train64-nqh has no test.parquet; keep the smoke test set for val files.
+val_dir="${PROJECT3_VAL_DIR:-$dataset_dir}"
 retriever_url="${PROJECT3_RETRIEVER_URL:-http://127.0.0.1:18080/retrieve}"
 run_dir="${PROJECT3_RUN_DIR:-${project_data}/dry-run/p3-grpo-fix-exp}"
 resume_from="${PROJECT3_RESUME_FROM:-}"
@@ -40,7 +54,7 @@ total_epochs="${PROJECT3_TOTAL_EPOCHS:-5}"
 fix_exp_lr="${PROJECT3_FIX_EXP_LR:-3e-6}"
 fix_exp_n="${PROJECT3_FIX_EXP_N:-4}"
 
-for required_path in "$python_bin" "$model_path" "$dataset_dir/train.parquet" "$dataset_dir/test.parquet"; do
+for required_path in "$python_bin" "$model_path" "$dataset_dir/train.parquet" "$val_dir/test.parquet"; do
   if [[ ! -e "$required_path" ]]; then
     echo "required path missing: ${required_path}" >&2
     exit 11
@@ -79,14 +93,14 @@ fi
 
 # Self-check: resolved experimental values must be visible on the first
 # stdout line of every run (guard against tmux env passthrough loss).
-echo "[FIX_EXP] resolved: fix_exp_lr=${fix_exp_lr} fix_exp_n=${fix_exp_n} total_training_steps=${total_training_steps} total_epochs=${total_epochs}"
+echo "[FIX_EXP] resolved: fix_exp_data=${fix_exp_data} fix_exp_lr=${fix_exp_lr} fix_exp_n=${fix_exp_n} total_training_steps=${total_training_steps} total_epochs=${total_epochs}"
 
 overrides=(
   "algorithm.adv_estimator=grpo"
   "algorithm.norm_adv_by_std_in_grpo=true"
   "algorithm.use_kl_in_reward=false"
   "data.train_files=${dataset_dir}/train.parquet"
-  "data.val_files=${dataset_dir}/test.parquet"
+  "data.val_files=${val_dir}/test.parquet"
   "data.train_batch_size=8"
   "data.val_batch_size=16"
   "data.max_prompt_length=2048"
@@ -141,7 +155,7 @@ overrides=(
   "env.search.log_requests=true"
   "trainer.logger=['console']"
   "trainer.project_name=search_r1_repro"
-  "trainer.experiment_name=p3_grpo_fix_lr${fix_exp_lr}_n${fix_exp_n}_prompt_fmt_qwen25_15b_lora32_seed0"
+  "trainer.experiment_name=p3_grpo_fix_${fix_exp_data}_lr${fix_exp_lr}_n${fix_exp_n}_prompt_fmt_qwen25_15b_lora32_seed0"
   "trainer.n_gpus_per_node=1"
   "trainer.nnodes=1"
   "trainer.total_epochs=${total_epochs}"
