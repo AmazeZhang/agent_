@@ -492,3 +492,47 @@ McNemar 不一致对 = 0，p = 1.0。无效动作率 29.3%（三轮无改善趋�
 **资源验收**：GPU 八卡回基线（GPU1 18 MiB 0%）、无 python 残留、retriever 精确
 Ctrl-C 停止（会话 `p3-fix3-retriever-20260814`）、端口 18080 释放。三轮全部 run
 目录保留未删。
+
+### 2026-08-14（续 2）：第三轮 n=8 修正重跑（run b）执行完成 —— smoke-8 触顶判定成立，train-64 已就绪
+
+**背景**：第三轮（a）因 tmux env passthrough 陷阱实际未生效（resolved hydra 仍为
+n=4）。修正方案（wrapper 自检首行 + `-- env PROJECT3_FIX_EXP_N=8` 传参，commit
+e35c8cc）后重跑。
+
+**n=8 生效核验（用户要求的三个判据全部通过）**：
+
+| 判据 | n=4（run b 参照） | n=8（run b） | 结论 |
+|---|---|---|---|
+| resolved hydra `env.rollout.n` | 4 | **8**（`actor_rollout_ref.rollout.n=1` 不变） | ✓ |
+| rollouts 行数/步 | 46 / 50 | **91 / 101**（1.98x / 2.02x） | ✓ |
+| global_seqlen（生成 token 量） | 25933 | **49232**（1.9x）；perf/total_num_tokens 同步 | ✓ |
+
+训练（run `p3-grpo-fix-n8-prompt-fmt-s0-20260814b`）exit 0，5 步全非零 reward，
+step5：reward/mean 0.175、tool_call_count 0.344、valid_action_ratio 0.698（三轮
+最高）、success_rate 0.094。每步 301s（n=4 为 175s，与 rollout 量翻倍吻合）。
+
+**heldout-32 eval（run `p3-eval-heldout32-fix3b-step5new-s0-20260814a`）**：
+step5new3b EM 2/32，与 base/step5old 持平。配对 McNemar：base↔new 不一致对=2
+（1 对 new 胜：nq "celebrity big brother"；1 对 new 负：nq "Stag Night…"），
+p=1.0 无方向性。搜索率 28%（no_search 23/32，较前轮 31% 略降）；无效动作率
+22.5%（较前轮 29.3% 改善，仍 > 18.4% 门槛）。数据文件 SHA 三组一致
+`1f8caca3…`（heldout32 manifest 核对 True），耗时 54.5s（f 85.5s / g 91.4s，
+同量级无异常）。对比报告：
+`/media/imc/data/project3-search-agent-rl/eval-heldout32-fix3b-20260814/`。
+
+**判定（用户预注册结束条件）**：搜索率 <50%、无效动作 >18.4%、heldout 零配对
+改善 → **停止 smoke-8 调参，判定小数据预算触顶，转向扩大训练集**。不自动继续
+epochs=10 / max_response=512。
+
+**train-64 构建器（`scripts/build_p3_train64.py`，已就绪）**：确定性分源抽取 64
+行（配额 nq 16/hotpotqa 16/popqa 8/2wiki 8/triviaqa 8/musique 4/bamboogle 4），
+排除 smoke-train 8 + heldout-32 32 的规范化问题（泄漏=0，跨池重复=0）。
+**数据审计发现**：上游 `train.parquet`（169,615 行）只有 nq+hotpotqa 两源；
+其余 5 源仅存在于上游 `test.parquet`。故双池混合：nq/hotpotqa 取 train 池、
+其余 5 源取 test 池（数据盘全盘确认无其他来源）。输出
+`datasets/searchr1-train64/train.parquet`（SHA `029e1a7f…`，schema 与 smoke
+train 一致），重建确定性匹配。训练配置将沿用修复集：prompt、format_score=0.1、
+n=4、lr=3e-6、train_batch_size=8、8 个 optimizer steps（1 epoch 覆盖 64 行）。
+
+**资源验收**：训练与评测 exit 0，GPU1 回基线（cleanup.log compute_processes=none），
+run 目录全部保留。train-64 训练（GPU）待批准后执行。
