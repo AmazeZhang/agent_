@@ -9,6 +9,7 @@ patch_files=(
   "${project_dir}/patches/0002-structured-rollout-audit.patch"
   "${project_dir}/patches/0003-graceful-ray-shutdown-and-atomic-rollout.patch"
   "${project_dir}/patches/0004-search-prompt-and-format-reward.patch"
+  "${project_dir}/patches/0005-search-env-loose-projection.patch"
 )
 
 for patch_file in "${patch_files[@]}"; do

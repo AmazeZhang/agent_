@@ -829,3 +829,68 @@ answer_compliance 0.844 vs 0.516 —— 官方 checkpoint 在我们环境上的�
 - 后续（第二阶段，另行预注册）：3B GRPO 复现训练（Qwen2.5-3B、官方宽松语义、
   NQ+HotpotQA 全量 train、GPU 1,2,3,4,6,7、真实 Wiki-18、Step 0/50/100/300
   门禁，Step 50/100 停训后用 GPU1 评测，不与训练并发压 retriever）。
+
+## 轮次：第二阶段设计 + 步骤 2 代码实现（2026-08-15）
+
+**状态**：设计已提交审阅（`bd5ae76`）；用户批准步骤 2 代码实现与 CPU/回归测试
+（不批准启动训练），审阅意见 8 项全部落实。
+
+### 审阅意见落实（设计文档 `P3_PHASE2_OFFICIAL_TRAIN_DESIGN_2026-08-15.md`）
+
+1. batch：`data.train_batch_size=66/132`（prompts）× group_n=5 →
+   samples/mini_batch = 330/660（66、132、330、660 均被 DP=6 整除）；
+2. `data.shuffle=true` + 固定 seed（`+data.seed=1234`、`+trainer.seed=1234`，
+   fork 中 seed 非 struct 字段，用 `+` 追加模式；`create_rl_sampler` 以
+   `data.seed` 固定 RandomSampler）；
+3. 删除"单卡模拟六卡显存"（只经六卡 smoke 实测）；
+4. 六卡 smoke 从 `gpu_memory_utilization=0.40` 起步（正式档 0.45，可调）；
+5. 正式 `save_freq=50`（checkpoint 对齐 Step 50/100/300；smoke profile 用
+   save_freq=1 以产出 checkpoint 供恢复验证，明确是验证工具而非正式配置）；
+6. Step 50/100 降为**开发门禁**（不作统计判定），final-confirm512 是**唯一
+   确认性检验**；
+7. retriever **先全局限流、后压测**（服务端 asyncio Semaphore 排队，非拒绝）。
+
+### 交付物（步骤 2）
+
+- **patch 0005**（`patches/0005-search-env-loose-projection.patch`）：
+  `make_envs` 按 `config.env.projection`（yaml 新增字段，默认 strict）选择
+  投影；`official` = 透传 `(actions, [True]*n)`，raw action 直达 skyrl
+  SearchEnv，valids 恒 true——与评测侧宽松线一致。惩罚为纯 config
+  （`use_invalid_action_penalty=false`，ray_trainer.py:1225 gate 已存在）。
+  测试 `tests/test_patch_0005.py` 5/5 通过（raw 透传、all-valid、strict 模式
+  保持 search_projection 语义、manager.step 端到端、val_envs 同宽松）。
+- **训练入口** `scripts/run_p3_grpo_official_exp.sh`：6 卡 gate
+  （`CUDA_VISIBLE_DEVICES` 必须恰为 `1,2,3,4,6,7`）、patch 0001-0005 全应用、
+  retriever health、managed-only、proxy 净化；formal/smoke 双 profile；
+  `--print-config` 验证全字段解析（train_batch 66、mini 330、shuffle、seed、
+  projection=official、penalty=false、n_gpus=6、save_freq 50/1、gpu_mem 0.45/0.40）。
+- **retriever 全局限流 + 压测**：
+  - `create_app(max_concurrent_queries)`：async endpoint + asyncio.Semaphore
+    + run_in_threadpool；/health 不受限并报告 limit。
+  - **发现并修复两个真 bug**：① Semaphore 在 create_app 时创建会绑定到
+    不存在的事件循环 → 请求永久挂起（单请求 >60s），改为首次请求惰性创建；
+    ② 原 `search()` 全局锁把并发检索全部串行化（吞吐 0.23 req/s），faiss
+    IndexFlatIP search 只读线程安全 → 锁只包 encode（0.02s）。
+  - **瓶颈诊断**：单次检索 4.0s 与 OMP 线程数无关（8/24/48/96 均 ~4.0s），
+    内存带宽硬墙（IndexFlatIP 每查询读 64.5GB）→ 吞吐上限 ~2.5 req/s。
+  - **压测矩阵**（timeout=180）：A(24 线程/limit 32) C=330 突发 p99 177s 失败；
+    B(8/64) p99 144s 0 超时；C(4/128) p99 147s。**选定 B**，服务已重启生效
+    （health 报告 max_concurrent_queries=64）。
+  - 测试 `tests/test_p25_cpu_retriever_service.py` 4/4 通过（新增：真实
+    uvicorn + urllib 并发限流测试——TestClient portal 线程不安全会死锁，
+    故用 live server 路径）。
+- 回归：repro env 57/57 + retriever env 4/4 全绿（严格线测试未受影响）。
+- retriever env 补装 pytest 8.3.5（9.1.1 在本环境挂起，对齐 repro env 版本）。
+
+### 问题与解决
+
+- `data.seed`/`trainer.seed` 非 fork struct 字段 → hydra `+` 追加模式；
+- pytest 9.1.1 在 retriever env 收集时挂起 → 降级 8.3.5；
+- TestClient 多线程并发 post 死锁 → 单测改用 live uvicorn + urllib；
+- 服务重启竞态（优雅关闭卡住/端口占用）→ 全量 kill 后确认端口释放再启动。
+
+### 下一步（等待批准）
+
+**六卡 smoke**（GPU 1,2,3,4,6,7）：`gpu_memory_utilization=0.40` 起步、
+smoke profile 1 步 + save_freq=1 → 显存观测 → resume 续跑验证。批准后执行；
+Step 50 正式训练另行批准。

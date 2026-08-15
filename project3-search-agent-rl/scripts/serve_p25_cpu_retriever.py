@@ -27,6 +27,9 @@ def main() -> int:
     parser.add_argument("--threads", type=int, default=24)
     parser.add_argument("--default-topk", type=int, default=3)
     parser.add_argument("--max-topk", type=int, default=10)
+    # Global /retrieve concurrency cap (queueing, not rejection). Protects the
+    # CPU index from burst load (e.g. 330 GRPO envs). See create_app.
+    parser.add_argument("--max-concurrent-queries", type=int, default=32)
     args = parser.parse_args()
     if os.environ.get("CUDA_VISIBLE_DEVICES") not in ("", "-1"):
         raise RuntimeError("CPU service requires CUDA_VISIBLE_DEVICES='' or '-1'")
@@ -62,7 +65,12 @@ def main() -> int:
         ),
         flush=True,
     )
-    app = create_app(retriever, default_topk=args.default_topk, max_topk=args.max_topk)
+    app = create_app(
+        retriever,
+        default_topk=args.default_topk,
+        max_topk=args.max_topk,
+        max_concurrent_queries=args.max_concurrent_queries,
+    )
     uvicorn.run(app, host="127.0.0.1", port=args.port, access_log=False, log_level="info")
     return 0
 

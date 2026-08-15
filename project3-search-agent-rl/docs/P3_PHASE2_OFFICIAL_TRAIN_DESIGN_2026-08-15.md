@@ -47,16 +47,17 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 
 ## 3. Batch 语义（global samples = prompts × group_n）
 
-| 档位 | prompts/step | × group_n=5 | samples/step |
+| 档位 | prompts/step | × group_n=5 | samples/step（ppo_mini_batch_size） |
 |---|---|---|---|
-| 最低 | 13 | 5 | **65**（≥64 ✓） |
-| 目标 | 26 | 5 | **130**（≥128 ✓） |
+| 最低 | **66** | 5 | **330** |
+| 目标 | **132** | 5 | **660** |
 
-- `data.train_batch_size` = prompts 数（13 起步 → 26 目标）；`env.rollout.n=5`。
-- `ppo_mini_batch_size=65/130`（GRPO 全量 mini）、`ppo_micro_batch_size_per_gpu=1`。
-- 优化步吞吐：130 samples × ~2304 tokens ≈ 300k tokens/step；6 卡 FSDP + 6 vLLM
-  engine，预计每步 5–10 分钟（3B 全参，60-70% 时间在 rollout/retrieval）。
-  Step 50 预计 4–8 小时（含 2 次停训评测）。
+- `data.train_batch_size` = prompts 数（66 → 132，用户审阅拍板值）；
+  `env.rollout.n=5`；`ppo_mini_batch_size=330/660`（GRPO 全量 mini）、
+  `ppo_micro_batch_size_per_gpu=1`。
+- 优化步吞吐：330/660 samples × ~2304 tokens ≈ 760k–1.5M tokens/step；
+  6 卡 FSDP + 6 vLLM engine，预计每步 10–25 分钟（3B 全参，60-70% 时间在
+  rollout/retrieval）。Step 50 预计 8–20 小时（含 2 次停训评测窗口）。
 
 ## 4. 显存预算（每卡 24GB，4090D；全参数主线）
 
@@ -68,19 +69,25 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 | 激活（micro 1 × 2304） | ~1–2 GB |
 | **合计** | **~22–23 GB（临界）** |
 
-风险与降级（按顺序尝试，均在"3B 单步显存"步骤实测决定）：
-1. `gpu_memory_utilization` 0.6 → 0.5 → 0.45（KV cache 缩小，rollout 批变小但 step 数不变）；
+风险与降级（用户审阅拍板：**六卡 smoke 从 `gpu_memory_utilization` 0.40/0.45
+起步**，不先试高值）：
+1. 六卡 smoke 初始 `gpu_memory_utilization=0.45`（0.40 为第一观测点）；
+   实测显存余量允许时再上调，**上调须记录**（resolved config 冻结时一并固定）；
 2. `param_offload=true`/`optimizer_offload=true`（CPU 换显存，速度损失 ~20–40%）；
 3. **LoRA 降级**（用户指定兜底）：`lora_rank=32` + `target_modules=all-linear` +
    现有一切 LoRA 配置（param_offload=true），batch 约束不变；仅当全参数在
    6 卡 24GB 上不可行时启用，并在 resolved config 与预注册中明确标注降级。
+4. **不做单卡模拟六卡显存**（用户审阅删除）：显存验证只在真六卡 smoke 上进行。
 
 ## 5. 数据
 
 - `datasets/searchr1-upstream/train.parquet`（169,615 行 = NQ 79,168 + HotpotQA
-  90,447；即官方训练集 `PeterJinGo/nq_hotpotqa_train` b7d80ab）全量作为 prompt 池，
-  `data.shuffle=false` 顺序取（与现有训练一致）；`filter_overlong_prompts=true`。
-- 50–300 步 × 65–130 prompts 消费 ≤39k 条，远小于池容量，无重复窗口问题。
+  90,447；即官方训练集 `PeterJinGo/nq_hotpotqa_train` b7d80ab）全量作为 prompt 池；
+  **`data.shuffle=true` + 固定 `data.seed`（如 1234）+ `trainer.seed` 固定**
+  （用户审阅拍板：shuffle 保证跨 epoch 不重复顺序依赖，固定 seed 保证可复现；
+  verl `create_rl_sampler` 用 `data.seed` 固定 RandomSampler 生成器）；
+  `filter_overlong_prompts=true`。
+- 50–300 步 × 66–132 prompts 消费 ≤40k 条，远小于池容量，无重复窗口问题。
 - val：dev 集评测不依赖训练 val 路径（中期门禁用独立 eval 入口 +
   `official-confirm256-v1`；训练侧 `val_before_train=false`、`test_freq=-1` 关闭
   训练内评测，避免与评测线混用）。
@@ -91,11 +98,17 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
   结构），overrides 差异：
   - `trainer.n_gpus_per_node=6`；`actor_rollout_ref.actor.fsdp_config.param_offload=false`、
     `optimizer_offload=false`（全参数主线）；
-  - `env.rollout.n=5`；`data.train_batch_size=13`（起步，目标 26）；
+  - `env.rollout.n=5`；`data.train_batch_size=66`（正式档，目标 132）；
+    `ppo_mini_batch_size=330`（目标 660）；
+  - `data.shuffle=true` + `data.seed=1234` + `trainer.seed=1234`（固定，可复现）；
   - `env.projection=official`（patch 0005）、`actor_rollout_ref.actor.use_invalid_action_penalty=false`；
   - `actor_rollout_ref.model.path=models/Qwen2.5-3B`（本地已有）、
     **不带 lora_rank**（全参数；降级路径再带）；
-  - `trainer.experiment_name=p3_grpo_official_3b_fsdp6_loose_n5_s0`；`save_freq=1`；
+  - `trainer.experiment_name=p3_grpo_official_3b_fsdp6_loose_n5_s0`；
+    **`save_freq=50`**（正式；checkpoint 自然对齐 Step 50/100/300；
+    smoke/恢复验证 profile 才覆盖为 `save_freq=1`，是验证工具而非正式配置）；
+  - 两个 profile：`smoke`（`--max-train-steps 1` + `save_freq=1`，验证管道/
+    显存/checkpoint 生成）与 `formal`（正式配置）；由环境变量选择，默认 `formal`；
   - 其余（V0、max_model_len 2304、topk 3、timeout 180、lr 等）沿用训练基线，
     官方超参（lr/kl/optimizer 细节）落地前从官方 Search-R1 配置提取核验并写入
     resolved config。
@@ -107,48 +120,70 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 
 ## 7. 分段运行编排（Step 0/50/100/300）
 
-| 步 | 动作 | 评测 | 判定（预注册时细化） |
+| 步 | 动作 | 评测 | 判定 |
 |---|---|---|---|
 | Step 0 | 基线 | 已有 Base-3B 官方线 dev 结果（20/256，official-confirm256-v1）直接作为基线（受管、SHA 在案） | — |
-| Step 50 | 训练正常退出（checkpoint global_step_50）→ **停训** → GPU1 评测 | dev 集，官方宽松线 eval 入口 | 与 Step 0 配对 McNemar：正向且 p<0.05 → 继续；无变化 → 诊断（预注册固定） |
-| Step 100 | `trainer.resume_mode=resume_path` 续训至 100 → 停训评测 | 同上 | 趋势一致（Step 50/100 均正向或 Step 100 更强）→ 继续至 300 |
-| Step 300 | 主门禁，最终 checkpoint | **final-confirm512 盲测**（新建，排除全部已用集，预注册配对检验） | PASS/INCONCLUSIVE/FAIL-TO-OBSERVE 三档（预注册固定） |
+| Step 50 | 训练正常退出（checkpoint global_step_50）→ **停训** → GPU1 评测 | dev 集，官方宽松线 eval 入口 | **开发门禁**（用户审阅拍板：不作统计显著性判定）：训练健康（正常退出、显存回基线）、行为变化（搜索协议遵守率、检索次数）、dev EM 趋势（相对 Step 0 方向性），只用于决定继续/诊断 |
+| Step 100 | `trainer.resume_mode=resume_path` 续训至 100 → 停训评测 | 同上 | **开发门禁**：趋势一致性（Step 50/100 方向一致或 Step 100 更强）→ 继续至 300；任一阶段异常 → 停训诊断 |
+| Step 300 | 主门禁，最终 checkpoint | **final-confirm512 盲测**（新建，排除全部已用集） | **唯一的确认性检验**（用户审阅拍板）：预注册配对检验，PASS/INCONCLUSIVE/FAIL-TO-OBSERVE 三档；dev 集数字不作终审 |
 
 - resume 依赖 verl 原生 `resume_from_path`（严格线已用）；
   六卡 resume 在"六卡 1 步+恢复"步骤先行验证。
 - 停训→评测→续训全程由 run_managed 受管；GPU1 在训练期间被训练占用时评测
   只在停训窗口进行（不并发）。
 
-## 8. Retriever 并发方案
+## 8. Retriever 并发方案（先全局限流，后压测；用户审阅拍板）
 
-- 压力面：6 卡 × 每卡 envs。训练 130 samples/step（26 prompts × 5 group）时
-  并发检索 ≈ 130 环境（+val 16）——低于 256（已 wedged 观察），但高于
-  32（已验证安全负载）。24 线程 CPU retriever 是否扛得住 130 并发需实测。
-- "Retriever 并发测试"步骤（六卡 1 步之后）：用真实 retriever 短跑 1 步，
-  判据：0 超时 + p99 检索延迟可接受 + health 存活。不通过则依次：
-  a) retriever 扩容（`serve_p25_cpu_retriever.py` OMP/线程 24→48，CPU 核数先确认）；
-  b) 训练侧 env 检索并发限流（保留语义，仅并发控制）；
+- 压力面：6 卡 × 每卡 envs。训练 330/660 samples/step（66/132 prompts × 5 group）
+  时并发检索可达数百环境——已超过 256（已 wedged 观察）。**在六卡 smoke 之前**
+  先做两件事：
+  a) **服务端全局限流**（`create_app` 内实现）：全局并发检索上限
+     `max_concurrent_queries`，超限请求在事件循环层排队（asyncio Semaphore，
+     **惰性创建**——创建时绑定事件循环，否则绑定到不存在的循环会永久挂起，
+     2026-08-15 实测修复）；/health 不受限；受管启动参数化。
+  b) **压测**（CPU-only，无 GPU）：真实 retriever + 并发客户端
+     （`scripts/stress_p25_retriever.py`），timeout=180（= 训练 env 超时）。
+- **瓶颈诊断（2026-08-15 实测）**：单次检索 4.0s 与 OMP 线程数无关（8/24/48/96
+  均 ~4.0s）——**内存带宽硬墙**（IndexFlatIP 每查询读 64.5GB），吞吐上限
+  ~2.5 req/s。原 `search()` 全局锁会把并发全部串行化（0.23 req/s）；已拆锁：
+  锁只包 encode（0.02s），faiss search（只读线程安全）放开并发。
+- **压测矩阵（timeout=180）**：
+
+  | 配置 | threads | limit | C=32 p99 | C=64 p99 | C=330 p99/max | 判定 |
+  |---|---|---|---|---|---|---|
+  | A | 24 | 32 | 17.2s | 34.6s | 177.3s / 179.9s | C=330 超时（FAIL） |
+  | B | 8 | 64 | — | — | 144.0s / 146.0s | 0 超时（OK） |
+  | C | 4 | 128 | — | — | 147.2s / 149.9s | 0 超时（OK） |
+
+  **选定 B（threads=8, max_concurrent_queries=64）**：330 检索突发 p99 144s < 180s，
+  吞吐 2.5 req/s；A 在 330 突发超限（线程过订阅 7920），C 无增益。
+  服务已按 B 重启（2026-08-15，health 报告 max_concurrent_queries=64）。
+- 训练侧语义不变（env 每次检索都是一次独立 HTTP 请求，排队在服务端完成，
+  仅并发控制）；评测侧 `--max-envs-per-batch 32` 分块机制保持不变。
+- 残余风险：一次 330 检索波 ~145s，180s 超时 margin ~35s；episode 第二步检索
+  只发生在未终局 env 上（数量更小、且与模型重生成间隔错峰）。六卡 smoke 实测
+  若仍有超时：a) 服务端再调参（OMP/limit）；b) 训练侧并发限流作为二次手段；
   c) 再评估 batch（用户约束 batch≥64 是下限，不降）。
 
 ## 9. 执行序列与每步验收（用户给定顺序）
 
 | # | 步骤 | 验收 |
 |---|---|---|
-| 1 | 本设计（提交供审阅） | 用户批准设计 |
-| 2 | 官方训练语义实现（patch 0005 + wrapper） | CPU 逻辑测试 + 严格线不受影响（现有测试全绿） |
-| 3 | 3B 单步显存 | 单卡（GPU1）跑通 1 优化步（全参数 FSDP 6 卡配置的单卡模拟或预检 nvidia-smi），峰值显存 < 22GB；失败则按 §4 降级顺序 |
-| 4 | 六卡 1 步 + 恢复 | GPU 1,2,3,4,6,7 跑 1 步 → 正常退出 → resume 续跑 1 步成功 |
-| 5 | Retriever 并发测试 | §8 判据 |
+| 1 | 本设计（提交供审阅） | 用户批准设计（已批准步骤 2；本表按审阅意见更新） |
+| 2 | 官方训练语义实现（patch 0005 + wrapper + retriever 全局限流/压测） | CPU 逻辑测试 + 压测报告 + 严格线不受影响（现有测试全绿） |
+| 3 | **六卡 smoke（显存验证）** | 用户批准后执行；GPU 1,2,3,4,6,7 跑 1 步（`gpu_memory_utilization=0.45` 起步，0.40 为第一观测点）；**不做单卡模拟**（用户审阅删除）；峰值显存 < 23.5GB；失败则按 §4 降级顺序 |
+| 4 | 六卡 1 步 + 恢复 | GPU 1,2,3,4,6,7 跑 1 步 → 正常退出 → resume 续跑 1 步成功（此 profile 用 save_freq=1 以产生 checkpoint；正式配置仍 save_freq=50） |
+| 5 | Retriever 并发压测 | §8 判据（全局限流已实现，压测选档） |
 | 6 | 冻结 resolved config | config 快照 + SHA 记录（含超参来源核验） |
-| 7 | 第二阶段预注册 | 提交（先于任何 Step 50+ 评测）；含 Step 50/100/300 判据 + final-confirm512 盲测协议 |
-| 8 | Step 0–50 训练 | 受管 6 卡；Step 50 停训 → GPU1 dev 评测 → 判定 → （通过则继续 100/300） |
+| 7 | 第二阶段预注册 | 提交（先于任何 Step 50+ 评测）；Step 50/100 为**开发门禁**（不设统计判据）、final-confirm512 为**唯一确认性检验**（预注册配对三档判定） |
+| 8 | Step 0–50 训练 | 受管 6 卡；Step 50 停训 → GPU1 dev 评测 → 开发门禁判定 → （通过则继续 100/300） |
 
 ## 10. 开放项（在落地步骤中逐一关闭）
 
 1. 官方 Search-R1 训练超参（lr、KL 系数/方式、warmup、optimizer）：从官方
    verl 配置/论文提取，写入 resolved config（§9-6）；
-2. 全参数 6 卡显存实测（§4 预算是否成立）；
-3. retriever CPU 核数与扩容可行性（§8）；
+2. 全参数 6 卡显存实测（§4 预算是否成立；只经六卡 smoke，单卡模拟已删除）；
+3. retriever 全局限流档位实测（§8 压测选档）；
 4. final-confirm512 构建（domain `searchr1-p3-final-confirm-v1`，排除
    dev32/confirm256/official-confirm256-v1/上游 train，512 题配额放大）；
 5. Step 0 基线的复用 vs 重跑（预注册中固定：复用受管 Base 结果，run id/SHA 在案）。

@@ -90,14 +90,18 @@ class CpuDenseRetriever:
         return cls(index=index, corpus=corpus, encoder=encoder)
 
     def search(self, query: str, topk: int) -> list[dict]:
+        # Encode is cheap but touches the transformers model; faiss
+        # IndexFlatIP.search is a read-only, documented thread-safe call, so it
+        # is deliberately NOT serialized here — the HTTP layer bounds the total
+        # concurrency via max_concurrent_queries instead.
         with self._lock:
             embedding = self.encoder.encode(query)
-            scores, indices = self.index.search(embedding, topk)
-            return [
-                {"document": self.corpus.get(int(index)), "score": float(score)}
-                for index, score in zip(indices[0], scores[0])
-                if index >= 0
-            ]
+        scores, indices = self.index.search(embedding, topk)
+        return [
+            {"document": self.corpus.get(int(index)), "score": float(score)}
+            for index, score in zip(indices[0], scores[0])
+            if index >= 0
+        ]
 
 
 class QueryRequest(BaseModel):
@@ -106,8 +110,33 @@ class QueryRequest(BaseModel):
     return_scores: bool = False
 
 
-def create_app(retriever: CpuDenseRetriever, default_topk: int = 3, max_topk: int = 10) -> FastAPI:
+def create_app(
+    retriever: CpuDenseRetriever,
+    default_topk: int = 3,
+    max_topk: int = 10,
+    max_concurrent_queries: int = 32,
+) -> FastAPI:
+    """FastAPI app with a global concurrency limit on /retrieve.
+
+    The retriever index is not thread-safe beyond a small number of workers
+    (single encoder + single faiss index guarded by one lock), and a burst of
+    parallel requests (e.g. 330 GRPO training envs) previously wedged the 24
+    thread OMP pool. `max_concurrent_queries` caps the number of searches that
+    may run at once: the endpoint is async, waits on an asyncio.Semaphore, and
+    runs the blocking search in the threadpool, so excess requests queue at the
+    event-loop level instead of piling into faiss/OMP. /health is never
+    rate-limited.
+    """
+    import asyncio
+
+    from fastapi.concurrency import run_in_threadpool
+
     app = FastAPI()
+
+    # Lazy creation: asyncio.Semaphore binds to the event loop that exists at
+    # construction time, and create_app() runs before any loop is up. Created
+    # at first request, it binds to uvicorn's actual serving loop.
+    semaphore: asyncio.Semaphore | None = None
 
     @app.get("/health")
     def health():
@@ -117,17 +146,22 @@ def create_app(retriever: CpuDenseRetriever, default_topk: int = 3, max_topk: in
             "dimension": int(retriever.index.d),
             "vectors": int(retriever.index.ntotal),
             "corpus_rows": int(retriever.corpus.rows),
+            "max_concurrent_queries": max_concurrent_queries,
         }
 
     @app.post("/retrieve")
-    def retrieve(request: QueryRequest):
+    async def retrieve(request: QueryRequest):
+        nonlocal semaphore
+        if semaphore is None:
+            semaphore = asyncio.Semaphore(max_concurrent_queries)
         query = request.query.strip()
         if not query:
             raise HTTPException(status_code=422, detail="query must not be blank")
         topk = request.topk or default_topk
         if topk > max_topk:
             raise HTTPException(status_code=422, detail=f"topk exceeds service maximum {max_topk}")
-        hits = retriever.search(query, topk)
+        async with semaphore:
+            hits = await run_in_threadpool(retriever.search, query, topk)
         if request.return_scores:
             result = hits
         else:

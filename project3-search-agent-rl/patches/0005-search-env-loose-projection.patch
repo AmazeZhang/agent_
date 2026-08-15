@@ -1,0 +1,36 @@
+diff --git a/agent_system/environments/env_manager.py b/agent_system/environments/env_manager.py
+index ab09dff..1376219 100644
+--- a/agent_system/environments/env_manager.py
++++ b/agent_system/environments/env_manager.py
+@@ -614,7 +614,16 @@ def make_envs(config):
+         _envs = build_search_envs(seed=config.env.seed, env_num=config.data.train_batch_size, group_n=group_n, is_train=True, env_config=config.env)
+         _val_envs = build_search_envs(seed=config.env.seed + 1000, env_num=config.data.val_batch_size, group_n=1, is_train=False, env_config=config.env)
+ 
+-        projection_f = partial(search_projection)
++        # projection=official selects official-loose semantics: raw actions
++        # reach the underlying skyrl SearchEnv untouched (no projection, no
++        # validity gate) and every action is valid, matching the official-line
++        # evaluation harness scripts/run_p3_eval_vllm_official.py. The
++        # invalid-action penalty is disabled separately via
++        # actor_rollout_ref.actor.use_invalid_action_penalty=false.
++        if OmegaConf.select(config.env, "projection", default="strict") == "official":
++            projection_f = lambda text_actions: (list(text_actions), [True] * len(text_actions))
++        else:
++            projection_f = partial(search_projection)
+         envs = SearchEnvironmentManager(_envs, projection_f, config)
+         val_envs = SearchEnvironmentManager(_val_envs, projection_f, config)
+         return envs, val_envs
+diff --git a/verl/trainer/config/ppo_trainer.yaml b/verl/trainer/config/ppo_trainer.yaml
+index d0f68ba..0c98727 100644
+--- a/verl/trainer/config/ppo_trainer.yaml
++++ b/verl/trainer/config/ppo_trainer.yaml
+@@ -292,6 +292,9 @@ ray_init:
+ env:
+   env_name: alfworld/AlfredTWEnv
+   seed: 0
++  # strict = default fork projection (search_projection + validity gate);
++  # official = official-loose passthrough projection (raw actions, all valid).
++  projection: strict
+   max_steps: 50
+   history_length: 2
+   resources_per_worker: # resources for each env worker
