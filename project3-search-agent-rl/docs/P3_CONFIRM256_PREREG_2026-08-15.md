@@ -75,7 +75,31 @@ tmux server 全局 env 携带 `http_proxy/https_proxy=http://127.0.0.1:7890`
 `read timeout=180` 失败（stderr 无一次成功检索）。dev32（08-14）各 run 0 次
 超时、检索正常 → 不受影响、结果有效。修复：`scripts/run_p3_eval_vllm.sh`
 新增代理净化（unset proxy + `NO_PROXY=127.0.0.1,localhost`），提交
-`be063fd`；评测脚本本体 `run_p3_eval_vllm.py`（f4d4784，自记录
-`runtime_script_sha256`）未改动。该环境修复不改任何固定条件（引擎/数据/
-参数/retriever 身份/指标/判定规则均不变），按第 4.5 条仅重跑被作废的
-Base run（`…-s0-20260815b`），不重抽数据、不改规则。
+`be063fd`。该环境修复不改任何固定条件（引擎/数据/参数/retriever 身份/
+指标/判定规则均不变），按第 4.5 条仅重跑被作废的 Base run。
+
+**2026-08-15 加注 2（第二个运行缺陷，评测脚本实现层修复）**：第二次 Base run
+（`p3-eval-vllm-confirm256-base-s0-20260815b`）仍作废：256 env 并发检索压垮
+24 线程 CPU retriever（uvicorn sync pool + faiss OMP-24/query），health 饥饿、
+全部 search 超时（请求已正确到达 18080，说明代理修复生效）。修复：
+`run_p3_eval_vllm.py` 按 `--max-envs-per-batch 32` 分块串行执行 episode
+（纯并发控制——eval env 确定性且无 per-env seed，逐 episode 语义与单次
+256-env 运行逐字节一致；提交 `0fe39f1`，CPU 逻辑测试
+`tests/test_eval_vllm_chunking.py` 验证 40 行/8 分块下的全局索引、
+步续、done/reward/won 传播）。经 smoke-16 门禁（0 超时、SHA 匹配、cleanup
+`compute_processes=none`）后重跑。
+
+**2026-08-15 加注 3（评测完成与判定，评测后追加，不改规则）**：
+- Base `p3-eval-vllm-confirm256-base-s0-20260815c`：EM **37/256**（14.45%），
+  Wilson 95% CI [0.107, 0.193]，0 检索超时，cleanup `compute_processes=none`；
+- train64nqh8 `p3-eval-vllm-confirm256-train64nqh8-s0-20260815a`：EM
+  **31/256**（12.11%），Wilson 95% CI [0.087, 0.167]，0 检索超时，cleanup
+  `compute_processes=none`；
+- 配对（按题目逐题对齐，两 run 同数据同序）：1→1=29、0→0=217、
+  1→0（Base 对/train64 错）=8、0→1（Base 错/train64 对）=2；
+  **精确双侧 McNemar p=0.109375**（≥0.05）；
+- **判定（按第 4 节规则 2）：H1 不支持**；点估计方向偏 Base 但不显著，
+  规则 4 的"负向记录"不触发（p≥0.05）。与 dev32（5/32 vs 3/32，p=0.5）
+  一致：两个独立样本均无证据支持 train64nqh8 优于 Base。
+- 完整分析：`analysis/p3_confirm256_pair_2026-08-15.{md,json}`（含 discordant
+  逐题明细、分源 EM、次要指标、逐字节一致/编辑距离）。

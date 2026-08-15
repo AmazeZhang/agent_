@@ -730,3 +730,47 @@ preflight.sh 门禁输出为准，不主动查询 GPU0。
   重试无惩罚）→ Search-R1 复现基线（对照官方论文数字）。
 - 线 2 严格投影 + 每行 invalid 惩罚 → 我们的 fork 改进/对照实验（可继续
   训练规模与 credit 整形路线）。
+
+---
+
+## 轮次：confirm-256 预注册配对比较（2026-08-15）
+
+**用户指令 4 步全部完成**：① 提交 vLLM 脚本修复并记录 SHA（f4d4784）→
+② 新建 confirm-256 确认集（256 题，新 domain 抽取，dev32 零重叠）→
+③ 预注册配对比较（c66677a，先于任何评测）→ ④ 官方宽松 vs 严格 fork 拆线
+（P3_EXPERIMENT_LINES_2026-08-15.md，d03d271）。
+
+### 结果（严格 fork 线，vLLM V0 greedy，与训练同引擎路径）
+
+| 模型 | EM | 率 | Wilson 95% CI |
+|---|---|---|---|
+| Base | 37/256 | 14.45% | [10.7%, 19.3%] |
+| train64nqh8 | 31/256 | 12.11% | [8.7%, 16.7%] |
+
+- 配对（逐题对齐）：1→1=29、0→0=217、1→0=8、0→1=2；
+  **精确双侧 McNemar p=0.109 ≥ 0.05 → H1 不支持**（点估计偏 Base 但不显著）。
+- 与 dev32（5/32 vs 3/32，p=0.5）一致：两个独立样本均无证据支持
+  train64nqh8 优于 Base。完整分析：`analysis/p3_confirm256_pair_2026-08-15.{md,json}`。
+- 次要指标：检索次数 Base 91 / train64 76（全部 success，无超时）；
+  invalid 动作 110/347 vs 93/332；answer_compliance 0.996 持平；134/256 个
+  episode 两模型逐字节一致，平均归一化编辑距离 0.13。
+
+### 问题与解决（本轮两个运行环境/规模缺陷）
+
+1. **代理污染**：tmux server 全局 env 带 `http_proxy=127.0.0.1:7890`（clash），
+   requests 把 loopback 检索流量送进代理 → 全部 search 超时（run …a 作废）。
+   解决：wrapper 内 unset proxy + `NO_PROXY=127.0.0.1,localhost`（be063fd）。
+   根因记录：dev32 各 run 0 次超时 → dev32 结果不受影响。
+2. **retriever 并发饱和**：256 env 同时检索压垮 24 线程 CPU retriever
+   （health 饥饿、全超时，run …b 作废）。解决：评测按 ≤32 env 分块串行
+   （纯并发控制，逐 episode 语义不变；0fe39f1 + CPU 测试
+   `tests/test_eval_vllm_chunking.py`）；retriever 重启后经 smoke-16 门禁
+   （0 超时）验收。
+3. 两轮作废 run 均按预注册 §4.5/§8 排除并记录；判定规则未改动。
+
+### 结论与后续
+
+- 严格 fork 线下：train64nqh8（GRPO n=4、64 训练题、8 步）未表现出优于
+  Base 的显著效果；中间步 credit 平坦 + 贪心解码下搜索收益有限仍是主因。
+- 后续方向（均需用户批准后执行）：官方宽松语义基线评测（线 1，对照论文）；
+  训练规模/credit 整形路线（线 2 继续）。

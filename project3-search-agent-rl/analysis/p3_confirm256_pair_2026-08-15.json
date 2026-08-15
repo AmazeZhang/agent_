@@ -1,0 +1,207 @@
+{
+  "base_run": "p3-eval-vllm-confirm256-base-s0-20260815c",
+  "data_sha256": "20e260d76221809b9998cd875373a83d50d360e7942f67a9759900566bc8e267",
+  "decision": {
+    "reason": "p=0.1094 >= 0.05; point estimate favors base (37 vs 31)",
+    "rule": "H1 supported only if p<0.05 and train64 EM > base EM (prereg section 4)",
+    "verdict": "H1_NOT_SUPPORTED"
+  },
+  "discordant_detail": [
+    {
+      "base_first_action": "<think>\nTo answer when South African Youth Day was first celebrated, I need to search for the information.\n</think>\n<search>when was South African Youth Day fir",
+      "base_reward": 1.0,
+      "direction": "base_won_train_lost",
+      "index": 1,
+      "question": "when was south african youth day first celebrated?",
+      "source": "nq",
+      "train_first_action": "<think>\nTo answer when South African Youth Day was first celebrated, I need to search for the information.\n</think>\n<search>when was South African Youth Day fir",
+      "train_reward": 0.1
+    },
+    {
+      "base_first_action": "<think>\nTo answer the question about the name of the first earthquake early warning system, I should first conduct a search to find information about the first ",
+      "base_reward": 1.0,
+      "direction": "base_won_train_lost",
+      "index": 31,
+      "question": "what is the name of the first earthquake early warning system?",
+      "source": "nq",
+      "train_first_action": "<think>\nTo answer the question about the name of the first earthquake early warning system, I should first conduct a search to find information about the first ",
+      "train_reward": 0.1
+    },
+    {
+      "base_first_action": "<think>\nTo find the first territorial governor of Oklahoma, I need to search for information about the territorial government of Oklahoma.\n</think>\n<search>firs",
+      "base_reward": 0.0,
+      "direction": "base_lost_train_won",
+      "index": 33,
+      "question": "who was the first territorial governor of oklahoma?",
+      "source": "nq",
+      "train_first_action": "<think>\nTo find the first territorial governor of Oklahoma, I need to search for information about the territorial government of Oklahoma.\n</think>\n<search>firs",
+      "train_reward": 1.0
+    },
+    {
+      "base_first_action": "<think>\nTo answer this question, I need to search for information about the actress who plays the mother of Howard on Big Bang Theory.\n</think>\n<search> actress",
+      "base_reward": 1.0,
+      "direction": "base_won_train_lost",
+      "index": 50,
+      "question": "who plays the mother of howard on big bang theory?",
+      "source": "nq",
+      "train_first_action": "<think>\nTo answer this question, I need to find information about the actress who plays the mother of Howard on the TV show \"The Big Bang Theory\".\n</think>\n<ans",
+      "train_reward": 0.1
+    },
+    {
+      "base_first_action": "<think>\nTo answer this question, I need to identify an English Egyptologist who is known for their works in the Egyptian Museum named after the capital of Egypt",
+      "base_reward": 1.0,
+      "direction": "base_won_train_lost",
+      "index": 71,
+      "question": "Which English Egyptologist is known mainly for his works in the Egyptian Museum that is named after the capital of Egypt?",
+      "source": "hotpotqa",
+      "train_first_action": "<think>\nTo answer this question, we need to identify an English Egyptologist who is known for their works in the Egyptian Museum named after the capital of Egyp",
+      "train_reward": 0.1
+    },
+    {
+      "base_first_action": "<think>\nTo answer this question, I need to find information about Codex Escalada and the country of origin of the saint who appears in the apparition.\n</think>\n",
+      "base_reward": 1.0,
+      "direction": "base_won_train_lost",
+      "index": 103,
+      "question": "Codex Escalada shows an apparition to the saint that is a native of which country?",
+      "source": "hotpotqa",
+      "train_first_action": "<think>\nTo answer this question, I need to find information about Codex Escalada and the country of origin of the saint it shows an apparition to.\n</think>\n<ans",
+      "train_reward": 0.1
+    },
+    {
+      "base_first_action": "<think>\nTo determine if Max Jacob and Connie May Fowler were both memoirists, we need to research their writing styles and backgrounds.\n</think>\n<search>Max Jac",
+      "base_reward": 1.0,
+      "direction": "base_won_train_lost",
+      "index": 122,
+      "question": "Were Max Jacob and Connie May Fowler both memoirists?",
+      "source": "hotpotqa",
+      "train_first_action": "<think>\nTo determine if Max Jacob and Connie May Fowler were both memoirists, we need to research their writing styles and backgrounds.\n</think>\n<answer>Yes</an",
+      "train_reward": 0.1
+    },
+    {
+      "base_first_action": "<think>\nAntichess is a chess variant that was invented by the chess player and writer John Nunn. It is a game that is played on a standard 8x8 chessboard, but w",
+      "base_reward": 0.1,
+      "direction": "base_lost_train_won",
+      "index": 151,
+      "question": "What sport does antichess play?",
+      "source": "popqa",
+      "train_first_action": "<think>\nAntichess is a chess variant that was invented by the chess player and writer John Nunn. It is a game that is played on a standard 8x8 chessboard, with ",
+      "train_reward": 1.0
+    },
+    {
+      "base_first_action": "<think>\nTo determine which film has the director born earlier, we need to find the birth years of the directors of both films.\n</think>\n<search>director of Lith",
+      "base_reward": 1.0,
+      "direction": "base_won_train_lost",
+      "index": 187,
+      "question": "Which film has the director born earlier, Lithivm or Romeo.Juliet?",
+      "source": "2wikimultihopqa",
+      "train_first_action": "<think>\nTo determine which film has the director born earlier, we need to find the birth years of the directors of both films.\n</think>\n<search>director of Lith",
+      "train_reward": 0.1
+    },
+    {
+      "base_first_action": "<think>\nTo answer the question, I need to recall the story of Pandora's Box. In Greek mythology, Pandora was given a box by Zeus, which contained all the evils ",
+      "base_reward": 1.0,
+      "direction": "base_won_train_lost",
+      "index": 213,
+      "question": "What was left in Pandora's Box after all the evil escaped?",
+      "source": "triviaqa",
+      "train_first_action": "<think>\nPandora's Box is a mythological story, and the question is asking about a specific event in the story. The evil in the box is released, but what is left",
+      "train_reward": 0.1
+    }
+  ],
+  "generation_comparison": {
+    "episodes_with_identical_steps": 134,
+    "mean_norm_lev_over_episodes": 0.13156451140801187,
+    "total_aligned_steps": 330,
+    "total_byte_identical_steps": 183
+  },
+  "kind": "p3-confirm256-preregistered-paired-comparison",
+  "line": "strict-fork",
+  "per_source": {
+    "2wikimultihopqa": {
+      "base_em": 7,
+      "n": 32,
+      "train_em": 6
+    },
+    "bamboogle": {
+      "base_em": 1,
+      "n": 16,
+      "train_em": 1
+    },
+    "hotpotqa": {
+      "base_em": 7,
+      "n": 64,
+      "train_em": 4
+    },
+    "musique": {
+      "base_em": 0,
+      "n": 16,
+      "train_em": 0
+    },
+    "nq": {
+      "base_em": 10,
+      "n": 64,
+      "train_em": 8
+    },
+    "popqa": {
+      "base_em": 5,
+      "n": 32,
+      "train_em": 6
+    },
+    "triviaqa": {
+      "base_em": 7,
+      "n": 32,
+      "train_em": 6
+    }
+  },
+  "prereg": "docs/P3_CONFIRM256_PREREG_2026-08-15.md",
+  "primary": {
+    "base_em": 37,
+    "base_em_rate": 0.14453125,
+    "base_wilson95_ci": [
+      0.10671067600593546,
+      0.1928622219218325
+    ],
+    "discordant": {
+      "b00_neither": 217,
+      "b01_train_won": 2,
+      "b10_base_won": 8,
+      "b11_both": 29
+    },
+    "exact_twosided_mcnemar_p": 0.109375,
+    "n": 256,
+    "train_em": 31,
+    "train_em_rate": 0.12109375,
+    "train_wilson95_ci": [
+      0.08663517067416432,
+      0.1667557205235664
+    ]
+  },
+  "schema_version": 1,
+  "scripts": {
+    "base_runtime_script_sha256": "2c72d3fb70696e779048cae94fad0ff848d12ddae93d97be59b2723962f4f9b8",
+    "train_runtime_script_sha256": "2c72d3fb70696e779048cae94fad0ff848d12ddae93d97be59b2723962f4f9b8"
+  },
+  "secondary": {
+    "base": {
+      "answer_compliance_rate": 0.99609375,
+      "invalid_actions": 110,
+      "retrieval_statuses": {
+        "invalid_query": 1,
+        "success": 90
+      },
+      "searches": 91,
+      "total_steps": 347
+    },
+    "train64nqh8": {
+      "answer_compliance_rate": 0.99609375,
+      "invalid_actions": 93,
+      "retrieval_statuses": {
+        "invalid_query": 1,
+        "success": 75
+      },
+      "searches": 76,
+      "total_steps": 332
+    }
+  },
+  "train_run": "p3-eval-vllm-confirm256-train64nqh8-s0-20260815a"
+}

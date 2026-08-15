@@ -88,3 +88,24 @@ flip均为正向。Step5old与train64恰好答对同一5题。Adapter文件存�
 5. 另建官方宽松动作语义基线，严格fork结果不直接对照论文数字。
 
 完整审计trace：`.aris/traces/experiment-audit/2026-08-15_run05/`。
+
+## Required Action Resolution (2026-08-15)
+
+| # | 动作 | 状态 | 证据 |
+|---|---|---|---|
+| 1 | 审阅并提交vLLM脚本修复，记录代码SHA | ✅ 关闭 | `f4d4784`（修复 + `runtime_script_sha256` 自记录）；后续每 run 的 results.json 均有该字段且与本轮脚本 SHA 一致 |
+| 2 | heldout-32 定位为 `dev32` | ✅ 关闭 | 预注册文档 `docs/P3_CONFIRM256_PREREG_2026-08-15.md` 明确 dev32 已被多轮调参查看，只作初步信号 |
+| 3 | 128–256 题确认集 + 预注册配对比较 | ✅ 关闭 | `searchr1-confirm256`（256 题，新 domain 抽取，dev32 零重叠，泄漏 0，SHA `20e260d7…`）；预注册 `c66677a` **先于任何评测**提交 |
+| 4 | 运行 vLLM 确认评测 | ✅ 关闭 | Base `…-base-s0-20260815c`：EM 37/256；train64nqh8 `…-train64nqh8-s0-20260815a`：EM 31/256；均受管运行、`compute_processes=none`、0 检索超时；**精确双侧 McNemar p=0.109（8:2 discordant）→ H1 不支持**。分析：`analysis/p3_confirm256_pair_2026-08-15.{md,json}` |
+| 5 | 官方宽松动作语义基线 | ⏳ 已组织、未运行 | `docs/P3_EXPERIMENT_LINES_2026-08-15.md`（`d03d271`）拆分两条线：官方宽松（raw action + 无惩罚 + format 0.1，论文口径，待建宽松评测入口）vs 严格 fork（投影有效性 + -0.1/invalid 行，当前全部训练/评测所在）；严格线数字**不得**直接对照论文 |
+
+### 本轮修复记录（2026-08-15 运行环境问题）
+
+1. **代理污染**：tmux server 全局 env 携带 `http_proxy/https_proxy=127.0.0.1:7890`（clash），
+   requests 将 loopback 检索流量路由进代理 → 全部 search 超时（`…-base-…a` 作废）。
+   修复：wrapper 内 unset proxy + `NO_PROXY=127.0.0.1,localhost`（`be063fd`）；dev32 各 run
+   0 次超时 → 不受影响。
+2. **Retriever 饱和**：256 env 并发检索压垮 24 线程 CPU retriever（health 饥饿、全超时，
+   `…-base-…b` 作废）。修复：评测按 ≤32 env 分块串行执行（纯并发控制，逐 episode 语义
+   不变，`0fe39f1` + CPU 测试 `tests/test_eval_vllm_chunking.py`）。
+   两轮作废 run 均已按预注册 §4.5/§8 排除并记录。
