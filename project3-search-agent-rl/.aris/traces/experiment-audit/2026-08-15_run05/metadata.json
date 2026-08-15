@@ -1,0 +1,11 @@
+{
+  "skill": "experiment-audit",
+  "run": "2026-08-15_run05",
+  "audited_run_id": "p3-eval-vllm-heldout32-{base,step5old,train64nqh8}-s0-20260814a",
+  "reviewer_agent": "/root/p3_vllm_eval_audit",
+  "review_independence": "same-family",
+  "acceptance_status": "provisional",
+  "overall_verdict": "WARN",
+  "reason_code": "real_small_sample_signal_but_not_significant_reused_devset_and_runtime_code_uncommitted",
+  "generated_at": "2026-08-15T10:04:56+08:00"
+}
