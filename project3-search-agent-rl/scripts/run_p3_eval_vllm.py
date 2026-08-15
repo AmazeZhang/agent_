@@ -439,6 +439,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--history-length", type=int, default=2)
     parser.add_argument("--topk", type=int, default=3)
     parser.add_argument("--timeout", type=int, default=180)
+    parser.add_argument(
+        "--max-envs-per-batch",
+        type=int,
+        default=32,
+        help="max concurrent eval envs per chunk (CPU retriever capacity; pure concurrency control, per-episode semantics unchanged)",
+    )
     parser.add_argument("--max-input-tokens", type=int, default=2048)
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--seed", type=int, default=0)
@@ -480,36 +486,6 @@ def main() -> int:
     llm = build_engine(tokenizer, args)
     torch.cuda.reset_peak_memory_stats()
 
-    env_config = OmegaConf.create(
-        {
-            "max_steps": args.max_steps,
-            "history_length": args.history_length,
-            "search": {
-                "search_url": args.search_url,
-                "topk": args.topk,
-                "timeout": args.timeout,
-                "log_requests": True,
-            },
-        }
-    )
-    raw_envs = SearchMultiProcessEnv(
-        seed=args.seed,
-        env_num=len(records),
-        group_n=1,
-        is_train=False,
-        env_config=env_config,
-    )
-    manager = SearchEnvironmentManager(raw_envs, search_projection, OmegaConf.create({"env": env_config}))
-    kwargs = [
-        {
-            "question": record["question"],
-            "ground_truth": {"target": record["answers"]},
-            "data_source": record["data_source"],
-        }
-        for record in records
-    ]
-    observations, _ = manager.reset(kwargs=kwargs)
-
     episodes: list[dict[str, Any]] = [
         {
             "question": record["question"],
@@ -527,41 +503,90 @@ def main() -> int:
     won = np.zeros(len(records), dtype=bool)
 
     try:
-        for step_index in range(args.max_steps):
-            active_before = ~done
-            if not active_before.any():
-                break
-            generation_started = time.monotonic()
-            raw_actions = generate_actions(llm, tokenizer, observations["text"], args)
-            projected_actions, projected_valids = search_projection(raw_actions)
-            next_observations, rewards, step_done, infos = manager.step(raw_actions)
-            generation_seconds = time.monotonic() - generation_started
-            for index in range(len(records)):
-                if not active_before[index]:
-                    continue
-                executed_search = bool(infos[index].get("tool_calling"))
-                episodes[index]["steps"].append(
-                    {
-                        "step": step_index + 1,
-                        "prompt": observations["text"][index],
-                        "raw_action": raw_actions[index],
-                        "projected_action": projected_actions[index],
-                        "action_quality": action_quality(raw_actions[index], bool(projected_valids[index])),
-                        "observation": jsonable(next_observations["anchor"][index]),
-                        "reward": float(rewards[index]),
-                        "done": bool(step_done[index]),
-                        "won": bool(infos[index].get("won", bool(step_done[index]) and float(rewards[index]) >= 1.0)),
-                        "executed_search": executed_search,
-                        "info": jsonable(infos[index]),
-                        "batch_generation_seconds": generation_seconds,
-                    }
-                )
-                final_rewards[index] += float(rewards[index])
-                won[index] = won[index] or bool(infos[index].get("won", False))
-            done |= np.asarray(step_done, dtype=bool)
-            observations = next_observations
+        # Episodes are evaluated in sequential chunks of max_envs_per_batch
+        # envs. The CPU retriever (uvicorn sync pool + faiss OMP-24 per query)
+        # wedges under 256-env concurrency (observed 2026-08-15: health
+        # starved, every search timed out); 32 envs is the proven dev32 load.
+        # This is a pure concurrency control — the eval envs are deterministic
+        # and seedless, so per-episode semantics are identical to a single
+        # 256-env run.
+        for batch_start in range(0, len(records), args.max_envs_per_batch):
+            batch_records = records[batch_start : batch_start + args.max_envs_per_batch]
+            env_config = OmegaConf.create(
+                {
+                    "max_steps": args.max_steps,
+                    "history_length": args.history_length,
+                    "search": {
+                        "search_url": args.search_url,
+                        "topk": args.topk,
+                        "timeout": args.timeout,
+                        "log_requests": True,
+                    },
+                }
+            )
+            raw_envs = SearchMultiProcessEnv(
+                seed=args.seed,
+                env_num=len(batch_records),
+                group_n=1,
+                is_train=False,
+                env_config=env_config,
+            )
+            manager = SearchEnvironmentManager(raw_envs, search_projection, OmegaConf.create({"env": env_config}))
+            kwargs = [
+                {
+                    "question": record["question"],
+                    "ground_truth": {"target": record["answers"]},
+                    "data_source": record["data_source"],
+                }
+                for record in batch_records
+            ]
+            observations, _ = manager.reset(kwargs=kwargs)
+
+            batch_done = np.zeros(len(batch_records), dtype=bool)
+            batch_final = np.zeros(len(batch_records), dtype=float)
+            batch_won = np.zeros(len(batch_records), dtype=bool)
+
+            try:
+                for step_index in range(args.max_steps):
+                    active_before = ~batch_done
+                    if not active_before.any():
+                        break
+                    generation_started = time.monotonic()
+                    raw_actions = generate_actions(llm, tokenizer, observations["text"], args)
+                    projected_actions, projected_valids = search_projection(raw_actions)
+                    next_observations, rewards, step_done, infos = manager.step(raw_actions)
+                    generation_seconds = time.monotonic() - generation_started
+                    for local_index in range(len(batch_records)):
+                        if not active_before[local_index]:
+                            continue
+                        global_index = batch_start + local_index
+                        executed_search = bool(infos[local_index].get("tool_calling"))
+                        episodes[global_index]["steps"].append(
+                            {
+                                "step": step_index + 1,
+                                "prompt": observations["text"][local_index],
+                                "raw_action": raw_actions[local_index],
+                                "projected_action": projected_actions[local_index],
+                                "action_quality": action_quality(raw_actions[local_index], bool(projected_valids[local_index])),
+                                "observation": jsonable(next_observations["anchor"][local_index]),
+                                "reward": float(rewards[local_index]),
+                                "done": bool(step_done[local_index]),
+                                "won": bool(infos[local_index].get("won", bool(step_done[local_index]) and float(rewards[local_index]) >= 1.0)),
+                                "executed_search": executed_search,
+                                "info": jsonable(infos[local_index]),
+                                "batch_generation_seconds": generation_seconds,
+                            }
+                        )
+                        batch_final[local_index] += float(rewards[local_index])
+                        batch_won[local_index] = batch_won[local_index] or bool(infos[local_index].get("won", False))
+                    batch_done |= np.asarray(step_done, dtype=bool)
+                    observations = next_observations
+            finally:
+                raw_envs.close()
+            done[batch_start : batch_start + len(batch_records)] |= batch_done
+            final_rewards[batch_start : batch_start + len(batch_records)] += batch_final
+            won[batch_start : batch_start + len(batch_records)] |= batch_won
     finally:
-        raw_envs.close()
         # vLLM 0.8.5 LLM has no shutdown(); releasing the engine is what frees
         # the GPU allocations before process exit.
         try:
@@ -621,6 +646,7 @@ def main() -> int:
             "history_length": args.history_length,
             "topk": args.topk,
             "timeout": args.timeout,
+            "max_envs_per_batch": args.max_envs_per_batch,
             "max_input_tokens": args.max_input_tokens,
             "max_new_tokens": args.max_new_tokens,
         },

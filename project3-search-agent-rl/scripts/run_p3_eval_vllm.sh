@@ -136,6 +136,9 @@ args=(
   --search-url "$retriever_url"
   --max-steps 2 --history-length 2 --topk 3 --timeout 180
   --max-input-tokens 2048 --max-new-tokens 256 --seed 0
+  # 32 concurrent envs per chunk: proven dev32 load; the CPU retriever wedges
+  # under full-set concurrency (256 envs -> 256 simultaneous searches).
+  --max-envs-per-batch 32
 )
 if [[ -n "$adapter_dir" ]]; then
   args+=(--adapter "$adapter_dir")
