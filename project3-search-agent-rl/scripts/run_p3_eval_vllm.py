@@ -384,12 +384,12 @@ def generate_actions(llm: vllm.LLM, tokenizer, prompts: list[str], args: argpars
     ]
     inputs = tokenizer(
         chats,
-        return_tensors="pt",
+        return_tensors=None,  # ragged lists: the vLLM engine batches internally
         padding=False,
         truncation=True,
         max_length=args.max_input_tokens,
     )
-    prompt_token_ids = [ids.tolist() for ids in inputs["input_ids"]]
+    prompt_token_ids = inputs["input_ids"]
     sampling_params = vllm.SamplingParams(
         temperature=0.0,
         top_p=1.0,
@@ -399,8 +399,9 @@ def generate_actions(llm: vllm.LLM, tokenizer, prompts: list[str], args: argpars
     )
     lora_request = None
     if args.adapter is not None:
+        # vLLM 0.8.5 LoRARequest takes lora_path (path is a read-only property).
         lora_request = LoRARequest(
-            lora_name="p3-adapter", lora_int_id=1, path=str(args.adapter)
+            lora_name="p3-adapter", lora_int_id=1, lora_path=str(args.adapter)
         )
     outputs = llm.generate(
         prompt_token_ids=prompt_token_ids,
@@ -561,7 +562,15 @@ def main() -> int:
             observations = next_observations
     finally:
         raw_envs.close()
-        llm.shutdown()
+        # vLLM 0.8.5 LLM has no shutdown(); releasing the engine is what frees
+        # the GPU allocations before process exit.
+        try:
+            del llm
+        except Exception:
+            pass
+        import gc
+
+        gc.collect()
 
     elapsed = time.monotonic() - started
 
@@ -575,6 +584,9 @@ def main() -> int:
     result = {
         "schema_version": 1,
         "kind": "p3-heldout-evaluation",
+        # Runtime code fingerprint: this eval script's own SHA256, so every run
+        # records exactly which harness version produced the numbers.
+        "runtime_script_sha256": sha256_file(Path(__file__).resolve()),
         "training": False,
         "training_operations": "none by construction: no optimizer, no scheduler, no backward, no Ray",
         "decoding_backend": "vllm-native-greedy",
