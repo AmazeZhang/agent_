@@ -34,8 +34,12 @@ HELDOUT_QUOTAS = {
     "musique": 2,
     "bamboogle": 2,
 }
-EXPECTED_TOTAL = sum(HELDOUT_QUOTAS.values())  # 32
+EXPECTED_TOTAL = sum(HELDOUT_QUOTAS.values())  # 32; --total must be a multiple of 32
 
+# The selection domain is part of the stable SHA key. A NEW domain MUST be
+# used for any additional sample drawn from the same pool, otherwise the
+# ascending-SHA ordering selects the same questions again (dev32 is the
+# 'searchr1-p3-eval-v1' draw; confirm-256 uses 'searchr1-p3-confirm-v1').
 SELECTION_DOMAIN = "searchr1-p3-eval-v1"
 UPSTREAM_REPO = "PeterJinGo/nq_hotpotqa_train"
 UPSTREAM_REVISION = "b7d80abfee334a7a91cb377544f09180d58b34f6"
@@ -53,8 +57,8 @@ def normalize_question(question: str) -> str:
     return " ".join(question.casefold().split())
 
 
-def stable_key(source: str, question: str, index: int) -> tuple[str, int]:
-    payload = f"{SELECTION_DOMAIN}\0{source}\0{normalize_question(question)}".encode()
+def stable_key(domain: str, source: str, question: str, index: int) -> tuple[str, int]:
+    payload = f"{domain}\0{source}\0{normalize_question(question)}".encode()
     return hashlib.sha256(payload).hexdigest(), index
 
 
@@ -63,7 +67,7 @@ def normalized_question_set(frame: pd.DataFrame) -> set[str]:
 
 
 def select_rows(
-    frame: pd.DataFrame, quotas: dict[str, int], excluded_questions: set[str]
+    frame: pd.DataFrame, quotas: dict[str, int], excluded_questions: set[str], domain: str
 ) -> pd.DataFrame:
     selected: list[int] = []
     seen = set(excluded_questions)
@@ -74,7 +78,7 @@ def select_rows(
             normalized = normalize_question(question)
             if normalized in seen:
                 continue
-            candidates.append((stable_key(source, question, int(index)), int(index), normalized))
+            candidates.append((stable_key(domain, source, question, int(index)), int(index), normalized))
         candidates.sort()
         source_selected = 0
         for _, index, normalized in candidates:
@@ -121,12 +125,20 @@ def main() -> None:
     parser.add_argument("--train-source", type=Path, required=True, help="upstream train.parquet (leakage exclusion)")
     parser.add_argument("--smoke-train", type=Path, required=True, help="smoke train.parquet (leakage exclusion)")
     parser.add_argument("--smoke-test", type=Path, required=True, help="smoke test.parquet (coverage exclusion)")
+    parser.add_argument("--total", type=int, default=32, help="total questions (multiple of 32; scales per-source quotas proportionally)")
+    parser.add_argument("--domain", default=SELECTION_DOMAIN, help="selection domain in the stable SHA key; MUST differ between draws from the same pool")
+    parser.add_argument("--extra-exclusions", type=Path, action="append", default=[], help="additional parquet whose questions are banned (e.g. dev32 heldout.parquet for the confirm set)")
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
 
-    for path in (args.test_source, args.train_source, args.smoke_train, args.smoke_test):
+    for path in (args.test_source, args.train_source, args.smoke_train, args.smoke_test, *args.extra_exclusions):
         if not path.is_file():
             raise SystemExit(f"input parquet missing: {path}")
+
+    if args.total < 32 or args.total % 32 != 0:
+        raise SystemExit("--total must be a multiple of 32 and at least 32")
+    scale = args.total // 32
+    quotas = {source: quota * scale for source, quota in HELDOUT_QUOTAS.items()}
 
     output_parquet = args.output_dir / "heldout.parquet"
     if output_parquet.exists():
@@ -140,23 +152,30 @@ def main() -> None:
     # Leakage exclusion: every normalized question trained on (upstream train,
     # smoke train) is banned. Smoke test rows are additionally excluded from the
     # pool so the held-out coverage is maximized (16 + 32 distinct questions).
+    # --extra-exclusions bans previously-drawn sets (dev32), so confirm-set
+    # questions have never been seen by any evaluation decision.
     upstream_train_questions = normalized_question_set(train_frame)
     smoke_train_questions = normalized_question_set(smoke_train)
     smoke_test_questions = normalized_question_set(smoke_test)
+    extra_questions = set()
+    for path in args.extra_exclusions:
+        extra_questions |= normalized_question_set(pd.read_parquet(path))
     banned = upstream_train_questions | smoke_train_questions
-    pool_exclusions = banned | smoke_test_questions
+    pool_exclusions = banned | smoke_test_questions | extra_questions
 
-    heldout = select_rows(test_frame, HELDOUT_QUOTAS, pool_exclusions)
+    heldout = select_rows(test_frame, quotas, pool_exclusions, args.domain)
 
-    if len(heldout) != EXPECTED_TOTAL:
-        raise RuntimeError(f"expected {EXPECTED_TOTAL} rows, got {len(heldout)}")
+    if len(heldout) != args.total:
+        raise RuntimeError(f"expected {args.total} rows, got {len(heldout)}")
     heldout_questions = normalized_question_set(heldout)
     if not heldout_questions.isdisjoint(banned):
         raise RuntimeError("leakage: held-out questions overlap trained questions")
     if not heldout_questions.isdisjoint(smoke_test_questions):
         raise RuntimeError("held-out questions overlap smoke test questions")
+    if not heldout_questions.isdisjoint(extra_questions):
+        raise RuntimeError("confirm questions overlap extra-exclusion questions")
     actual_quotas = heldout.groupby("data_source").size().to_dict()
-    if actual_quotas != HELDOUT_QUOTAS:
+    if actual_quotas != quotas:
         raise RuntimeError(f"quota mismatch: {actual_quotas}")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -188,11 +207,16 @@ def main() -> None:
 
     manifest = {
         "schema_version": 1,
-        "purpose": "held-out evaluation set for Step 0/Step 2/Step 5 same-condition comparison",
-        "claim_boundary": (
-            "small-sample (32 rows) preliminary evidence; not by itself a Search-R1 "
-            "reproduction or a generalization claim"
+        "purpose": (
+            f"held-out evaluation set ({args.total} rows, domain={args.domain}); "
+            "dev32 (searchr1-p3-eval-v1, 32 rows) is the reused development set; "
+            "this draw is a fresh, never-before-evaluated confirm set"
         ),
+        "claim_boundary": (
+            f"{args.total}-row confirm set; preregistered paired comparison evidence, "
+            "not by itself a Search-R1 reproduction or a generalization claim"
+        ),
+        "selection_domain": args.domain,
         "upstream_dataset": {
             "repo_id": UPSTREAM_REPO,
             "revision": UPSTREAM_REVISION,
@@ -202,15 +226,16 @@ def main() -> None:
             "root": root_revision,
         },
         "selection_algorithm": (
-            f"per-source quota, ascending SHA256({SELECTION_DOMAIN}\\0source\\0normalized_question), "
+            f"per-source quota, ascending SHA256({args.domain}\\0source\\0normalized_question), "
             "excluding upstream-train and smoke-train normalized questions"
         ),
         "selection_is_order_independent": True,
-        "quotas": HELDOUT_QUOTAS,
+        "quotas": quotas,
         "leakage": {
             "upstream_train_normalized_overlap": len(heldout_questions & upstream_train_questions),
             "smoke_train_normalized_overlap": len(heldout_questions & smoke_train_questions),
             "smoke_test_normalized_overlap": len(heldout_questions & smoke_test_questions),
+            "extra_exclusion_normalized_overlap": len(heldout_questions & extra_questions),
             "pool_duplicates_removed": 0,
         },
         "inputs": {
@@ -218,6 +243,10 @@ def main() -> None:
             "train": {"path": str(args.train_source.resolve()), "sha256": sha256_file(args.train_source), "rows": len(train_frame)},
             "smoke_train": {"path": str(args.smoke_train.resolve()), "sha256": sha256_file(args.smoke_train), "rows": len(smoke_train)},
             "smoke_test": {"path": str(args.smoke_test.resolve()), "sha256": sha256_file(args.smoke_test), "rows": len(smoke_test)},
+            "extra_exclusions": [
+                {"path": str(path.resolve()), "sha256": sha256_file(path), "rows": len(pd.read_parquet(path))}
+                for path in args.extra_exclusions
+            ],
         },
         "outputs": {
             "heldout": {"path": str(output_parquet.resolve()), "sha256": sha256_file(output_parquet), "rows": len(heldout)},
