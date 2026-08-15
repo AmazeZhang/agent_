@@ -65,3 +65,17 @@ nq64/hotpotqa64/popqa32/2wiki32/triviaqa32/musique16/bamboogle16）在真实效�
 - confirm-256 题从未参与任何调参或决策（构建时显式排除 dev32）；
 - 本实验不声称 Search-R1 复现（官方宽松语义基线为另一条线，见第 4 步拆线）；
 - 若支持 H1，也只支持"在该固定条件下 train64nqh8 优于 Base"这一有限声明。
+
+## 8. 运行记录（追加；不改变第 4 节规则）
+
+**2026-08-15 加注（预注册后、首次有效评测前）**：首轮 Base run
+（`p3-eval-vllm-confirm256-base-s0-20260815a`）因运行环境缺陷作废并排除：
+tmux server 全局 env 携带 `http_proxy/https_proxy=http://127.0.0.1:7890`
+（clash），requests 将 loopback 检索流量路由进代理，全部 search 以
+`read timeout=180` 失败（stderr 无一次成功检索）。dev32（08-14）各 run 0 次
+超时、检索正常 → 不受影响、结果有效。修复：`scripts/run_p3_eval_vllm.sh`
+新增代理净化（unset proxy + `NO_PROXY=127.0.0.1,localhost`），提交
+`be063fd`；评测脚本本体 `run_p3_eval_vllm.py`（f4d4784，自记录
+`runtime_script_sha256`）未改动。该环境修复不改任何固定条件（引擎/数据/
+参数/retriever 身份/指标/判定规则均不变），按第 4.5 条仅重跑被作废的
+Base run（`…-s0-20260815b`），不重抽数据、不改规则。
