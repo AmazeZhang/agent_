@@ -46,8 +46,13 @@ case "$eval_data" in
     manifest_path="${project_data}/datasets/searchr1-heldout32/manifest.json"
     manifest_key="heldout"
     ;;
+  confirm256)
+    data_files="${project_data}/datasets/searchr1-confirm256/heldout.parquet"
+    manifest_path="${project_data}/datasets/searchr1-confirm256/manifest.json"
+    manifest_key="heldout"
+    ;;
   *)
-    echo "PROJECT3_EVAL_DATA must be smoke or heldout32, got: ${eval_data}" >&2
+    echo "PROJECT3_EVAL_DATA must be smoke, heldout32 or confirm256, got: ${eval_data}" >&2
     exit 19
     ;;
 esac
@@ -112,6 +117,14 @@ export TOKENIZERS_PARALLELISM=false
 # Same vLLM engine path as the training rollout (run_p3_grpo_fix_exp.sh);
 # the eval script aborts unless VLLM_USE_V1 is exactly "0".
 export VLLM_USE_V1=0
+# Local-only stack: model files, dataset and retriever all live on loopback.
+# The tmux server env may carry http(s)_proxy (e.g. a system proxy on 7890);
+# requests/httpx then route loopback traffic through the proxy and every
+# search times out (observed 2026-08-15 on confirm-256). Managed evals must
+# never traverse a proxy, independent of the launching shell's environment.
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy
+export no_proxy="127.0.0.1,localhost"
+export NO_PROXY="127.0.0.1,localhost"
 export PYTHONPATH="${vendor_dir}:${project_dir}${PYTHONPATH:+:${PYTHONPATH}}"
 
 args=(
