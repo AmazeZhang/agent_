@@ -774,3 +774,58 @@ preflight.sh 门禁输出为准，不主动查询 GPU0。
   Base 的显著效果；中间步 credit 平坦 + 贪心解码下搜索收益有限仍是主因。
 - 后续方向（均需用户批准后执行）：官方宽松语义基线评测（线 1，对照论文）；
   训练规模/credit 整形路线（线 2 继续）。
+
+## 轮次：官方模型验证（2026-08-15）—— 官方宽松语义线，判定 PASS
+
+### 目的
+
+严格线 confirm-256（train64nqh8 31 vs Base 37，p=0.109）无法区分"8 步 LoRA 太弱"
+与"环境观察不到 Search-R1 效应"。用官方 Search-R1 3B GRPO checkpoint 做最便宜的
+关键判断：官方模型是官方环境训练出的强模型，若它在我们的评测链路上也无效果 →
+环境不一致；有效果 → 环境可观察，问题在我们自己的训练设置。
+
+### 执行（全部预注册，先于任何评测）
+
+- 模型：`PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-3b-em-grpo`（F32 合并权重
+  13.59GB，3 分片 SHA 已记录，safetensors 可读 435 tensors，config=Qwen2ForCausalLM
+  36 层）+ `Qwen/Qwen2.5-3B`（bf16 6.17GB，434 tensors）。代理下载（hf 客户端在
+  代理下停滞，改 curl 并行分片断点续传）。
+- 数据：`searchr1-official-confirm256-v1`（256 行，domain
+  `searchr1-p3-official-confirm-v1`，SHA ffebf468…，重建确定一致；排除 dev32 +
+  旧 confirm256 + 训练集，泄漏 0）。
+- 入口：`run_p3_eval_vllm_official.py`（官方宽松语义：raw action 直达 vendored
+  skyrl SearchEnv、无投影无惩罚、format_score=0.1；tokenizer 固定 Base 使两模型
+  输入 byte-identical）+ 受管 wrapper + CPU 测试 + 分析脚本。
+- 预注册 `docs/P3_OFFICIAL_CHECKPOINT_PREREG_2026-08-15.md`（`72467a5`），
+  三档判定：PASS / FAIL-TO-OBSERVE / INCONCLUSIVE。
+
+### 结果（official-confirm256-v1，vLLM V0 greedy，受管 GPU1，0 检索超时）
+
+| 模型 | EM | 率 | Wilson 95% CI |
+|---|---|---|---|
+| Qwen2.5-3B Base | 20/256 | 7.81% | [5.11%, 11.76%] |
+| 官方 Search-R1 3B GRPO | 32/256 | 12.50% | [9.00%, 17.11%] |
+
+配对：1→1=12、0→0=216、1→0=8、0→1=20；**精确双侧 McNemar p=0.0357** → **PASS**。
+
+行为差异（描述性）：官方模型 0 次 invalid_query / 0 次 error observation
+（Base 114/380），40 次检索全部 success（Base 10 success / 114 invalid）；
+answer_compliance 0.844 vs 0.516 —— 官方 checkpoint 在我们环境上的行为与
+"已学会搜索协议"一致。
+
+### 问题与解决
+
+- hf 客户端（huggingface_hub 0.30.2）在 clash 代理下分块下载停滞（1 小时 16MB）；
+  改 curl 并行分片 + `-C -` 断点续传，聚合 ~10MB/s，20GB 约 40 分钟。
+- 官方 checkpoint 的 chat_template 是 tools 版本（2427 字符，含 `{%- if tools %}`
+  system 段）——固定 Base tokenizer 渲染输入，两模型输入 byte-identical。
+
+### 结论与后续（判定：PASS）
+
+- 环境（retriever/prompt/宽松语义/评测）能观察到官方训练的 Search-R1 效应 →
+  **批准进入 3B 复现训练阶段**。
+- 我们自己的严格线 train64nqh8 无提升的归因更新：不指向环境不一致，指向
+  训练设置本身（规模/步数/语义/数据量）——3B 复现训练是下一步。
+- 后续（第二阶段，另行预注册）：3B GRPO 复现训练（Qwen2.5-3B、官方宽松语义、
+  NQ+HotpotQA 全量 train、GPU 1,2,3,4,6,7、真实 Wiki-18、Step 0/50/100/300
+  门禁，Step 50/100 停训后用 GPU1 评测，不与训练并发压 retriever）。

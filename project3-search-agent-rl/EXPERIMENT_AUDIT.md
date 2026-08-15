@@ -97,7 +97,7 @@ flip均为正向。Step5old与train64恰好答对同一5题。Adapter文件存�
 | 2 | heldout-32 定位为 `dev32` | ✅ 关闭 | 预注册文档 `docs/P3_CONFIRM256_PREREG_2026-08-15.md` 明确 dev32 已被多轮调参查看，只作初步信号 |
 | 3 | 128–256 题确认集 + 预注册配对比较 | ✅ 关闭 | `searchr1-confirm256`（256 题，新 domain 抽取，dev32 零重叠，泄漏 0，SHA `20e260d7…`）；预注册 `c66677a` **先于任何评测**提交 |
 | 4 | 运行 vLLM 确认评测 | ✅ 关闭 | Base `…-base-s0-20260815c`：EM 37/256；train64nqh8 `…-train64nqh8-s0-20260815a`：EM 31/256；均受管运行、`compute_processes=none`、0 检索超时；**精确双侧 McNemar p=0.109（8:2 discordant）→ H1 不支持**。分析：`analysis/p3_confirm256_pair_2026-08-15.{md,json}` |
-| 5 | 官方宽松动作语义基线 | ⏳ 已组织、未运行 | `docs/P3_EXPERIMENT_LINES_2026-08-15.md`（`d03d271`）拆分两条线：官方宽松（raw action + 无惩罚 + format 0.1，论文口径，待建宽松评测入口）vs 严格 fork（投影有效性 + -0.1/invalid 行，当前全部训练/评测所在）；严格线数字**不得**直接对照论文 |
+| 5 | 官方宽松动作语义基线 | ✅ 关闭 | `docs/P3_EXPERIMENT_LINES_2026-08-15.md`（`d03d271`）拆两条线；官方线独立入口 `run_p3_eval_vllm_official.py`（raw action 直达 skyrl SearchEnv、无投影无惩罚、format 0.1）；**官方模型验证 PASS**：官方 Search-R1 3B GRPO 32/256 vs Qwen2.5-3B Base 20/256，精确 McNemar p=0.0357 → 环境能观察 Search-R1 效应（预注册 `docs/P3_OFFICIAL_CHECKPOINT_PREREG_2026-08-15.md`，分析 `analysis/official-line/p3_official_pair_2026-08-15.{md,json}`） |
 
 ### 本轮修复记录（2026-08-15 运行环境问题）
 

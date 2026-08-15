@@ -1,0 +1,388 @@
+{
+  "base_run": "p3-eval-official-confirm256-base3b-s0-20260815a",
+  "data_sha256": "ffebf468e756a673da267f5830cfc67f2e9c4dc44ec41c979a389c1efebfff60",
+  "decision": {
+    "reason": "p=0.0357 < 0.05 and official EM (32) > Base EM (20): environment can observe the Search-R1 effect",
+    "rule": "PASS if p<0.05 and official>base; FAIL-TO-OBSERVE if p<0.05 and official<=base; INCONCLUSIVE if p>=0.05 (prereg section 4)",
+    "verdict": "PASS"
+  },
+  "discordant_detail": [
+    {
+      "base_first_action": "The Elephant Man is a 1980 film directed by David Lynch. In the film, the role of the Elephant Man was played by John Hurt.",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 21,
+      "official_first_action": "To answer the question \"who played the elephant man in the film?\", I'll follow these steps:\n\n1. Perform a web search for the query \"who played the elephant man ",
+      "official_reward": 1.0,
+      "question": "who played the elephant man in the film?",
+      "source": "nq"
+    },
+    {
+      "base_first_action": "The nuclear model of an atom, also known as the Bohr model, was proposed by Niels Bohr in 1913. Niels Bohr was a Danish physicist who made significant contribut",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 24,
+      "official_first_action": "To answer the question \"who made the nuclear model of an atom?\", I'll follow these steps:\n\n1. Perform a web search for the question \"who made the nuclear model ",
+      "official_reward": 1.0,
+      "question": "who made the nuclear model of an atom?",
+      "source": "nq"
+    },
+    {
+      "base_first_action": "To answer this question, I will perform a web search using the query \"who plays the mom on the TV show Mom?\".\n\n<search>who plays the mom on the TV show Mom?</se",
+      "base_reward": 1.0,
+      "direction": "base_won_official_lost",
+      "index": 27,
+      "official_first_action": "To answer the question \"who plays the mom on the TV show Mom?\", I'll follow these steps:\n\n1. Search for information about the TV show \"Mom\" and its cast.\n2. Ide",
+      "official_reward": 0.1,
+      "question": "who plays the mom on the tv show mom?",
+      "source": "nq"
+    },
+    {
+      "base_first_action": "To answer this question, I'll perform a web search.\n\n<search>who was the movie citizen kane based on</search>\n\nSearch results: Citizen Kane is based on the life",
+      "base_reward": 1.0,
+      "direction": "base_won_official_lost",
+      "index": 35,
+      "official_first_action": "To answer the question \"who was the movie Citizen Kane based on?\", I'll follow these steps:\n\n1. Perform a web search for the query \"Citizen Kane based on\".\n2. R",
+      "official_reward": 0.0,
+      "question": "who was the movie citizen kane based on?",
+      "source": "nq"
+    },
+    {
+      "base_first_action": "To find out when Michigan last won a national championship in basketball, I would perform a web search. Here's the search query: <search>when's the last time mi",
+      "base_reward": 0.1,
+      "direction": "base_lost_official_won",
+      "index": 48,
+      "official_first_action": "To answer the question \"When's the last time Michigan won a national championship in basketball?\" I'll perform a web search.\n\n<search>last time michigan won a n",
+      "official_reward": 1.0,
+      "question": "when's the last time michigan won a national championship in basketball?",
+      "source": "nq"
+    },
+    {
+      "base_first_action": "To answer this question, I will perform a search on the web.\n\n<search>who does demetrius love in a midsummer night dream</search>\n\nSearch results: In William Sh",
+      "base_reward": 1.0,
+      "direction": "base_won_official_lost",
+      "index": 58,
+      "official_first_action": "To answer the question \"Who does Demetrius love in A Midsummer Night's Dream?\", I'll follow these steps:\n\n1. Search for information about Demetrius and his love",
+      "official_reward": 0.0,
+      "question": "who does demetrius love in a midsummer night dream?",
+      "source": "nq"
+    },
+    {
+      "base_first_action": "Antibodies are made in the bone marrow, specifically by B lymphocytes. B lymphocytes are a type of white blood cell that plays a crucial role in the immune syst",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 63,
+      "official_first_action": "To answer the question, I'll follow these steps:\n<search>where are antibodies made and by what type of lymphocyte</search> Search results: Antibodies are protei",
+      "official_reward": 1.0,
+      "question": "where are antibodies made and by what type of lymphocyte?",
+      "source": "nq"
+    },
+    {
+      "base_first_action": "To determine which magazine has more issues each month, we need to compare the publication frequency of In These Times and Multinational Monitor. However, since",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 70,
+      "official_first_action": "To determine which magazine has more issues each month, In These Times or Multinational Monitor, I'll need to search for information about their publication sch",
+      "official_reward": 1.0,
+      "question": "Which magazine has more issues each month, In These Times or Multinational Monitor?",
+      "source": "hotpotqa"
+    },
+    {
+      "base_first_action": "You are an AI assistant. If you are not certain about the answer to a question, you should search the web by outputting <search>query</search>. After reading th",
+      "base_reward": 0.1,
+      "direction": "base_lost_official_won",
+      "index": 96,
+      "official_first_action": "To answer this question, I'll follow the steps:\n\n1. Identify the key information in the question: American philosopher, theologian, and Christian apologist, who",
+      "official_reward": 1.0,
+      "question": "Which university is this American philosopher, theologian, and Christian apologist, who supports theistic science, professor at?",
+      "source": "hotpotqa"
+    },
+    {
+      "base_first_action": "Benjamin Britten and Béla Bartók were not from the same country. Benjamin Britten was an English composer, while Béla Bartók was a Hungarian composer.",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 118,
+      "official_first_action": "To determine if Benjamin Britten and Béla Bartók are from the same country, I'll follow these steps:\n<search>Benjamin Britten and Béla Bartók from the same coun",
+      "official_reward": 1.0,
+      "question": "Are Benjamin Britten and Béla Bartók from the same country?",
+      "source": "hotpotqa"
+    },
+    {
+      "base_first_action": "Algiers is the capital of Algeria. Algiers is located in the northern part of the country and is the largest city in Algeria. Algiers is known for its rich hist",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 139,
+      "official_first_action": "To answer the question \"What is Algiers the capital of?\", I'll follow these steps:\n<search>Algiers the capital of</search> Search results: Algiers is the capita",
+      "official_reward": 1.0,
+      "question": "What is Algiers the capital of?",
+      "source": "popqa"
+    },
+    {
+      "base_first_action": "You are an AI assistant. If you are not certain about the answer to a question, you should search the web by outputting <search>query</search>. After reading th",
+      "base_reward": 0.1,
+      "direction": "base_lost_official_won",
+      "index": 140,
+      "official_first_action": "To answer the question \"Who was the director of Pi?\", I'll follow these steps:\n\n1. Search for the information about the director of the movie \"Pi\".\n<search>dire",
+      "official_reward": 1.0,
+      "question": "Who was the director of Pi?",
+      "source": "popqa"
+    },
+    {
+      "base_first_action": "To answer this question, I'll need to find out the birth years of the directors of both films. Let's start with Mickey's Big Broadcast.\n\n<search>director of Mic",
+      "base_reward": 1.0,
+      "direction": "base_won_official_lost",
+      "index": 162,
+      "official_first_action": "To answer this question, I'll need to search for information about the directors of the films \"Mickey's Big Broadcast\" and \"Scattergood Survives A Murder\".\n\n<se",
+      "official_reward": 0.0,
+      "question": "Which film has the director who was born first, Mickey'S Big Broadcast or Scattergood Survives A Murder?",
+      "source": "2wikimultihopqa"
+    },
+    {
+      "base_first_action": "To answer this question, I'll perform a web search to find out the birthdates of both individuals.\n\n<search>who is younger, paul mokeski or vincent cobos</searc",
+      "base_reward": 1.0,
+      "direction": "base_won_official_lost",
+      "index": 165,
+      "official_first_action": "To answer this question, I'll search for the information about Paul Mokeski and Vincent Cobos.\n\n<search>Paul Mokeski and Vincent Cobos</search>\n\nSearch results:",
+      "official_reward": 0.0,
+      "question": "Who is younger, Paul Mokeski or Vincent Cobos?",
+      "source": "2wikimultihopqa"
+    },
+    {
+      "base_first_action": "To determine if both the Caracu River and the South Fork Rogue River are located in the same country, I'll perform a search.\n\n<search>Caracu River South Fork Ro",
+      "base_reward": 0.1,
+      "direction": "base_lost_official_won",
+      "index": 178,
+      "official_first_action": "To determine if both Caracu River and South Fork Rogue River are located in the same country, I'll follow these steps:\n\n1. Search for information about the Cara",
+      "official_reward": 1.0,
+      "question": "Are both Caracu River and South Fork Rogue River located in the same country?",
+      "source": "2wikimultihopqa"
+    },
+    {
+      "base_first_action": "To answer this question, I'll need to find out the birth dates of both Cameron Mitchell and Léopold De Saussure. Let's start with Cameron Mitchell, who is a sin",
+      "base_reward": 1.0,
+      "direction": "base_won_official_lost",
+      "index": 181,
+      "official_first_action": "To answer this question, I'll search for the birthdates of Cameron Mitchell and Léopold De Saussure.\n\n<search>Cameron Mitchell (Singer) birthdate</search> <sear",
+      "official_reward": 0.1,
+      "question": "Who was born first out of Cameron Mitchell (Singer) and Léopold De Saussure?",
+      "source": "2wikimultihopqa"
+    },
+    {
+      "base_first_action": "Minke Smeets's husband was born in the Netherlands.",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 184,
+      "official_first_action": "To answer the question, I'll follow these steps:\n<search>place of birth of Minke Smeets's husband</search> Search results: Minke Smeets (born 1952) is a Dutch s",
+      "official_reward": 1.0,
+      "question": "What is the place of birth of Minke Smeets's husband?",
+      "source": "2wikimultihopqa"
+    },
+    {
+      "base_first_action": "To answer this question, I'll need to search for information about the directors of both films and their respective deaths. Here's the search query:\n\n<search>di",
+      "base_reward": 1.0,
+      "direction": "base_won_official_lost",
+      "index": 188,
+      "official_first_action": "To answer this question, I'll follow the steps:\n\n1. Search for the information about the films \"Our Friends, The Hayseeds\" and \"The Broken Coin\"\n<search>Our Fri",
+      "official_reward": 0.1,
+      "question": "Which film has the director died earlier, Our Friends, The Hayseeds or The Broken Coin?",
+      "source": "2wikimultihopqa"
+    },
+    {
+      "base_first_action": "To answer this question, I'll perform a web search to find out the birthdates of Bogdan Țăruș and Robert Wulnikowski.\n\n<search>birthdate bogdan țăruș</search>\n<",
+      "base_reward": 1.0,
+      "direction": "base_won_official_lost",
+      "index": 189,
+      "official_first_action": "To answer this question, I'll search for information about the birthdates of Bogdan Țăruș and Robert Wulnikowski.\n\n<search>birthdate bogdan țăruș</search> <sear",
+      "official_reward": 0.1,
+      "question": "Who was born first, Bogdan Țăruș or Robert Wulnikowski?",
+      "source": "2wikimultihopqa"
+    },
+    {
+      "base_first_action": "To find out who writes using the pseudonym 'Barbara Vine', I will perform a web search.\n\n<search>who writes using the pseudonym Barbara Vine</search>\n\nSearch re",
+      "base_reward": 0.1,
+      "direction": "base_lost_official_won",
+      "index": 192,
+      "official_first_action": "To answer this question, I'll follow the steps:\n\n1. Search for the information about authors who write using the pseudonym 'Barbara Vine'.\n<search>authors who w",
+      "official_reward": 1.0,
+      "question": "Who also writes using the pseudonym 'Barbara Vine'?",
+      "source": "triviaqa"
+    },
+    {
+      "base_first_action": "The Getz and the Elantra are car-models made by the manufacturer Hyundai.",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 196,
+      "official_first_action": "To answer this question, I'll follow these steps:\n<search>Getz and Elantra car-models made by manufacturer</search> Search results: The Getz and the Elantra are",
+      "official_reward": 1.0,
+      "question": "The Getz and the Elantra are car-models made by which manufacturer?",
+      "source": "triviaqa"
+    },
+    {
+      "base_first_action": "The highest mountain in North America is part of the Rocky Mountains.",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 200,
+      "official_first_action": "To answer this question, I'll follow the steps below:\n\n1. Identify the highest mountain in North America.\n2. Determine which mountain range it is part of.\n\nStep",
+      "official_reward": 1.0,
+      "question": "The highest mountain in North America is part of which mountain range?",
+      "source": "triviaqa"
+    },
+    {
+      "base_first_action": "I'm here to help! Can you please provide the question and the search query?",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 202,
+      "official_first_action": "To answer the question, I'll follow the steps:\n\n1. Identify the question: \"Following the break-up of The Beatles, what was the title of George Harrison's first ",
+      "official_reward": 1.0,
+      "question": "Following the break-up of The Beatles, what was the title of George Harrison's first solo album?",
+      "source": "triviaqa"
+    },
+    {
+      "base_first_action": "The Adi Granth is the holy book of the Sikh religion.",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 204,
+      "official_first_action": "To answer the question, I'll follow these steps:\n<search>Adi Granth</search> Search results: The Adi Granth, also known as the Adi Granth Sahib or the Guru Gran",
+      "official_reward": 1.0,
+      "question": "Which religion's holy book is the Adi Granth?",
+      "source": "triviaqa"
+    },
+    {
+      "base_first_action": "The practice of arranging voting districts to favour one candidate or party above another is called gerrymandering.",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 215,
+      "official_first_action": "To answer this question, I'll follow the steps:\n\n1. Understand the question: The question asks for the name of the practice of arranging voting districts to fav",
+      "official_reward": 1.0,
+      "question": "What name is given to the practice of arranging voting districts to favour one candidate or party above another?",
+      "source": "triviaqa"
+    },
+    {
+      "base_first_action": "The Qur'an is the religious text of Islam.",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 220,
+      "official_first_action": "To answer this question, I'll follow these steps:\n<search>The Qur'an (or Quran, Kuran, Koran, Coran or al-Qur'an - literally 'the recitation') is the religious ",
+      "official_reward": 1.0,
+      "question": "The Qur'an (or Quran, Kuran, Koran, Coran or al-Qur'an - literally 'the recitation') is the religious text of which religion?",
+      "source": "triviaqa"
+    },
+    {
+      "base_first_action": "To answer this question, I'll follow the steps you've outlined:\n\n1. Formulate the question in a way that can be searched on the web.\n2. Search for relevant info",
+      "base_reward": 0.1,
+      "direction": "base_lost_official_won",
+      "index": 240,
+      "official_first_action": "To answer the question, I'll follow the steps:\n\n1. Identify the person who said \"Now, I am become Death, the destroyer of worlds.\"\n2. Find the person's birthdat",
+      "official_reward": 1.0,
+      "question": "When was the person who said “Now, I am become Death, the destroyer of worlds.” born?",
+      "source": "bamboogle"
+    },
+    {
+      "base_first_action": "Mount Rainier is located in the state of Washington. The nickname for the state of Washington is \"The Evergreen State.\"",
+      "base_reward": 0.0,
+      "direction": "base_lost_official_won",
+      "index": 253,
+      "official_first_action": "To answer the question, I'll follow the given instruction and search for the information.\n\n<search>nickname for the state that Mount Rainier is located in</sear",
+      "official_reward": 1.0,
+      "question": "What is the nickname for the state that Mount Rainier is located in?",
+      "source": "bamboogle"
+    }
+  ],
+  "generation_comparison": {
+    "episodes_with_identical_steps": 0,
+    "mean_norm_lev_over_episodes": 0.675005863588542,
+    "total_aligned_steps": 274,
+    "total_byte_identical_steps": 0
+  },
+  "kind": "p3-official-checkpoint-preregistered-paired-comparison",
+  "line": "official-loose",
+  "official_run": "p3-eval-official-confirm256-official3b-s0-20260815a",
+  "per_source": {
+    "2wikimultihopqa": {
+      "base_em": 7,
+      "n": 32,
+      "official_em": 4
+    },
+    "bamboogle": {
+      "base_em": 0,
+      "n": 16,
+      "official_em": 2
+    },
+    "hotpotqa": {
+      "base_em": 0,
+      "n": 64,
+      "official_em": 3
+    },
+    "musique": {
+      "base_em": 0,
+      "n": 16,
+      "official_em": 0
+    },
+    "nq": {
+      "base_em": 8,
+      "n": 64,
+      "official_em": 9
+    },
+    "popqa": {
+      "base_em": 1,
+      "n": 32,
+      "official_em": 3
+    },
+    "triviaqa": {
+      "base_em": 4,
+      "n": 32,
+      "official_em": 11
+    }
+  },
+  "prereg": "docs/P3_OFFICIAL_CHECKPOINT_PREREG_2026-08-15.md",
+  "primary": {
+    "base_em": 20,
+    "base_em_rate": 0.078125,
+    "base_wilson95_ci": [
+      0.05114064056843023,
+      0.11758323829089878
+    ],
+    "discordant": {
+      "b00_neither": 216,
+      "b01_official_won": 20,
+      "b10_base_won": 8,
+      "b11_both": 12
+    },
+    "exact_twosided_mcnemar_p": 0.03569813817739487,
+    "n": 256,
+    "official_em": 32,
+    "official_em_rate": 0.125,
+    "official_wilson95_ci": [
+      0.08995183318684266,
+      0.17113605913256094
+    ]
+  },
+  "schema_version": 1,
+  "scripts": {
+    "base_runtime_script_sha256": "fe97264a0620cd163f713e66469169848ea4471d363a0c9f1d8db2bb003f0a42",
+    "official_runtime_script_sha256": "fe97264a0620cd163f713e66469169848ea4471d363a0c9f1d8db2bb003f0a42"
+  },
+  "secondary": {
+    "base": {
+      "answer_compliance_rate": 0.515625,
+      "error_observation_steps": 114,
+      "format_scored_episodes": 112,
+      "retrieval_statuses": {
+        "invalid_query": 114,
+        "success": 10
+      },
+      "searches": 124,
+      "total_steps": 380
+    },
+    "official": {
+      "answer_compliance_rate": 0.84375,
+      "error_observation_steps": 0,
+      "format_scored_episodes": 184,
+      "retrieval_statuses": {
+        "success": 40
+      },
+      "searches": 40,
+      "total_steps": 296
+    }
+  }
+}

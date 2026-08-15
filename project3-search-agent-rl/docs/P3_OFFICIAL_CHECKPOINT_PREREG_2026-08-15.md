@@ -113,4 +113,25 @@ p<0.05 判定；若效应很小，256 题与严格线同功效水平（严格线
   旧 confirm-256（256 行），manifest `inputs.extra_exclusions` 记录；泄漏 0。
 
 **2026-08-15 加注 C（smoke-16 门禁与正式评测结果，评测后追加，不改规则）**：
-（待评测运行后填写。）
+
+- smoke-16 门禁（宽松语义管线验证，数字不作声明）：
+  Base-3B `p3-eval-official-smoke-base3b-s0-20260815a`（EM 8/16、0 超时、
+  cleanup `compute_processes=none`）；官方-3B
+  `p3-eval-official-smoke-official3b-s0-20260815a`（EM 2/16、0 超时、
+  cleanup none、stderr 无 traceback）。两 run 均通过退出验收。
+- 正式评测（official-confirm256-v1，256 题，单 seed greedy）：
+  - Base-3B `p3-eval-official-confirm256-base3b-s0-20260815a`：**EM 20/256**
+    （7.81%，Wilson [0.051, 0.118]），检索 124 次（**invalid_query 114 / success 10**）、
+    error observation 114/380 步、answer_compliance 0.516；
+  - 官方-3B `p3-eval-official-confirm256-official3b-s0-20260815a`：**EM 32/256**
+    （12.50%，Wilson [0.090, 0.171]），检索 40 次（**success 40、0 error**）、
+    answer_compliance 0.844；
+  - 配对：1→1=12、0→0=216、1→0（Base 对官方错）=8、0→1（Base 错官方对）=20；
+    **精确双侧 McNemar p = 0.035698**（<0.05 且 32 > 20）；
+  - **判定（预注册 §4 规则 1）：PASS** —— 我们的评测链路能观察到官方训练出来的
+    Search-R1 效应 → 批准进入 3B 复现训练阶段（第二阶段门禁另行预注册）。
+- 行为差异（描述性）：官方模型始终输出协议化动作（0 次 invalid_query vs Base 114 次、
+  0 次 error observation vs 114 次），confirm256 上 search 协议遵守率与
+  answer_compliance 均显著更高——官方 checkpoint 在我们的 retriever/prompt/评测
+  上表现与"已学会搜索协议"一致。
+- 完整分析：`analysis/official-line/p3_official_pair_2026-08-15.{md,json}`。
