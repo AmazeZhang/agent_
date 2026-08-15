@@ -244,7 +244,14 @@ retrieve_url = sys.argv[1]
 health_url = retrieve_url.rsplit("/", 1)[0] + "/health"
 with urlopen(health_url, timeout=5) as response:
     payload = json.load(response)
-if payload.get("status") != "ready" or payload.get("vectors") != 21_015_324:
+# 21,015,324 vectors = the real Wiki-18 index; max_concurrent_queries must be
+# the rate-limit config chosen by the stress matrix (threads=8, limit=64), the
+# only config under which the 330-env burst stays inside the 180s timeout.
+if (
+    payload.get("status") != "ready"
+    or payload.get("vectors") != 21_015_324
+    or payload.get("max_concurrent_queries") != 64
+):
     raise SystemExit(f"retriever health gate failed: {payload}")
 print(f"retriever health gate passed: {payload}")
 PY

@@ -3,16 +3,18 @@
 Run with:  CUDA_VISIBLE_DEVICES='' python -m pytest -q tests/test_patch_0005.py
 Requires PYTHONPATH="$PWD/vendor/verl-agent:$PWD".
 
-What patch 0005 changes (agent_system/environments/env_manager.py make_envs):
-  - env.projection=official  -> projection_f is a passthrough lambda that
-    returns raw text actions untouched with valids all True (official-loose
-    semantics, matching scripts/run_p3_eval_vllm_official.py). The underlying
-    skyrl SearchEnv receives the raw action; is_action_valid is always True;
-    the invalid-action penalty is disabled separately by config
+What patch 0005 changes:
+  - agent_system/environments/env_package/search/projection.py: new top-level
+    passthrough_projection() that returns raw text actions untouched with
+    valids all True (official-loose semantics, matching
+    scripts/run_p3_eval_vllm_official.py).
+  - env_manager.py make_envs: env.projection=official -> projection_f is the
+    passthrough_projection function; env.projection=strict (or key absent) ->
+    original search_projection (validity gating). Any other value raises
+    ValueError (fail-fast, so a typo can never silently fall back to strict).
+    The underlying skyrl SearchEnv receives the raw action; is_action_valid is
+    always True; the invalid-action penalty is disabled separately by config
     (actor_rollout_ref.actor.use_invalid_action_penalty=false).
-  - env.projection=strict (or key absent) -> projection_f is the original
-    search_projection (validity gating), i.e. the strict fork line is
-    unchanged.
 """
 
 from __future__ import annotations
@@ -28,7 +30,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "vendor" / "verl-agent"))
 
 from agent_system.environments.env_manager import make_envs
-from agent_system.environments.env_package.search.projection import search_projection
+from agent_system.environments.env_package.search.projection import (
+    passthrough_projection,
+    search_projection,
+)
 
 
 def _config(projection=None, history_length=0):
@@ -79,6 +84,14 @@ def stub_pool(monkeypatch):
 # projection selection
 # --------------------------------------------------------------------------
 
+def test_official_projection_is_top_level_passthrough_function(stub_pool):
+    # projection_f must be the real top-level function (not an inline lambda),
+    # so the semantics are a named, testable, importable contract.
+    envs, val_envs = make_envs(_config(projection="official"))
+    assert envs.projection_f is passthrough_projection
+    assert val_envs.projection_f is passthrough_projection
+
+
 def test_official_projection_is_raw_passthrough_all_valid(stub_pool):
     envs, _val_envs = make_envs(_config(projection="official"))
 
@@ -102,6 +115,17 @@ def test_strict_default_projection_is_search_projection(stub_pool):
     # explicit strict -> same
     envs2, _val_envs2 = make_envs(_config(projection="strict"))
     assert envs2.projection_f.func is search_projection
+
+
+def test_unknown_projection_value_fails_fast(stub_pool):
+    # A typo must never silently fall back to strict semantics: any value
+    # other than strict/official aborts at env construction time.
+    with pytest.raises(ValueError, match="projection"):
+        make_envs(_config(projection="offical"))
+    with pytest.raises(ValueError, match="projection"):
+        make_envs(_config(projection="LOOSE"))
+    with pytest.raises(ValueError, match="projection"):
+        make_envs(_config(projection=""))
 
 
 def test_strict_projection_still_gates_validity(stub_pool):

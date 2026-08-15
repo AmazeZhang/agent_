@@ -1,25 +1,68 @@
 diff --git a/agent_system/environments/env_manager.py b/agent_system/environments/env_manager.py
-index ab09dff..1376219 100644
+index ab09dff..530db3f 100644
 --- a/agent_system/environments/env_manager.py
 +++ b/agent_system/environments/env_manager.py
-@@ -614,7 +614,16 @@ def make_envs(config):
+@@ -610,11 +610,21 @@ def make_envs(config):
+     resources_per_worker = OmegaConf.to_container(config.env.resources_per_worker, resolve=True)
+ 
+     if "search" in config.env.env_name.lower():
+-        from agent_system.environments.env_package.search import build_search_envs, search_projection
++        from agent_system.environments.env_package.search import build_search_envs, passthrough_projection, search_projection
          _envs = build_search_envs(seed=config.env.seed, env_num=config.data.train_batch_size, group_n=group_n, is_train=True, env_config=config.env)
          _val_envs = build_search_envs(seed=config.env.seed + 1000, env_num=config.data.val_batch_size, group_n=1, is_train=False, env_config=config.env)
  
 -        projection_f = partial(search_projection)
-+        # projection=official selects official-loose semantics: raw actions
-+        # reach the underlying skyrl SearchEnv untouched (no projection, no
-+        # validity gate) and every action is valid, matching the official-line
-+        # evaluation harness scripts/run_p3_eval_vllm_official.py. The
++        # projection=official selects official-loose semantics (passthrough
++        # projection: raw actions reach the skyrl SearchEnv untouched, all
++        # valid), matching the official-line evaluation harness. The
 +        # invalid-action penalty is disabled separately via
 +        # actor_rollout_ref.actor.use_invalid_action_penalty=false.
-+        if OmegaConf.select(config.env, "projection", default="strict") == "official":
-+            projection_f = lambda text_actions: (list(text_actions), [True] * len(text_actions))
-+        else:
-+            projection_f = partial(search_projection)
++        # Unknown values fail fast so a typo can never silently fall back to
++        # strict semantics.
++        projection = OmegaConf.select(config.env, "projection", default="strict")
++        if projection not in ("strict", "official"):
++            raise ValueError(f"unknown env.projection={projection!r}; expected 'strict' or 'official'")
++        projection_f = passthrough_projection if projection == "official" else partial(search_projection)
          envs = SearchEnvironmentManager(_envs, projection_f, config)
          val_envs = SearchEnvironmentManager(_val_envs, projection_f, config)
          return envs, val_envs
+diff --git a/agent_system/environments/env_package/search/__init__.py b/agent_system/environments/env_package/search/__init__.py
+index 837d59e..a03643d 100644
+--- a/agent_system/environments/env_package/search/__init__.py
++++ b/agent_system/environments/env_package/search/__init__.py
+@@ -13,5 +13,5 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-from .projection import search_projection
++from .projection import passthrough_projection, search_projection
+ from .envs import build_search_envs
+\ No newline at end of file
+diff --git a/agent_system/environments/env_package/search/projection.py b/agent_system/environments/env_package/search/projection.py
+index 3ce7039..97c2c4f 100644
+--- a/agent_system/environments/env_package/search/projection.py
++++ b/agent_system/environments/env_package/search/projection.py
+@@ -31,6 +31,20 @@ def _postprocess_action(action: str) -> str:
+     return action
+ 
+ 
++def passthrough_projection(actions: List[str]) -> Tuple[List[str], List[bool]]:
++    """Official-loose projection: raw actions pass through untouched, all valid.
++
++    Selected via ``config.env.projection=official`` (patch 0005). The raw LLM
++    action text reaches the underlying skyrl SearchEnv byte-identical and every
++    action is marked valid — there is no invalid-action concept on the official
++    line, matching the official-line evaluation harness. The invalid-action
++    penalty is disabled separately via
++    ``actor_rollout_ref.actor.use_invalid_action_penalty=false``.
++    """
++
++    return list(actions), [True] * len(actions)
++
++
+ def search_projection(actions: List[str]) -> Tuple[List[str], List[int]]:
+     """Project a list of LLM *actions* into (`results`, `valids`).
+ 
 diff --git a/verl/trainer/config/ppo_trainer.yaml b/verl/trainer/config/ppo_trainer.yaml
 index d0f68ba..0c98727 100644
 --- a/verl/trainer/config/ppo_trainer.yaml
