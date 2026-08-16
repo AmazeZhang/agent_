@@ -894,3 +894,50 @@ answer_compliance 0.844 vs 0.516 —— 官方 checkpoint 在我们环境上的�
 **六卡 smoke**（GPU 1,2,3,4,6,7）：`gpu_memory_utilization=0.40` 起步、
 smoke profile 1 步 + save_freq=1 → 显存观测 → resume 续跑验证。批准后执行；
 Step 50 正式训练另行批准。
+
+## 轮次：六卡 smoke 两次失败（2026-08-16）—— KV cache 初始化失败 + vLLM 内存画像
+
+**状态**：步骤 2 修正（bfa7cbb）后，用户批准六卡 smoke。两次运行均在
+**vLLM `initialize_cache`** 失败（任何 rollout / optimizer step / checkpoint
+之前），已按用户指示停止并报告，未自动调整参数或降级。
+
+### smoke #1（2026-08-15，run `p3-official-smoke-fsdp6-b66-n5-s0-20260815a`）
+
+- 参数：GPU 1,2,3,4,6,7、profile=smoke、66×5=330、1 步、全参数 FSDP
+  （无 offload / LoRA）、`gpu_memory_utilization=0.40`。
+- 失败：`actor_rollout_init_model` → `initialize_cache` → `ValueError: No
+  available memory for the cache blocks. Try increasing gpu_memory_utilization`。
+- 观测（10s 采样）：各卡峰值 ~7,027 MiB（GPU7 7,102）；耗时 2m37s；
+  retriever 0 请求；optimizer step 0；无 checkpoint；退出干净（exit_code=1，
+  6 卡回基线 18 MiB，cleanup.log 6/6 compute_processes=none）。
+
+### smoke #2（2026-08-16，run `p3-official-smoke-fsdp6-b66-n5-s0-20260816a`）
+
+- 用户批准以 0.45 重跑，**唯一实验变量** gpu_mem=0.45，其余完全一致，
+  全新 run ID，显存改为 1s 采样；明确禁止自动升 0.50 / offload / LoRA。
+- 失败：与 #1 完全相同（`initialize_cache`，0 blocks）。
+- **vLLM 完整内存画像**（VLLM_LOGGING_LEVEL=INFO，6 卡一致）：
+  `model weights take 5.79GiB; non_torch_memory takes 0.01GiB; PyTorch
+  activation peak memory takes 5.53GiB; the rest reserved for KV Cache`。
+- **预算推算**（每卡 23.99 GiB）：非 KV 合计 11.33 GiB；0.45 预算 10.80 GiB
+  → KV −0.53 GiB → 0 blocks → abort。
+- 1s 采样峰值：GPU1 9,319 / GPU2 9,319 / GPU3 13,181 / GPU4 9,319 / GPU6
+  14,963 / GPU7 9,368 MiB（GPU3/6 为 profiling 瞬时尖峰）；abort 时稳定
+  ~9.3 GiB。耗时 2m04s；retriever 0 请求；optimizer step 0；无 checkpoint；
+  退出干净。
+
+### 问题与解决（根因，供决策）
+
+- **激活峰值 5.53 GiB 是主导项**：profiling 批次 = `max_num_batched_tokens
+  =2304` token 全量进 eager 模型（`enable_chunked_prefill=false`），远超
+  设计文档 §4 的 1–2 GiB 估计 → 设计 §4 该行已被实测证伪，需修正。
+- KV 预算公式（每卡）：`gpu_mem_utilization × 23.99 − 11.33 GiB`。
+  - 0.45 → −0.53 GiB（失败，实测）；0.50 → +0.66 GiB ≈ 21.6k blocks（推算
+    可过，但用户禁止自动升档，待批准）。
+- 候选路径（均待用户批准）：a) gpu_mem=0.50 重跑；b) `enable_chunked_prefill
+  =true` 收缩激活峰值；c) 缩小 max_num_batched_tokens；LoRA/offload 降级
+  不在候选（用户约束）。
+
+### 下一步（等待批准）
+
+用户对上述候选路径的指示；resume 验证待 smoke 通过后另行申请。

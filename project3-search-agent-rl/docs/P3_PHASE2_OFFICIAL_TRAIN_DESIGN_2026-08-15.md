@@ -65,9 +65,20 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 |---|---|
 | actor 权重+梯度+Adam（3.06B 全参，bf16 权重 + fp32 Adam） | ~7.6 GB（6.1+3.1+36.7 总 /6） |
 | ref 模型（bf16，无优化器） | ~1.5 GB |
-| vLLM rollout（3B bf16 权重每卡全量 6.1GB + KV cache） | ~12.3 GB（gpu_mem 0.5×24） |
-| 激活（micro 1 × 2304） | ~1–2 GB |
+| vLLM rollout（3B bf16 权重每卡全量 5.79GB + KV cache） | 见 §4.1 实测 |
+| 激活（micro 1 × 2304） | **实测 5.53 GiB**（见 §4.1；原 1–2 GB 估计已证伪） |
 | **合计** | **~22–23 GB（临界）** |
+
+### 4.1 六卡 smoke 实测（2026-08-16，两次失败，详见 PROGRESS_SYNC）
+
+- vLLM profiling 画像（6 卡一致）：weights 5.79 GiB + non_torch 0.01 GiB +
+  **激活峰值 5.53 GiB**（profiling 批次 = max_num_batched_tokens 2304 全量进
+  eager 模型，enable_chunked_prefill=false）= 非 KV 合计 **11.33 GiB**。
+- KV 预算公式（每卡 23.99 GiB）：`gpu_mem_utilization × 23.99 − 11.33`。
+  0.40 与 0.45 均实测失败（−1.73 / −0.53 GiB → 0 blocks → `initialize_cache`
+  abort）；0.50 推算 +0.66 GiB ≈ 21.6k blocks（未实测，待批准）。
+- 实测峰值（1s 采样，0.45 档）：GPU3 13,181 / GPU6 14,963 MiB（profiling
+  瞬时尖峰），其余 ~9.3 GiB；abort 时稳定 ~9.3 GiB。
 
 风险与降级（用户审阅拍板：**六卡 smoke 从 `gpu_memory_utilization` 0.40/0.45
 起步**，不先试高值）：
@@ -171,7 +182,7 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 |---|---|---|
 | 1 | 本设计（提交供审阅） | 用户批准设计（已批准步骤 2；本表按审阅意见更新） |
 | 2 | 官方训练语义实现（patch 0005 + wrapper + retriever 全局限流/压测） | CPU 逻辑测试 + 压测报告 + 严格线不受影响（现有测试全绿） |
-| 3 | **六卡 smoke（显存验证）** | 用户批准后执行；GPU 1,2,3,4,6,7 跑 1 步（`gpu_memory_utilization=0.45` 起步，0.40 为第一观测点）；**不做单卡模拟**（用户审阅删除）；峰值显存 < 23.5GB；失败则按 §4 降级顺序 |
+| 3 | **六卡 smoke（显存验证）** | 用户批准后执行；GPU 1,2,3,4,6,7 跑 1 步；**不做单卡模拟**（用户审阅删除）。**2026-08-16 实测：0.40 与 0.45 均失败于 vLLM `initialize_cache`**（§4.1 画像，激活峰值 5.53 GiB 超预算，KV 0 blocks）；两次均按用户指示停止、未自动调整；0.50 与配置路径待用户批准 |
 | 4 | 六卡 1 步 + 恢复 | GPU 1,2,3,4,6,7 跑 1 步 → 正常退出 → resume 续跑 1 步成功（此 profile 用 save_freq=1 以产生 checkpoint；正式配置仍 save_freq=50） |
 | 5 | Retriever 并发压测 | §8 判据（全局限流已实现，压测选档） |
 | 6 | 冻结 resolved config | config 快照 + SHA 记录（含超参来源核验） |
