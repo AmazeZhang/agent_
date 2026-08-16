@@ -47,23 +47,50 @@ resume_from="${PROJECT3_RESUME_FROM:-}"
 
 profile="${PROJECT3_TRAIN_PROFILE:-formal}"
 case "$profile" in
-  smoke|formal) ;;
-  *) echo "unknown PROJECT3_TRAIN_PROFILE: ${profile} (smoke|formal)" >&2; exit 20 ;;
+  smoke|formal|official-offload-smoke) ;;
+  *) echo "unknown PROJECT3_TRAIN_PROFILE: ${profile} (smoke|formal|official-offload-smoke)" >&2; exit 20 ;;
 esac
 
 train_batch_size="${PROJECT3_TRAIN_BATCH_SIZE:-66}"          # 66 formal default; 132 target
 mini_batch_size=$((train_batch_size * 5))                    # group_n=5 samples
 total_training_steps="${PROJECT3_TOTAL_TRAINING_STEPS:-50}"  # formal default 50
-official_lr="${PROJECT3_OFFICIAL_LR:-1e-5}"                  # verify vs official Search-R1 config before freeze
-official_kl="${PROJECT3_OFFICIAL_KL_COEF:-0.001}"             # verify vs official Search-R1 config before freeze
+# Official Search-R1 hyperparams (reference commit 598e61bd1d36895726d28a8d06b3a15bed19f5d3,
+# train_grpo.sh blob 119d348e90d7c082c3b635eee7e022c941d14a57, file sha256
+# 203098948565e60caf90da93aeaab74759d8ad9df1449649c8f03425e64f7c66): lr=1e-6,
+# lr_warmup_steps_ratio=0.285, kl low_var_kl coef 0.001. lr_warmup_steps must
+# stay -1 (verl default) so the ratio takes effect; a concrete step count
+# would shadow the ratio.
+official_lr="${PROJECT3_OFFICIAL_LR:-1e-6}"
+official_kl="${PROJECT3_OFFICIAL_KL_COEF:-0.001}"
+official_warmup_ratio="${PROJECT3_OFFICIAL_WARMUP_RATIO:-0.285}"
 trainer_seed="${PROJECT3_TRAINER_SEED:-1234}"
 data_seed="${PROJECT3_DATA_SEED:-1234}"
 gpu_memory_utilization="${PROJECT3_GPU_MEM_UTIL:-0.45}"
 save_freq="${PROJECT3_SAVE_FREQ:-50}"
+offload_param=false
+offload_optimizer=false
+offload_ref=false
+max_num_seqs=""
 if [[ "$profile" == "smoke" ]]; then
   total_training_steps="1"
   save_freq="1"
   gpu_memory_utilization="${PROJECT3_GPU_MEM_UTIL:-0.40}"
+fi
+if [[ "$profile" == "official-offload-smoke" ]]; then
+  # Official-architecture adaptation smoke (independent line from the 0.40/0.45
+  # single-variable experiments; see PROGRESS_SYNC 2026-08-16): actor params +
+  # optimizer and ref params offloaded to CPU (fork path:
+  # verl/workers/fsdp_workers.py:142-146, 452, 553-560 via
+  # verl/utils/fsdp_utils.py offload_fsdp_model_to_cpu / offload_fsdp_optimizer,
+  # FSDP1 manual offload; no grad_offload field exists in this fork), vLLM gets
+  # 0.60, max_num_seqs capped at 64 for 6x24GB x 330 samples.
+  total_training_steps="1"
+  save_freq="1"
+  gpu_memory_utilization="${PROJECT3_GPU_MEM_UTIL:-0.60}"
+  max_num_seqs="${PROJECT3_MAX_NUM_SEQS:-64}"
+  offload_param=true
+  offload_optimizer=true
+  offload_ref=true
 fi
 
 for required_path in "$python_bin" "$model_path" "$train_parquet" "$val_dir/test.parquet"; do
@@ -112,7 +139,7 @@ if (( $# != 0 )); then
 fi
 
 # Self-check: resolved experimental values on the first stdout line.
-echo "[OFFICIAL_EXP] resolved: profile=${profile} train_batch_size=${train_batch_size} mini_batch_size=${mini_batch_size} steps=${total_training_steps} lr=${official_lr} kl=${official_kl} gpu_mem=${gpu_memory_utilization} save_freq=${save_freq} seed=${trainer_seed}/${data_seed}"
+echo "[OFFICIAL_EXP] resolved: profile=${profile} train_batch_size=${train_batch_size} mini_batch_size=${mini_batch_size} steps=${total_training_steps} lr=${official_lr} lr_warmup_steps=-1 lr_warmup_steps_ratio=${official_warmup_ratio} kl=${official_kl} gpu_mem=${gpu_memory_utilization} max_num_seqs=${max_num_seqs:--} offload_param=${offload_param} offload_optimizer=${offload_optimizer} offload_ref=${offload_ref} save_freq=${save_freq} seed=${trainer_seed}/${data_seed}"
 
 overrides=(
   "algorithm.adv_estimator=grpo"
@@ -137,7 +164,8 @@ overrides=(
   "actor_rollout_ref.model.enable_gradient_checkpointing=true"
   "actor_rollout_ref.model.use_remove_padding=true"
   "actor_rollout_ref.actor.optim.lr=${official_lr}"
-  "actor_rollout_ref.actor.optim.lr_warmup_steps=0"
+  "actor_rollout_ref.actor.optim.lr_warmup_steps=-1"  # -1 required; ratio below takes effect
+  "actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=${official_warmup_ratio}"
   "actor_rollout_ref.actor.ppo_mini_batch_size=${mini_batch_size}"
   "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1"
   "actor_rollout_ref.actor.use_dynamic_bsz=false"
@@ -146,8 +174,8 @@ overrides=(
   "actor_rollout_ref.actor.kl_loss_type=low_var_kl"
   "actor_rollout_ref.actor.entropy_coeff=0"
   "actor_rollout_ref.actor.use_torch_compile=false"
-  "actor_rollout_ref.actor.fsdp_config.param_offload=false"
-  "actor_rollout_ref.actor.fsdp_config.optimizer_offload=false"
+  "actor_rollout_ref.actor.fsdp_config.param_offload=${offload_param}"
+  "actor_rollout_ref.actor.fsdp_config.optimizer_offload=${offload_optimizer}"
   "actor_rollout_ref.rollout.name=vllm"
   "actor_rollout_ref.rollout.mode=sync"
   # Fork hard constraint (main_ppo.py:173): actor_rollout_ref.rollout.n==1,
@@ -162,7 +190,7 @@ overrides=(
   "actor_rollout_ref.rollout.max_model_len=2304"
   "actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1"
   "actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1"
-  "actor_rollout_ref.ref.fsdp_config.param_offload=false"
+  "actor_rollout_ref.ref.fsdp_config.param_offload=${offload_ref}"
   # Official-loose semantics (patch 0005 + config-only penalty off).
   "env.env_name=search"
   "env.projection=official"
@@ -192,11 +220,20 @@ overrides=(
   "hydra.run.dir=${run_dir}/hydra"
 )
 
+if [[ -n "$max_num_seqs" ]]; then
+  overrides+=("actor_rollout_ref.rollout.max_num_seqs=${max_num_seqs}")
+fi
+
 if [[ -n "$resume_from" ]]; then
   overrides+=("trainer.resume_mode=resume_path" "trainer.resume_from_path=${resume_from}")
 else
   overrides+=("trainer.resume_mode=disable")
 fi
+
+# Canonical fingerprint of the resolved overrides (sorted, so it is stable
+# independent of insertion order); recorded in the run log for the report.
+config_fp="$(printf '%s\n' "${overrides[@]}" | LC_ALL=C sort | sha256sum | cut -d' ' -f1)"
+echo "[OFFICIAL_EXP] resolved_config_sha256=${config_fp}"
 
 export PYTHONNOUSERSITE=1
 export TOKENIZERS_PARALLELISM=false
@@ -215,6 +252,82 @@ if [[ -z "${PROJECT3_RUN_ID:-}" || -z "${PROJECT3_RUN_DIR:-}" ]]; then
   echo "actual training must be launched through scripts/run_managed.sh" >&2
   exit 13
 fi
+
+# CPU memory / swap gate (offload needs tens of GiB of CPU RAM; the retriever
+# index is ~64.5GB on disk and its process RSS must not push the machine into
+# swap). MemAvailable >= 96GiB -> proceed; 64-96GiB -> pause, report, abort;
+# < 64GiB -> abort. Already-noticeable swap (> 2GiB used) -> abort.
+"$python_bin" - "$run_dir" <<'PY'
+import os
+import subprocess
+import sys
+
+run_dir = sys.argv[1]
+
+def meminfo():
+    values = {}
+    with open("/proc/meminfo") as handle:
+        for line in handle:
+            key, rest = line.split(":", 1)
+            values[key] = int(rest.split()[0]) * 1024  # kB -> bytes
+    return values
+
+def gib(value):
+    return value / 1024**3
+
+mem = meminfo()
+retriever_rss = 0
+try:
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as handle:
+                cmdline = handle.read().replace(b"\0", b" ")
+        except OSError:
+            continue
+        if b"serve_p25_cpu_retriever" in cmdline:
+            with open(f"/proc/{pid}/status") as handle:
+                for line in handle:
+                    if line.startswith("VmRSS:"):
+                        retriever_rss += int(line.split()[1]) * 1024
+                        break
+except OSError:
+    pass
+import glob as _glob
+ray_tmp_bytes = 0
+for path in _glob.glob("/tmp/p3r.*"):
+    try:
+        result = subprocess.run(["du", "-sb", path], capture_output=True, text=True, check=True)
+        ray_tmp_bytes += int(result.stdout.split()[0])
+    except (subprocess.CalledProcessError, ValueError, IndexError):
+        pass
+disk = subprocess.run(["df", "-B1", "--output=avail", run_dir],
+                      capture_output=True, text=True).stdout.splitlines()
+disk_free = int(disk[1]) if len(disk) > 1 else 0
+
+report = {
+    "MemTotal_GiB": round(gib(mem["MemTotal"]), 1),
+    "MemAvailable_GiB": round(gib(mem["MemAvailable"]), 1),
+    "SwapTotal_GiB": round(gib(mem["SwapTotal"]), 1),
+    "SwapFree_GiB": round(gib(mem["SwapFree"]), 1),
+    "retriever_rss_GiB": round(gib(retriever_rss), 1),
+    "ray_tmp_bytes_GiB": round(gib(ray_tmp_bytes), 1),
+    "checkpoint_disk_free_GiB": round(gib(disk_free), 1),
+}
+print(f"[OFFICIAL_EXP] cpu_memory_gate report: {report}", flush=True)
+available = mem["MemAvailable"]
+swap_used = mem["SwapTotal"] - mem["SwapFree"]
+if available < 64 * 1024**3:
+    raise SystemExit("cpu memory gate failed: MemAvailable < 64GiB, aborting")
+if available < 96 * 1024**3:
+    raise SystemExit("cpu memory gate: MemAvailable in 64-96GiB band, pausing (no auto start)")
+if swap_used > 2 * 1024**3:
+    raise SystemExit(f"cpu memory gate failed: already swapping ({swap_used/1024**3:.1f}GiB used), aborting")
+if disk_free < 100 * 1024**3:
+    print(f"[OFFICIAL_EXP] warning: checkpoint disk < 100GiB ({gib(disk_free):.0f}GiB), advisory only", flush=True)
+print("[OFFICIAL_EXP] cpu memory gate passed", flush=True)
+PY
 
 # 6 physical GPUs 1,2,3,4,6,7 only; GPU0/5 are forbidden by design and the
 # run_managed.sh gpu_guard rejects them too (GPU0 = desktop, GPU5 unstable).
