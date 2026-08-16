@@ -93,5 +93,6 @@ McNemar p=0.0357，环境能观察 Search-R1 效应）→ 用户批准进入 3B 
   重建确定性已验证：同参数重建 → 同 SHA）
 - 构建器：`scripts/build_p3_heldout_eval.py`（--domain `searchr1-p3-final-confirm-v1`
   --total 512 --extra-exclusions dev32/confirm256/official-confirm256-v1）
-- 构建代码提交：本预注册的 git commit（含冻结 JSON/测试/patch 0006）→ 收尾时回填
-  完整 commit hash。
+- 构建代码提交：`723cd78`（`freeze(p3): formal 3-segment freeze + patch 0006 +
+  prereg`，含构建器、冻结 JSON、test_scheduler_continuity.py、patch 0006 与本预注册
+  文件本体）。
