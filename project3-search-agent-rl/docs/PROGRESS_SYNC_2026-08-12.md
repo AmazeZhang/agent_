@@ -1070,6 +1070,12 @@ resolved config → 预注册 → Step 0–50（另行批准）。
 | 无 OOM/NaN/swap | 0 匹配；swapfree 恒 2.0 GiB（delta 0）；VRAM 峰值 ≤19.2 GiB |
 | 退出清理 | exit 0；cleanup.log 6/6 compute_processes=none；6 卡回 18 MiB/0%；无残留进程 |
 
+注：`optimizer 非重初始化` 行中 Adam `step` 计数 2→4 的语义已审计核实——~540 条
+rollout records ÷ `ppo_mini_batch_size=330` = 2 个 PPO mini-batches（330+210），
+`ppo_epochs=1` 每个 mini-batch 调用一次 `optimizer.step()` → 每 Global Step 恰 2
+次；LR scheduler 每 Global Step 推进一次（last_epoch 1→2），不随子步推进。属
+多轮 step 展开的正常 verl/官方语义，非意外重复更新（设计文档 §3.1）。
+
 ### 显存/耗时
 
 - 各卡峰值（1s 采样）：GPU1 18,819 / GPU2 19,167 / GPU3 19,031 / GPU4 17,165 /
@@ -1093,3 +1099,79 @@ resolved config → 预注册 → Step 0–50（另行批准）。
 已在服务端生效）；resume 验证通过后剩余：**冻结 resolved config（须先解决 §10-6
 LR 调度分段问题：300 步总调度长度 vs 50/100/300 段停止点拆分）→ 预注册 →
 正式 Step 0–50**（另行批准，本次不含）。
+
+---
+
+## 2026-08-16 冻结阶段完成（9 项全部交付；未启动任何 GPU 训练）
+
+### 1. Optimizer 子步审计（结论：正常，仅修文档）
+
+- ~540–546 rollout records/步：330 env samples × 多轮展开（62% episodes 到达 step 2）。
+- ppo_mini_batch_size=330 → 每 global step 2 个 mini-batch → `ppo_epochs=1` → 每
+  global step 恰好 2 次 `optimizer.step()`（dp_actor.py:443 `_optimizer_step()`）。
+- Adam step 2→4 观测与上述一致；scheduler 每 global step 恰一次推进（
+  fsdp_workers.py update_actor：`lr = get_last_lr()[0]` → metrics → `step()`）。
+- 与官方 Search-R1 语义一致；**未修改任何算法**。文档修正：设计文档新增 §3.1。
+
+### 2. Patch 0006：segment stop 与 schedule horizon 解耦
+
+- `trainer.segment_stop_step`（默认 null）：到达停止点 → 完成当前 step + 保存
+  checkpoint（DataLoader/Optimizer/Scheduler/RNG）+ 正常 return + `SEGMENT_STOP:` 标记。
+- schedule horizon 恒 300（LR 长度），warmup_steps=85 恒不变；不再用
+  total_training_steps 控制分段。
+- Round-trip 验证字节一致（snapshot-commit 方法），py_compile OK。
+
+### 3. Formal wrapper fail-closed（exit 30–42 全部实测通过）
+
+| 条件 | exit |
+|---|---|
+| STOP 缺失 / 非法 | 30 / 31 |
+| stop=50 + resume | 32 |
+| stop=100 无 resume / resume≠global_step_50 | 33 / 34 |
+| stop=300 无 resume / resume≠global_step_100 | 35 / 36 |
+| resume step ≥ stop / TOTAL≠300 / gpu_mem≠0.60 / max_num_seqs≠64 | 37–40 |
+| offloads≠true / save_freq≠50 / non-formal+stop | 40–42 |
+| 合法组合（50 / 50→100 / 100→300） | 0 |
+
+### 4. LR 调度连续性 CPU 验证（6/6 通过）
+
+- 300/85 基准：`lr(N)=min(1,(N-1)/85)×1e-6`，每步恰一次 step。
+- Step 50/100 保存-恢复后 LR 轨迹与不间断基准**逐点一致**（last_epoch/_step_count
+  连续）。
+- 错误 horizon（50/100 步）可在 checkpoint `_last_lr` 处检出（对照
+  `min(1,last_epoch/85)×base_lr`）；纯 post-resume 比较检不出（位置由 last_epoch
+  承载）→ checkpoint 级检查为必需检测点。
+
+### 5. final-confirm512 构建与封存（不评测、不挑题）
+
+- `datasets/searchr1-final-confirm512/heldout.parquet` SHA
+  `94b39266c2d9c54a55b4471e90daa493ab083a889d8f23510dadd8194b304ecc`；manifest
+  泄漏全 0（排除上游 train、smoke train/test、dev32、confirm256、
+  official-confirm256-v1）；配额 128/128/64/64/64/32/32；重建确定性已验证。
+
+### 6. 三段 resolved config 冻结
+
+- `configs/p3_formal_segments_2026-08-16.json`（wrapper 自 `--dump-overrides` 导出，
+  单一来源）；**training-invariant SHA256 三段相同**：
+  `2cc743a3cedbd957518717f7d47b0f1c3fe060abb07d92fe84b71cd270339674`；full SHA：
+  0-50 `4a472c90…` / 50-100 `910f216c…` / 100-300 `758326c6…`。差异仅限 7 个
+  run 字段（stop/resume source/run dir/output dir）。
+
+### 7. 第二阶段预注册
+
+- `docs/P3_PHASE2_PREREG_2026-08-16.md`：Step 50/100 开发门禁（无统计判据）；
+  final-confirm512 为**唯一确认性检验**（McNemar 三档 PASS / INCONCLUSIVE /
+  FAIL-TO-OBSERVE，预先固定，不因中期结果修改）。
+
+### 8. 文档边界（设计文档 §9/§10/§11）
+
+- Optimizer 子步语义按实际观测修正；保留声明：smoke/resume checkpoints 仅工程
+  验证不接入正式训练；正式 Step 0 必须从 Qwen2.5-3B Base 重启；0.47GiB 为组合
+  配置；工程可行性 ≠ 质量提升。
+
+### 9. 验证状态
+
+- 全套 CPU 测试：65 passed（新增 test_scheduler_continuity.py 6/6；faiss 依赖的
+  retriever 测试属另一环境，排除）。
+
+**下一步：等待 Step 0–50 单独批准后启动正式训练（本阶段未启动 GPU）。**

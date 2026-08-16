@@ -59,6 +59,30 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
   6 卡 FSDP + 6 vLLM engine，预计每步 10–25 分钟（3B 全参，60-70% 时间在
   rollout/retrieval）。Step 50 预计 8–20 小时（含 2 次停训评测窗口）。
 
+### 3.1 Optimizer 子步语义（2026-08-16 实测审计，正式冻结前核对）
+
+每 Global Step 的更新结构（fork 上游 pin `20bd331b`，与官方 Search-R1 同 verl
+语义）：
+
+- **rollout records**：`train_batch_size=66` prompts × group_n=5 = 330 个 env
+  samples；多轮展开后变为 ~540 条 rollout records（330 条 step-1 + ~210 条
+  step-2；实测 546/540 条，episode/length/mean 1.624，62% episodes 到达第 2
+  轮）。每轮每条 record 独立计算 old_log_probs/ref_log_prob/advantages 并参与
+  actor 更新。
+- **PPO mini-batches**：`update_policy`（`dp_actor.py:317`）把全部 records 按
+  `ppo_mini_batch_size=330` 切块 → 540/330 ≈ 2 个 mini-batches（330 + 210）；
+  `ppo_epochs=1`；每个 mini-batch 内按 micro-batch 梯度累积（
+  `ppo_micro_batch_size_per_gpu=1`）后调用一次 `_optimizer_step()`
+  （`dp_actor.py:443`，NaN 梯度时跳过更新）。
+- **optimizer.step() 次数 = mini-batch 数 = 2 / global step**：与 resume 验证
+  实测 Adam `step` 计数 2→4 精确一致。
+- **LR scheduler 每 Global Step 推进一次**（`fsdp_workers.py:624-626`，
+  `update_policy` 之后 `scheduler.step()`），不随 optimizer 子步推进；实测
+  `last_epoch` 1→2、`_step_count` 2→3 一致。300 步总调度下 warmup 85 步按
+  global step 计数，与分段停止点解耦（§10-6）。
+- **结论**：属多轮 step 展开的正常语义，与官方 Search-R1（同 verl 框架、
+  GRPO 全量 mini + `ppo_epochs=1`）一致，**非意外重复更新**；不修改算法，仅记录。
+
 ## 4. 显存预算（每卡 24GB，4090D；全参数主线）
 
 | 分量 | 每卡占用（FSDP 6 卡分片） |
@@ -211,35 +235,51 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 | 3 | **六卡 smoke（显存验证）** | 用户批准后执行；GPU 1,2,3,4,6,7 跑 1 步；**不做单卡模拟**（用户审阅删除）。2026-08-16 实测三段：**0.40 与 0.45 失败**于 vLLM `initialize_cache`（§4.1 画像，激活峰值 5.53 GiB 超预算，KV 0 blocks；均按用户指示停止、未自动调整）；**official-offload-smoke（0.60 + 全 offload + max_num_seqs=64）成功**（§4.1，一次通过，exit 0，checkpoint global_step_1 完整） |
 | 4 | 六卡 1 步 + 恢复 | **完成（2026-08-16，全部通过标准满足）**：`official-offload-resume-smoke` 从源 global_step_1（清单+SHA 记录，运行前后哈希一致=只读）resume 至 global_step_2；日志标记/rank 四态恢复/游标 66→132/scheduler 1→2/optimizer 非重初始化/模型 SHA 变化/0 超时/无 OOM/清理 6/6，详见 PROGRESS_SYNC |
 | 5 | Retriever 并发压测 | §8 判据（全局限流已实现，压测选档） |
-| 6 | 冻结 resolved config | config 快照 + SHA 记录（含超参来源核验） |
-| 7 | 第二阶段预注册 | 提交（先于任何 Step 50+ 评测）；Step 50/100 为**开发门禁**（不设统计判据）、final-confirm512 为**唯一确认性检验**（预注册配对三档判定） |
-| 8 | Step 0–50 训练 | 受管 6 卡；Step 50 停训 → GPU1 dev 评测 → 开发门禁判定 → （通过则继续 100/300） |
+| 6 | 冻结 resolved config | **完成（2026-08-16）**：`configs/p3_formal_segments_2026-08-16.json` 三段快照 + 完整 SHA + training-invariant SHA `2cc743a3…`（三段一致，仅 stop/resume/run-dir 7 字段不同）；由 wrapper `--dump-overrides` 同一代码路径导出（`scripts/freeze_p3_formal_segments.py`） |
+| 7 | 第二阶段预注册 | **完成（2026-08-16）**：`docs/P3_PHASE2_PREREG_2026-08-16.md`（Base 20/256 复用；Step 50/100 开发门禁；final-confirm512 唯一确认性 McNemar 三档；final 数据 SHA + 构建 commit 在案；不因中期结果修改判据） |
+| 8 | Step 0–50 训练 | **待单独批准**（冻结阶段明确不启动 GPU 训练）；受管 6 卡；Step 50 停训 → GPU1 dev 评测 → 开发门禁判定 → （通过则继续 100/300） |
 
 ## 10. 开放项（在落地步骤中逐一关闭）
 
 1. 官方 Search-R1 训练超参（lr、KL 系数/方式、warmup、optimizer）：从官方
-   verl 配置/论文提取，写入 resolved config（§9-6）；
-2. 全参数 6 卡显存实测（§4 预算是否成立；只经六卡 smoke，单卡模拟已删除）；
+   verl 配置/论文提取，写入 resolved config（§9-6）。**已关闭（2026-08-16）**：
+   超参来源核验在案（train_grpo.sh blob 119d348e / sha256 2030989…，lr 1e-6 /
+   ratio 0.285 / low_var_kl 0.001），落地为正式 warmup_steps=85 固定值，冻结
+   于 `configs/p3_formal_segments_2026-08-16.json`；
+2. 全参数 6 卡显存实测（§4 预算是否成立；只经六卡 smoke，单卡模拟已删除）。
+   **已关闭（2026-08-16）**：0.40/0.45 失败、offload 组合成功（§4.1），
+   formal 固定已验证架构 0.60/64/offloads=true；
 3. retriever 全局限流档位实测（§8 压测选档）；
 4. final-confirm512 构建（domain `searchr1-p3-final-confirm-v1`，排除
-   dev32/confirm256/official-confirm256-v1/上游 train，512 题配额放大）；
-5. Step 0 基线的复用 vs 重跑（预注册中固定：复用受管 Base 结果，run id/SHA 在案）；
-6. **LR schedule 分段问题（2026-08-16 记录，阻塞正式 Step 0–50 冻结，不阻塞
-   本次 Step 1→2 resume 工程验证）**：正式目标总 300 步，warmup ratio 0.285
-   ⇒ warmup ≈ 85 步。若 Step 0–50 段以 `total_training_steps=50` 创建 scheduler、
-   resume 时再改为 100/300，前 50 步 warmup 曲线会偏离官方配置（fork 在
-   `fsdp_workers.py:371-383` 按 `num_warmup_steps = int(ratio × total_steps)` 建
-   scheduler，`ray_trainer.py:622-638` 把 `trainer.total_training_steps` 注入
-   `actor.optim.total_training_steps`）。冻结 resolved config 前必须把**总调度
-   长度 300**（scheduler/DataLoader epoch 语义）与**本段停止点 50/100/300**
-   （段间停训评测）拆成两个独立配置概念（如 scheduler 恒用 300，段停止由单独
-   的 stop-at-step 机制控制），再冻结。另：0.47 GiB activation 为组合配置观测，
-   如需单变量归因须另行实验（§4.1）；formal 默认已切换为已验证架构
-   （0.60/64/offload=true）。
+   dev32/confirm256/official-confirm256-v1/上游 train，512 题配额放大）。
+   **已关闭（2026-08-16）**：`datasets/searchr1-final-confirm512/`（heldout
+   SHA `94b39266c2d9…`，512 题，配额 nq 128/hotpotqa 128/popqa 64/2wiki
+   64/triviaqa 64/musique 32/bamboogle 32，泄漏 0；重建确定性已验证）；
+   封存 manifest+SHA，不评测不挑题；
+5. Step 0 基线的复用 vs 重跑（预注册中固定：复用受管 Base 结果，run id/SHA 在案）。
+   **已关闭（2026-08-16）**：`P3_PHASE2_PREREG_2026-08-16.md` §2 固定复用
+   `p3-eval-official-confirm256-base3b-s0-20260815a`（dev 20/256）；
+6. **LR schedule 分段问题 —— 已解决（2026-08-16，patch 0006）**：新增
+   `trainer.segment_stop_step`（`ray_trainer.py`，含 0006 引入的配置与打印），
+   正式固定 `total_training_steps=300` + `warmup_steps=85`（warmup 恒 85，
+   不再用 -1/ratio 委托）；段停止点 50/100/300 由 `segment_stop_step` 独立
+   控制，到达时完成当前 step + 保存 checkpoint（DataLoader/Optimizer/
+   Scheduler/RNG）+ 正常 return；wrapper fail-closed 强制组合关系（stop=50
+   禁 resume、stop=100 须 resume global_step_50、stop=300 须 resume
+   global_step_100，其他组合报错 exit 30–42）；LR 曲线三段逐点一致由
+   `tests/test_scheduler_continuity.py` 验证（6/6）；错误 horizon 可在
+   checkpoint 级检出（scheduler `_last_lr` 与预期 300/85 曲线比对）。
 
 ## 11. 声明边界
 
 - 本设计是官方宽松语义线的训练入口设计；严格 fork 线（LoRA + 投影 + 惩罚）
   全部现有产物不动；
 - 训练成功与否由预注册门禁判定，本设计不预设结果；
-- final-confirm512 盲测是最终 Checkpoint 的唯一验收，dev 集数字不作终审。
+- final-confirm512 盲测是最终 Checkpoint 的唯一验收，dev 集数字不作终审；
+- **smoke / resume 验证的 checkpoints 仅工程验证（显存/恢复机制），不接入
+  正式训练**；正式 Step 0 必须从 Qwen2.5-3B Base 权重重启（fail-closed：
+  stop=50 禁止 resume）；
+- **工程可行性 ≠ 质量提升**：显存通过/恢复成功/检查点完整只证明机制可行，
+  不构成训练质量或 Search-R1 效应的证据（质量由 final-confirm512 判定）；
+- optimizer 子步语义（每 Global Step 恰 2 次 `optimizer.step()`、scheduler
+  每 Global Step 1 次）为多轮展开的正常 verl/官方语义，见 §3.1；不修改算法。

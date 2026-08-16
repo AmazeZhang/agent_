@@ -13,14 +13,18 @@
 #   - save_freq=50 (formal; checkpoints align to Step 50/100/300)
 #
 # Profiles (PROJECT3_TRAIN_PROFILE):
-#   formal (default): total_training_steps=50 (PROJECT3_TOTAL_TRAINING_STEPS
-#     override for continuation; NOTE: the 300-step LR-schedule horizon must be
-#     split from segment stop points before this profile is frozen -- see
-#     docs/P3_PHASE2_OFFICIAL_TRAIN_DESIGN_2026-08-15.md SS10), save_freq=50,
-#     gpu_memory_utilization=0.60 (PROJECT3_GPU_MEM_UTIL override), max_num_seqs=64,
-#     actor/optimizer/ref offload=true -- the architecture verified by the
-#     official-offload-smoke run (2026-08-16); the 0.45/no-offload form was
-#     empirically rejected and must not be reintroduced here.
+#   formal (default): schedule horizon FIXED at total_training_steps=300
+#     (patch 0006 decouples the 300-step LR schedule from segment stops;
+#     SS10 of the design doc is resolved). Segment stop point REQUIRED via
+#     PROJECT3_SEGMENT_STOP_STEP=50|100|300 with fail-closed resume rules:
+#     stop=50 -> no resume (fresh start from Qwen2.5-3B Base); stop=100 ->
+#     resume from global_step_50; stop=300 -> resume from global_step_100;
+#     every other combination exits with an error (see fail-closed block).
+#     Architecture pinned to the verified form (official-offload-smoke
+#     2026-08-16): gpu_memory_utilization=0.60, max_num_seqs=64,
+#     actor/optimizer/ref offload=true, save_freq=50, lr_warmup_steps=85
+#     (== int(0.285 x 300)); the 0.45/no-offload form was empirically rejected
+#     and must not be reintroduced here.
 #   smoke: total_training_steps=1, save_freq=1 (produces a checkpoint for the
 #     resume verification), gpu_memory_utilization=0.40 (first VRAM observation
 #     point per user review; 0.45 next). Smoke is a verification tool only,
@@ -62,9 +66,23 @@ case "$profile" in
   *) echo "unknown PROJECT3_TRAIN_PROFILE: ${profile} (smoke|formal|official-offload-smoke|official-offload-resume-smoke)" >&2; exit 20 ;;
 esac
 
+mode="run"
+if [[ "${1:-}" == "--print-config" ]]; then
+  mode="print-config"
+  shift
+fi
+if [[ "${1:-}" == "--dump-overrides" ]]; then
+  mode="dump-overrides"
+  shift
+fi
+if (( $# != 0 )); then
+  echo "usage: $0 [--print-config|--dump-overrides]" >&2
+  exit 2
+fi
+
 train_batch_size="${PROJECT3_TRAIN_BATCH_SIZE:-66}"          # 66 formal default; 132 target
 mini_batch_size=$((train_batch_size * 5))                    # group_n=5 samples
-total_training_steps="${PROJECT3_TOTAL_TRAINING_STEPS:-50}"  # formal default 50
+total_training_steps="${PROJECT3_TOTAL_TRAINING_STEPS:-300}"  # formal default: 300-step schedule horizon (fixed)
 # Official Search-R1 hyperparams (reference commit 598e61bd1d36895726d28a8d06b3a15bed19f5d3,
 # train_grpo.sh blob 119d348e90d7c082c3b635eee7e022c941d14a57, file sha256
 # 203098948565e60caf90da93aeaab74759d8ad9df1449649c8f03425e64f7c66): lr=1e-6,
@@ -140,11 +158,14 @@ if (( mini_batch_size % 6 != 0 )); then
   exit 22
 fi
 if [[ -n "$resume_from" ]]; then
-  if [[ "$resume_from" != /* || ! -d "$resume_from/actor" || ! -f "$resume_from/data.pt" ]]; then
+  # --dump-overrides is freeze tooling: the fail-closed stop/resume rules still
+  # apply, but the source checkpoint may not exist yet (segments resume from
+  # checkpoints produced by the PREVIOUS segment), so only the format is checked.
+  if [[ "$mode" != "dump-overrides" ]] && { [[ "$resume_from" != /* || ! -d "$resume_from/actor" || ! -f "$resume_from/data.pt" ]]; }; then
     echo "resume checkpoint must be an absolute global_step directory with actor/ and data.pt: ${resume_from}" >&2
     exit 17
   fi
-  if [[ ! "$(basename -- "$resume_from")" =~ ^global_step_[0-9]+$ ]]; then
+  if [[ "$resume_from" != /* || ! "$(basename -- "$resume_from")" =~ ^global_step_[0-9]+$ ]]; then
     echo "resume checkpoint basename must be global_step_N: ${resume_from}" >&2
     exit 18
   fi
@@ -164,23 +185,93 @@ if [[ "$profile" == "official-offload-resume-smoke" ]]; then
   fi
 fi
 
+# ---- formal segment-stop fail-closed validation (patch 0006) ----
+# Segment stops (50/100/300) are decoupled from the schedule horizon (300, fixed):
+# trainer.segment_stop_step only ends this segment after saving a checkpoint with
+# DataLoader/Optimizer/Scheduler/RNG state; the LR scheduler is always built for
+# 300 steps with warmup 85. Every combination other than the fixed table below
+# exits with an error -- formal never silently changes its stop/resume semantics.
+segment_stop_step="${PROJECT3_SEGMENT_STOP_STEP:-}"
+resume_step=""
+if [[ -n "$resume_from" ]]; then
+  resume_step="$(basename -- "$resume_from")"
+  resume_step="${resume_step#global_step_}"
+fi
+if [[ "$profile" == "formal" ]]; then
+  if [[ -z "$segment_stop_step" ]]; then
+    echo "fail-closed: formal requires PROJECT3_SEGMENT_STOP_STEP=50|100|300 (segment stop point; schedule horizon fixed at 300)" >&2
+    exit 30
+  fi
+  case "$segment_stop_step" in
+    50|100|300) ;;
+    *) echo "fail-closed: PROJECT3_SEGMENT_STOP_STEP must be one of 50|100|300 (got: ${segment_stop_step})" >&2; exit 31 ;;
+  esac
+  if [[ "$segment_stop_step" == "50" ]]; then
+    if [[ -n "$resume_from" ]]; then
+      echo "fail-closed: segment stop 50 forbids resume (formal Step 0-50 starts from Qwen2.5-3B Base; got PROJECT3_RESUME_FROM=${resume_from})" >&2
+      exit 32
+    fi
+  elif [[ "$segment_stop_step" == "100" ]]; then
+    if [[ -z "$resume_from" ]]; then
+      echo "fail-closed: segment stop 100 requires resume from global_step_50 (got: no PROJECT3_RESUME_FROM)" >&2
+      exit 33
+    fi
+    if [[ "$resume_step" != "50" ]]; then
+      echo "fail-closed: segment stop 100 requires resume from global_step_50 (got: ${resume_from})" >&2
+      exit 34
+    fi
+  elif [[ "$segment_stop_step" == "300" ]]; then
+    if [[ -z "$resume_from" ]]; then
+      echo "fail-closed: segment stop 300 requires resume from global_step_100 (got: no PROJECT3_RESUME_FROM)" >&2
+      exit 35
+    fi
+    if [[ "$resume_step" != "100" ]]; then
+      echo "fail-closed: segment stop 300 requires resume from global_step_100 (got: ${resume_from})" >&2
+      exit 36
+    fi
+  fi
+  # generic: resume step must be strictly before the stop point
+  if [[ -n "$resume_step" ]] && (( 10#$resume_step >= 10#$segment_stop_step )); then
+    echo "fail-closed: resume step ${resume_step} >= segment stop ${segment_stop_step} (no training left in this segment)" >&2
+    exit 37
+  fi
+  # schedule horizon pinned to 300 (segment control is segment_stop_step only)
+  if [[ "$total_training_steps" != "300" ]]; then
+    echo "fail-closed: formal schedule horizon pinned to total_training_steps=300 (got PROJECT3_TOTAL_TRAINING_STEPS=${total_training_steps}); segment stops are controlled by PROJECT3_SEGMENT_STOP_STEP only" >&2
+    exit 38
+  fi
+  # architecture pinned to the verified form (official-offload-smoke 2026-08-16)
+  if [[ "$gpu_memory_utilization" != "0.60" || "$max_num_seqs" != "64" ]]; then
+    echo "fail-closed: formal architecture pinned to gpu_mem=0.60 + max_num_seqs=64 (got ${gpu_memory_utilization}/${max_num_seqs})" >&2
+    exit 39
+  fi
+  if [[ "$offload_param" != "true" || "$offload_optimizer" != "true" || "$offload_ref" != "true" ]]; then
+    echo "fail-closed: formal architecture pinned to param/optimizer/ref offload=true (got ${offload_param}/${offload_optimizer}/${offload_ref})" >&2
+    exit 40
+  fi
+  if [[ "$save_freq" != "50" ]]; then
+    echo "fail-closed: formal save_freq pinned to 50 (checkpoints align to segment stops; got ${save_freq})" >&2
+    exit 41
+  fi
+elif [[ -n "$segment_stop_step" ]]; then
+  echo "fail-closed: PROJECT3_SEGMENT_STOP_STEP is formal-only (profile=${profile}); smoke profiles stop via total_training_steps" >&2
+  exit 42
+fi
+
 if [[ ! "$retriever_url" =~ ^http://127\.0\.0\.1:[0-9]{1,5}/retrieve$ ]]; then
   echo "retriever URL must be an IPv4 loopback /retrieve endpoint: ${retriever_url}" >&2
   exit 12
 fi
 
-mode="run"
-if [[ "${1:-}" == "--print-config" ]]; then
-  mode="print-config"
-  shift
-fi
-if (( $# != 0 )); then
-  echo "usage: $0 [--print-config]" >&2
-  exit 2
-fi
-
 # Self-check: resolved experimental values on the first stdout line.
-echo "[OFFICIAL_EXP] resolved: profile=${profile} train_batch_size=${train_batch_size} mini_batch_size=${mini_batch_size} steps=${total_training_steps} lr=${official_lr} lr_warmup_steps=-1 lr_warmup_steps_ratio=${official_warmup_ratio} kl=${official_kl} gpu_mem=${gpu_memory_utilization} max_num_seqs=${max_num_seqs:--} offload_param=${offload_param} offload_optimizer=${offload_optimizer} offload_ref=${offload_ref} save_freq=${save_freq} seed=${trainer_seed}/${data_seed} resume_from=${resume_from:-<none>}"
+if [[ "$profile" == "formal" ]]; then
+  warmup_display="85"     # formal: fixed == int(0.285 x 300)
+  ratio_display="n/a"
+else
+  warmup_display="-1"
+  ratio_display="${official_warmup_ratio}"
+fi
+echo "[OFFICIAL_EXP] resolved: profile=${profile} train_batch_size=${train_batch_size} mini_batch_size=${mini_batch_size} schedule_total_steps=${total_training_steps} segment_stop_step=${segment_stop_step:-<none>} lr=${official_lr} lr_warmup_steps=${warmup_display} lr_warmup_steps_ratio=${ratio_display} kl=${official_kl} gpu_mem=${gpu_memory_utilization} max_num_seqs=${max_num_seqs:--} offload_param=${offload_param} offload_optimizer=${offload_optimizer} offload_ref=${offload_ref} save_freq=${save_freq} seed=${trainer_seed}/${data_seed} resume_from=${resume_from:-<none>}"
 
 overrides=(
   "algorithm.adv_estimator=grpo"
@@ -205,8 +296,6 @@ overrides=(
   "actor_rollout_ref.model.enable_gradient_checkpointing=true"
   "actor_rollout_ref.model.use_remove_padding=true"
   "actor_rollout_ref.actor.optim.lr=${official_lr}"
-  "actor_rollout_ref.actor.optim.lr_warmup_steps=-1"  # -1 required; ratio below takes effect
-  "actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=${official_warmup_ratio}"
   "actor_rollout_ref.actor.ppo_mini_batch_size=${mini_batch_size}"
   "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1"
   "actor_rollout_ref.actor.use_dynamic_bsz=false"
@@ -265,6 +354,24 @@ if [[ -n "$max_num_seqs" ]]; then
   overrides+=("actor_rollout_ref.rollout.max_num_seqs=${max_num_seqs}")
 fi
 
+if [[ "$profile" == "formal" ]]; then
+  # formal: warmup fixed at 85 steps (== int(0.285 x 300)); a positive
+  # lr_warmup_steps takes priority in fsdp_workers.py:371-383, so the ratio is
+  # never consulted and the LR schedule is identical across the 0-50/50-100/100-300
+  # segments regardless of the segment stop point.
+  overrides+=("actor_rollout_ref.actor.optim.lr_warmup_steps=85")
+  # segment stop point (patch 0006): trainer stops after this global step,
+  # saving checkpoint (DataLoader/Optimizer/Scheduler/RNG) and returning normally.
+  overrides+=("trainer.segment_stop_step=${segment_stop_step}")
+else
+  # smoke profiles: warmup via ratio (verl default delegation); total_training_steps
+  # still bounds these short engineering runs directly.
+  overrides+=(
+    "actor_rollout_ref.actor.optim.lr_warmup_steps=-1"
+    "actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=${official_warmup_ratio}"
+  )
+fi
+
 if [[ -n "$resume_from" ]]; then
   overrides+=("trainer.resume_mode=resume_path" "trainer.resume_from_path=${resume_from}")
 else
@@ -287,6 +394,15 @@ export NO_PROXY="127.0.0.1,localhost"
 
 if [[ "$mode" == "print-config" ]]; then
   exec "$python_bin" -m verl.trainer.main_ppo --cfg job "${overrides[@]}"
+fi
+
+if [[ "$mode" == "dump-overrides" ]]; then
+  # Machine-readable override list + canonical fingerprint (same computation as
+  # the run path); used by the freeze tooling to derive full and
+  # training-invariant SHAs from this script's own code path.
+  printf '%s\n' "${overrides[@]}"
+  echo "__config_fp__=${config_fp}"
+  exit 0
 fi
 
 if [[ -z "${PROJECT3_RUN_ID:-}" || -z "${PROJECT3_RUN_DIR:-}" ]]; then
@@ -382,7 +498,8 @@ for patch_file in \
   "${project_dir}/patches/0002-structured-rollout-audit.patch" \
   "${project_dir}/patches/0003-graceful-ray-shutdown-and-atomic-rollout.patch" \
   "${project_dir}/patches/0004-search-prompt-and-format-reward.patch" \
-  "${project_dir}/patches/0005-search-env-loose-projection.patch"; do
+  "${project_dir}/patches/0005-search-env-loose-projection.patch" \
+  "${project_dir}/patches/0006-segment-stop-step-decoupled-schedule-horizon.patch"; do
   if ! git -C "$vendor_dir" apply --reverse --check "$patch_file" 2>/dev/null; then
     echo "required patch is not applied: $(basename -- "$patch_file")" >&2
     exit 15

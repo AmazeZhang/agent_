@@ -1,0 +1,63 @@
+diff --git a/verl/trainer/config/ppo_trainer.yaml b/verl/trainer/config/ppo_trainer.yaml
+index 0c98727..0ae65d6 100644
+--- a/verl/trainer/config/ppo_trainer.yaml
++++ b/verl/trainer/config/ppo_trainer.yaml
+@@ -260,6 +260,9 @@ trainer:
+   balance_batch: True
+   total_epochs: 30
+   total_training_steps: null
++  # P3 patch 0006: stop this segment after this global step (save checkpoint + normal return);
++  # schedule horizon stays total_training_steps (e.g. 300) so LR schedule is segment-invariant.
++  segment_stop_step: null
+   project_name: verl_examples
+   experiment_name: gsm8k
+   logger: [ 'console', 'wandb' ]
+diff --git a/verl/trainer/ppo/ray_trainer.py b/verl/trainer/ppo/ray_trainer.py
+index 3115394..29a9145 100644
+--- a/verl/trainer/ppo/ray_trainer.py
++++ b/verl/trainer/ppo/ray_trainer.py
+@@ -627,6 +627,19 @@ class RayPPOTrainer:
+         self.total_training_steps = total_training_steps
+         print(f"Total training steps: {self.total_training_steps}")
+ 
++        # P3 patch 0006: segment_stop_step decouples the *stop point* of this training
++        # segment from the *schedule horizon* (total_training_steps). The LR scheduler is
++        # always built for the full horizon (e.g. 300), while segment_stop_step ends the
++        # current segment early (e.g. 50/100/300) after completing the step and saving a
++        # checkpoint (model/optimizer/extra_state incl. lr_scheduler+RNG + data.pt) with
++        # a normal return. Must not be used to shrink total_training_steps.
++        self.segment_stop_step = self.config.trainer.get("segment_stop_step", None)
++        if self.segment_stop_step is not None:
++            assert isinstance(self.segment_stop_step, int) and self.segment_stop_step > 0, (
++                f"segment_stop_step must be a positive int, got {self.segment_stop_step}"
++            )
++            print(f"Segment stop step: {self.segment_stop_step} (schedule horizon stays {total_training_steps})")
++
+         try:
+             OmegaConf.set_struct(self.config, True)
+             with open_dict(self.config):
+@@ -1087,7 +1100,12 @@ class RayPPOTrainer:
+                     non_tensor_batch_keys=non_tensor_batch_keys_to_pop,
+                 )
+ 
+-                is_last_step = self.global_steps >= self.total_training_steps
++                # P3 patch 0006: stop at segment_stop_step as well (whichever comes first).
++                # total_training_steps keeps defining the scheduler horizon so the LR schedule
++                # is identical across segments; segment_stop_step only bounds this segment's
++                # execution and reuses the same save-and-return path as the final step.
++                is_segment_stop = self.segment_stop_step is not None and self.global_steps >= self.segment_stop_step
++                is_last_step = self.global_steps >= self.total_training_steps or is_segment_stop
+ 
+                 with _timer("step", timing_raw):
+                     # generate a batch
+@@ -1329,6 +1347,9 @@ class RayPPOTrainer:
+                 progress_bar.update(1)
+                 self.global_steps += 1
+                 if is_last_step:
+-                    pprint(f"Final validation metrics: {last_val_metrics}")
++                    if is_segment_stop:
++                        print(f"SEGMENT_STOP: finished global_step {self.global_steps - 1} (segment_stop_step={self.segment_stop_step}); checkpoint saved with DataLoader/Optimizer/Scheduler/RNG state; returning normally (schedule horizon {self.total_training_steps} untouched)")
++                    else:
++                        pprint(f"Final validation metrics: {last_val_metrics}")
+                     progress_bar.close()
+                     return
