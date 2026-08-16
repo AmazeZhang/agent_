@@ -69,15 +69,28 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 | 激活（micro 1 × 2304） | **实测 5.53 GiB**（见 §4.1；原 1–2 GB 估计已证伪） |
 | **合计** | **~22–23 GB（临界）** |
 
-### 4.1 六卡 smoke 实测（2026-08-16，两次失败，详见 PROGRESS_SYNC）
+### 4.1 六卡 smoke 实测（2026-08-16，详见 PROGRESS_SYNC）
 
-- vLLM profiling 画像（6 卡一致）：weights 5.79 GiB + non_torch 0.01 GiB +
+- vLLM profiling 画像（6 卡一致，全驻留时）：weights 5.79 GiB + non_torch 0.01 GiB +
   **激活峰值 5.53 GiB**（profiling 批次 = max_num_batched_tokens 2304 全量进
   eager 模型，enable_chunked_prefill=false）= 非 KV 合计 **11.33 GiB**。
 - KV 预算公式（每卡 23.99 GiB）：`gpu_mem_utilization × 23.99 − 11.33`。
   0.40 与 0.45 均实测失败（−1.73 / −0.53 GiB → 0 blocks → `initialize_cache`
-  abort）；0.50 推算 +0.66 GiB ≈ 21.6k blocks（未实测，待批准）。
-- 实测峰值（1s 采样，0.45 档）：GPU3 13,181 / GPU6 14,963 MiB（profiling
+  abort）；**未自动调整**（用户规则），报告后经用户批准改道。
+- **官方架构适配（offload + gpu_mem=0.60 + max_num_seqs=64）成功**：
+  profile `official-offload-smoke`（独立命名，不覆盖 0.40/0.45 记录）：
+  - vLLM 画像（同配置下）：weights 5.79 / non_torch 0.01 / **activation 0.47 GiB**
+    （offload 后 profiling 阶段 GPU 无 FSDP 竞争）/ **KV 7.83 GiB**；
+    GPU blocks **14259** / CPU blocks 7281 / max concurrency 99x；init 3.75s。
+  - 各卡峰值（1s 采样）：GPU1 19,191 / GPU2 20,335 / GPU3 20,219 /
+    GPU4 19,367 / GPU6 20,611 / GPU7 19,509 MiB（峰值在 optimizer/checkpoint
+    gather 阶段，均 <85% 卡容量，无 OOM）。
+  - 一次通过：exit 0、optimizer step 1 完成、checkpoint global_step_1
+    （model+optimizer+extra_state world_size_6 + data.pt）完整、退出清理干净。
+  - 显存机理：offload 后训练阶段 VRAM 呈"engine asleep ~2.2 GB（参数在 CPU）
+    → wake 13–16 GB（rollout）→ 19–20.6 GB（optimizer/gather）"周期，
+    KV cache 预算 +8.4 GiB 来自 activation 峰值从 5.53 降到 0.47 GiB。
+- 全驻留 0.45 档实测峰值（对照）：GPU3 13,181 / GPU6 14,963 MiB（profiling
   瞬时尖峰），其余 ~9.3 GiB；abort 时稳定 ~9.3 GiB。
 
 风险与降级（用户审阅拍板：**六卡 smoke 从 `gpu_memory_utilization` 0.40/0.45
@@ -118,8 +131,11 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
   - `trainer.experiment_name=p3_grpo_official_3b_fsdp6_loose_n5_s0`；
     **`save_freq=50`**（正式；checkpoint 自然对齐 Step 50/100/300；
     smoke/恢复验证 profile 才覆盖为 `save_freq=1`，是验证工具而非正式配置）；
-  - 两个 profile：`smoke`（`--max-train-steps 1` + `save_freq=1`，验证管道/
-    显存/checkpoint 生成）与 `formal`（正式配置）；由环境变量选择，默认 `formal`；
+  - 三个 profile：`smoke`（全驻留 `gpu_mem=0.40` 起点，`--max-train-steps 1` +
+    `save_freq=1`，验证管道/显存/checkpoint 生成）、`official-offload-smoke`
+    （官方架构适配：`gpu_mem=0.60` + actor/optimizer/ref offload +
+    `max_num_seqs=64`，独立命名，不覆盖前两者记录）与 `formal`（正式配置）；
+    由环境变量选择，默认 `formal`；
   - 其余（V0、max_model_len 2304、topk 3、timeout 180、lr 等）沿用训练基线，
     官方超参（lr/kl/optimizer 细节）落地前从官方 Search-R1 配置提取核验并写入
     resolved config。
@@ -182,7 +198,7 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 |---|---|---|
 | 1 | 本设计（提交供审阅） | 用户批准设计（已批准步骤 2；本表按审阅意见更新） |
 | 2 | 官方训练语义实现（patch 0005 + wrapper + retriever 全局限流/压测） | CPU 逻辑测试 + 压测报告 + 严格线不受影响（现有测试全绿） |
-| 3 | **六卡 smoke（显存验证）** | 用户批准后执行；GPU 1,2,3,4,6,7 跑 1 步；**不做单卡模拟**（用户审阅删除）。**2026-08-16 实测：0.40 与 0.45 均失败于 vLLM `initialize_cache`**（§4.1 画像，激活峰值 5.53 GiB 超预算，KV 0 blocks）；两次均按用户指示停止、未自动调整；0.50 与配置路径待用户批准 |
+| 3 | **六卡 smoke（显存验证）** | 用户批准后执行；GPU 1,2,3,4,6,7 跑 1 步；**不做单卡模拟**（用户审阅删除）。2026-08-16 实测三段：**0.40 与 0.45 失败**于 vLLM `initialize_cache`（§4.1 画像，激活峰值 5.53 GiB 超预算，KV 0 blocks；均按用户指示停止、未自动调整）；**official-offload-smoke（0.60 + 全 offload + max_num_seqs=64）成功**（§4.1，一次通过，exit 0，checkpoint global_step_1 完整） |
 | 4 | 六卡 1 步 + 恢复 | GPU 1,2,3,4,6,7 跑 1 步 → 正常退出 → resume 续跑 1 步成功（此 profile 用 save_freq=1 以产生 checkpoint；正式配置仍 save_freq=50） |
 | 5 | Retriever 并发压测 | §8 判据（全局限流已实现，压测选档） |
 | 6 | 冻结 resolved config | config 快照 + SHA 记录（含超参来源核验） |

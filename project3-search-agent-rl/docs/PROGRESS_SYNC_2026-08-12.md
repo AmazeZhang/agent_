@@ -941,3 +941,82 @@ Step 50 正式训练另行批准。
 ### 下一步（等待批准）
 
 用户对上述候选路径的指示；resume 验证待 smoke 通过后另行申请。
+
+## 轮次：official-offload-smoke 成功（2026-08-16）——官方架构适配六卡 smoke
+
+**状态**：用户在两次 0.40/0.45 失败后批准"官方架构适配"实验线（独立命名，不与
+单变量实验混线）。**成功**：exit_code=0，optimizer step 1 完成，checkpoint
+global_step_1 完整，退出清理干净。
+
+### 官方参考记录（防 main 变化）
+
+- 仓库 PeterGriffinJin/Search-R1，**commit `598e61bd1d36895726d28a8d06b3a15bed19f5d3`**
+  （2025-11-13，"Add GlobalRAG project to README"）；
+- train_grpo.sh **blob SHA `119d348e90d7c082c3b635eee7e022c941d14a57`**，文件
+  SHA256 `203098948565e60caf90da93aeaab74759d8ad9df1449649c8f03425e64f7c66`；
+- 官方取值核验：lr=1e-6、lr_warmup_steps_ratio=0.285（无 lr_warmup_steps →
+  verl 默认 -1，ratio 生效）、use_kl_loss + kl_coef=0.001 + low_var_kl、
+  param/optimizer offload=true、ref param_offload=True、gpu_mem=0.6；
+- 未照搬（与 6×4090/评测语义差异）：batch 512、prompt 4096、response 500、
+  mini 256、micro 64、log_prob_micro 128、XFORMERS、8 卡、grad_offload
+  （本 fork 无此字段）。
+
+### fork offload 实际实现路径（记录）
+
+- `verl/workers/fsdp_workers.py:142-146`：`_is_offload_param/_is_offload_optimizer`
+  读 `config.actor.fsdp_config.{param_offload,optimizer_offload}`；ref 读
+  `config.ref.fsdp_config.param_offload`；
+- `fsdp_workers.py:452`：`FSDPVLLMShardingManager(offload_param=...)`（rollout
+  权重按需唤醒）；
+- `fsdp_workers.py:553-560`：init 后 `offload_fsdp_model_to_cpu` +
+  `offload_fsdp_optimizer`（FSDP1 手动 offload；FSDP2 走 offload_policy，
+  本 profile 用默认 strategy=fsdp 即 FSDP1）；
+- 实现：`verl/utils/fsdp_utils.py:130/188`。**无 grad_offload 字段**（不添加）。
+
+### 运行（run `p3-official-offload-smoke-fsdp6-b66-n5-s0-20260816a`）
+
+- 启动 commit `27254e5`；resolved config SHA256 `f100560387ad2ad6f9c5da9ab5b4fdf979cf86ef2132439846c19fcd00903716`；
+- 参数：GPU 1,2,3,4,6,7、66×5=330、gpu_mem=0.60、max_num_seqs=64、1 步、
+  save_freq=1、全参数 FSDP + actor/optimizer/ref offload、lr=1e-6、
+  warmup=-1/ratio 0.285、kl 0.001；
+- 门禁全过：print-config 三 profile、回归 59+4、CPU gate（MemAvail 929.4 GiB、
+  swap 0、Retriever RSS 60.5 GiB、磁盘 2754.8 GiB）、GPU idle 6/6。
+
+### 结果（§九 全项）
+
+- **vLLM 画像**（对比 0.45 失败时）：weights 5.79 GiB / non_torch 0.01 GiB /
+  **activation peak 0.47 GiB（原 5.53）** / **KV cache 7.83 GiB（原 −0.53）** /
+  GPU blocks **14259** / CPU blocks 7281 / max concurrency 99x（2304 tokens）；
+  init 3.75s。offload 后 vLLM 预算 0.60×23.52=14.11 GiB。
+- **各卡峰值显存**（1s 采样）：GPU1 19,191 / GPU2 20,335 / GPU3 20,219 /
+  GPU4 19,367 / GPU6 20,611 / GPU7 19,509 MiB（峰值 81-84% 卡容量，无 OOM；
+  峰值出现在 optimizer/checkpoint gather 阶段）。
+- **阶段耗时**（日志时间戳推导，总 17m09s = 11:17:56→11:35:05）：
+  初始化（prompt 过滤 169k 行 + 模型加载 + engine init）≈2m12s（→11:20:08）；
+  rollout+检索（两波生成 + 51 次检索）≈37s（→11:20:45）；
+  训练更新（forward/backward/optimizer，offload 搬运）≈13m10s（→11:33:55）；
+  checkpoint 保存 ≈1m（11:34:47 完成）；退出清理 ≈18s。
+- **CPU**：最低 MemAvailable **753.8 GiB**（offload 峰值时）；swap delta **0**
+  （768KiB→768KiB）；Retriever RSS 60.5→60.9 GiB。
+- **Retriever**：51 次成功检索（第一波），**0 超时、0 重试**；51 个 env 搜索，
+  其余直接 answer。
+- **optimizer step：完成**（exit 0 + checkpoint）。
+- **checkpoint global_step_1 内容**：actor/ 下 model_world_size_6_rank_{0-5}.pt、
+  optim_world_size_6_rank_{0-5}.pt、extra_state_world_size_6_rank_{0-5}.pt、
+  tokenizer/config jsons + data.pt（1.5KB）→ **model+optimizer+extra/data state 齐全**。
+- **退出清理**：exit_code=0，patch 0003 优雅关闭（Gracefully stopped register
+  centers），6 卡回 18 MiB/0%，无残留 ray/vllm 进程，cleanup.log 6/6 none。
+
+### 问题与解决
+
+- 0.40/0.45 失败根因确认：全驻留时 vLLM profiling 激活峰值 5.53 GiB 吃穿预算；
+  offload 后同配置下 activation peak 仅 0.47 GiB（profile 阶段 GPU 上无 FSDP
+  竞争占用），KV cache 预算 +8.4 GiB → 14259 blocks，一次通过。
+- offload 训练更新阶段 ~13 分钟无日志属正常（每层 CPU↔GPU 搬运 + 55 个
+  micro-batch 串行），GPU 100% util 持续为计算进行特征。
+
+### 下一步（等待批准）
+
+**resume 验证**（用户原定执行序列步骤 4：六卡 1 步 + 恢复）——从
+global_step_1 resume 续跑 1 步，验证 checkpoint 可恢复。之后按序列：冻结
+resolved config → 预注册 → Step 0–50（另行批准）。
