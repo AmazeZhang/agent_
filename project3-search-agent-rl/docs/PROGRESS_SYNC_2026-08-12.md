@@ -987,7 +987,9 @@ global_step_1 完整，退出清理干净。
 - **vLLM 画像**（对比 0.45 失败时）：weights 5.79 GiB / non_torch 0.01 GiB /
   **activation peak 0.47 GiB（原 5.53）** / **KV cache 7.83 GiB（原 −0.53）** /
   GPU blocks **14259** / CPU blocks 7281 / max concurrency 99x（2304 tokens）；
-  init 3.75s。offload 后 vLLM 预算 0.60×23.52=14.11 GiB。
+  init 3.75s。0.60 档 vLLM 预算 0.60×23.52=14.11 GiB。**归因注意**：0.47 GiB 是
+  "offload + max_num_seqs=64"**组合配置**的观测结果（两变量同时改变，未做单变量
+  归因实验），文档此后按组合配置观测表述。
 - **各卡峰值显存**（1s 采样）：GPU1 19,191 / GPU2 20,335 / GPU3 20,219 /
   GPU4 19,367 / GPU6 20,611 / GPU7 19,509 MiB（峰值 81-84% 卡容量，无 OOM；
   峰值出现在 optimizer/checkpoint gather 阶段）。
@@ -1009,9 +1011,10 @@ global_step_1 完整，退出清理干净。
 
 ### 问题与解决
 
-- 0.40/0.45 失败根因确认：全驻留时 vLLM profiling 激活峰值 5.53 GiB 吃穿预算；
-  offload 后同配置下 activation peak 仅 0.47 GiB（profile 阶段 GPU 上无 FSDP
-  竞争占用），KV cache 预算 +8.4 GiB → 14259 blocks，一次通过。
+- 0.40/0.45 失败根因确认：全驻留时 vLLM profiling 激活峰值 5.53 GiB 吃穿预算。
+  "offload + max_num_seqs=64"组合配置下 activation peak 观测为 0.47 GiB，
+  KV cache 预算 −0.53 → +7.83 GiB → 14259 blocks，一次通过（组合配置观测，
+  未做单变量归因，2026-08-16 措辞修正）。
 - offload 训练更新阶段 ~13 分钟无日志属正常（每层 CPU↔GPU 搬运 + 55 个
   micro-batch 串行），GPU 100% util 持续为计算进行特征。
 

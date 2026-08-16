@@ -14,12 +14,23 @@
 #
 # Profiles (PROJECT3_TRAIN_PROFILE):
 #   formal (default): total_training_steps=50 (PROJECT3_TOTAL_TRAINING_STEPS
-#     override for 100/300 continuation), save_freq=50,
-#     gpu_memory_utilization=0.45 (PROJECT3_GPU_MEM_UTIL override).
+#     override for continuation; NOTE: the 300-step LR-schedule horizon must be
+#     split from segment stop points before this profile is frozen -- see
+#     docs/P3_PHASE2_OFFICIAL_TRAIN_DESIGN_2026-08-15.md SS10), save_freq=50,
+#     gpu_memory_utilization=0.60 (PROJECT3_GPU_MEM_UTIL override), max_num_seqs=64,
+#     actor/optimizer/ref offload=true -- the architecture verified by the
+#     official-offload-smoke run (2026-08-16); the 0.45/no-offload form was
+#     empirically rejected and must not be reintroduced here.
 #   smoke: total_training_steps=1, save_freq=1 (produces a checkpoint for the
 #     resume verification), gpu_memory_utilization=0.40 (first VRAM observation
 #     point per user review; 0.45 next). Smoke is a verification tool only,
 #     never a formal config.
+#   official-offload-smoke: the verified 0.60 + offload + max_num_seqs=64
+#     architecture, 1 step (see PROGRESS_SYNC 2026-08-16).
+#   official-offload-resume-smoke: resume verification from global_step_1;
+#     total_training_steps=2 (resume at global step 1 -> exactly one new update,
+#     final global_step_2; never continues to step 3), save_freq=1,
+#     PROJECT3_RESUME_FROM is REQUIRED and must point at .../global_step_1.
 #
 # Resume: PROJECT3_RESUME_FROM=<absolute global_step_N dir> (verl native).
 set -euo pipefail
@@ -47,8 +58,8 @@ resume_from="${PROJECT3_RESUME_FROM:-}"
 
 profile="${PROJECT3_TRAIN_PROFILE:-formal}"
 case "$profile" in
-  smoke|formal|official-offload-smoke) ;;
-  *) echo "unknown PROJECT3_TRAIN_PROFILE: ${profile} (smoke|formal|official-offload-smoke)" >&2; exit 20 ;;
+  smoke|formal|official-offload-smoke|official-offload-resume-smoke) ;;
+  *) echo "unknown PROJECT3_TRAIN_PROFILE: ${profile} (smoke|formal|official-offload-smoke|official-offload-resume-smoke)" >&2; exit 20 ;;
 esac
 
 train_batch_size="${PROJECT3_TRAIN_BATCH_SIZE:-66}"          # 66 formal default; 132 target
@@ -65,12 +76,14 @@ official_kl="${PROJECT3_OFFICIAL_KL_COEF:-0.001}"
 official_warmup_ratio="${PROJECT3_OFFICIAL_WARMUP_RATIO:-0.285}"
 trainer_seed="${PROJECT3_TRAINER_SEED:-1234}"
 data_seed="${PROJECT3_DATA_SEED:-1234}"
-gpu_memory_utilization="${PROJECT3_GPU_MEM_UTIL:-0.45}"
+# formal defaults = the verified-successful architecture (official-offload-smoke,
+# 2026-08-16): 0.60 vLLM budget, max_num_seqs=64, full param/optimizer/ref offload.
+gpu_memory_utilization="${PROJECT3_GPU_MEM_UTIL:-0.60}"
 save_freq="${PROJECT3_SAVE_FREQ:-50}"
-offload_param=false
-offload_optimizer=false
-offload_ref=false
-max_num_seqs=""
+offload_param=true
+offload_optimizer=true
+offload_ref=true
+max_num_seqs="${PROJECT3_MAX_NUM_SEQS:-64}"
 if [[ "$profile" == "smoke" ]]; then
   total_training_steps="1"
   save_freq="1"
@@ -85,6 +98,20 @@ if [[ "$profile" == "official-offload-smoke" ]]; then
   # FSDP1 manual offload; no grad_offload field exists in this fork), vLLM gets
   # 0.60, max_num_seqs capped at 64 for 6x24GB x 330 samples.
   total_training_steps="1"
+  save_freq="1"
+  gpu_memory_utilization="${PROJECT3_GPU_MEM_UTIL:-0.60}"
+  max_num_seqs="${PROJECT3_MAX_NUM_SEQS:-64}"
+  offload_param=true
+  offload_optimizer=true
+  offload_ref=true
+fi
+if [[ "$profile" == "official-offload-resume-smoke" ]]; then
+  # Resume verification (design sequence step 4): same verified architecture as
+  # official-offload-smoke, but total_training_steps=2 so that resuming from
+  # global_step_1 performs exactly ONE new update and stops at global_step_2
+  # (no automatic continuation to step 3). PROJECT3_RESUME_FROM is required and
+  # pinned to the source global_step_1 directory (validated below).
+  total_training_steps="2"
   save_freq="1"
   gpu_memory_utilization="${PROJECT3_GPU_MEM_UTIL:-0.60}"
   max_num_seqs="${PROJECT3_MAX_NUM_SEQS:-64}"
@@ -122,6 +149,20 @@ if [[ -n "$resume_from" ]]; then
     exit 18
   fi
 fi
+if [[ "$profile" == "official-offload-resume-smoke" ]]; then
+  # This profile is a resume-verification tool: the source must be the exact
+  # global_step_1 directory of the official-offload-smoke run (absolute path,
+  # read-only; the wrapper never writes into it -- default_local_dir is the new
+  # run's own directory).
+  if [[ -z "$resume_from" ]]; then
+    echo "profile official-offload-resume-smoke requires PROJECT3_RESUME_FROM=<absolute global_step_1 dir>" >&2
+    exit 23
+  fi
+  if [[ "$(basename -- "$resume_from")" != "global_step_1" ]]; then
+    echo "profile official-offload-resume-smoke requires resume source .../global_step_1 (got: ${resume_from})" >&2
+    exit 24
+  fi
+fi
 
 if [[ ! "$retriever_url" =~ ^http://127\.0\.0\.1:[0-9]{1,5}/retrieve$ ]]; then
   echo "retriever URL must be an IPv4 loopback /retrieve endpoint: ${retriever_url}" >&2
@@ -139,7 +180,7 @@ if (( $# != 0 )); then
 fi
 
 # Self-check: resolved experimental values on the first stdout line.
-echo "[OFFICIAL_EXP] resolved: profile=${profile} train_batch_size=${train_batch_size} mini_batch_size=${mini_batch_size} steps=${total_training_steps} lr=${official_lr} lr_warmup_steps=-1 lr_warmup_steps_ratio=${official_warmup_ratio} kl=${official_kl} gpu_mem=${gpu_memory_utilization} max_num_seqs=${max_num_seqs:--} offload_param=${offload_param} offload_optimizer=${offload_optimizer} offload_ref=${offload_ref} save_freq=${save_freq} seed=${trainer_seed}/${data_seed}"
+echo "[OFFICIAL_EXP] resolved: profile=${profile} train_batch_size=${train_batch_size} mini_batch_size=${mini_batch_size} steps=${total_training_steps} lr=${official_lr} lr_warmup_steps=-1 lr_warmup_steps_ratio=${official_warmup_ratio} kl=${official_kl} gpu_mem=${gpu_memory_utilization} max_num_seqs=${max_num_seqs:--} offload_param=${offload_param} offload_optimizer=${offload_optimizer} offload_ref=${offload_ref} save_freq=${save_freq} seed=${trainer_seed}/${data_seed} resume_from=${resume_from:-<none>}"
 
 overrides=(
   "algorithm.adv_estimator=grpo"

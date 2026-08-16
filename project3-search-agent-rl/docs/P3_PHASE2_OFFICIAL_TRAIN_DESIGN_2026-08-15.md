@@ -79,17 +79,20 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
   abort）；**未自动调整**（用户规则），报告后经用户批准改道。
 - **官方架构适配（offload + gpu_mem=0.60 + max_num_seqs=64）成功**：
   profile `official-offload-smoke`（独立命名，不覆盖 0.40/0.45 记录）：
-  - vLLM 画像（同配置下）：weights 5.79 / non_torch 0.01 / **activation 0.47 GiB**
-    （offload 后 profiling 阶段 GPU 无 FSDP 竞争）/ **KV 7.83 GiB**；
-    GPU blocks **14259** / CPU blocks 7281 / max concurrency 99x；init 3.75s。
+  - vLLM 画像（同配置下）：weights 5.79 / non_torch 0.01 / **activation 0.47 GiB** /
+    **KV 7.83 GiB**；GPU blocks **14259** / CPU blocks 7281 / max concurrency 99x；
+    init 3.75s。**注意**：0.47 GiB 是"offload + max_num_seqs=64"**组合配置**的
+    观测结果——两个变量同时改变，不能严格宣称由 offload 单独导致（单变量归因未
+    实测，见 §10 开放项）。
   - 各卡峰值（1s 采样）：GPU1 19,191 / GPU2 20,335 / GPU3 20,219 /
     GPU4 19,367 / GPU6 20,611 / GPU7 19,509 MiB（峰值在 optimizer/checkpoint
     gather 阶段，均 <85% 卡容量，无 OOM）。
   - 一次通过：exit 0、optimizer step 1 完成、checkpoint global_step_1
     （model+optimizer+extra_state world_size_6 + data.pt）完整、退出清理干净。
-  - 显存机理：offload 后训练阶段 VRAM 呈"engine asleep ~2.2 GB（参数在 CPU）
-    → wake 13–16 GB（rollout）→ 19–20.6 GB（optimizer/gather）"周期，
-    KV cache 预算 +8.4 GiB 来自 activation 峰值从 5.53 降到 0.47 GiB。
+  - 显存机理（组合配置观测，非单变量归因）：训练阶段 VRAM 呈"engine asleep
+    ~2.2 GB（参数在 CPU）→ wake 13–16 GB（rollout）→ 19–20.6 GB
+    （optimizer/gather）"周期；与全驻留失败档相比，vLLM 画像中 activation
+    峰值 5.53 → 0.47 GiB、KV cache 预算 −0.53 → +7.83 GiB。
 - 全驻留 0.45 档实测峰值（对照）：GPU3 13,181 / GPU6 14,963 MiB（profiling
   瞬时尖峰），其余 ~9.3 GiB；abort 时稳定 ~9.3 GiB。
 
@@ -120,8 +123,10 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 
 - 新脚本 `scripts/run_p3_grpo_official_exp.sh`（镜像 `run_p3_grpo_fix_exp.sh`
   结构），overrides 差异：
-  - `trainer.n_gpus_per_node=6`；`actor_rollout_ref.actor.fsdp_config.param_offload=false`、
-    `optimizer_offload=false`（全参数主线）；
+  - `trainer.n_gpus_per_node=6`；`actor_rollout_ref.actor.fsdp_config.param_offload=true`、
+    `optimizer_offload=true`、ref `param_offload=true`（全参数 FSDP + 状态 offload，
+    2026-08-16 按已验证成功的架构从 false 切换，原 0.45/无 offload 形式已被实测
+    拒绝）；
   - `env.rollout.n=5`；`data.train_batch_size=66`（正式档，目标 132）；
     `ppo_mini_batch_size=330`（目标 660）；
   - `data.shuffle=true` + `data.seed=1234` + `trainer.seed=1234`（固定，可复现）；
@@ -131,11 +136,16 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
   - `trainer.experiment_name=p3_grpo_official_3b_fsdp6_loose_n5_s0`；
     **`save_freq=50`**（正式；checkpoint 自然对齐 Step 50/100/300；
     smoke/恢复验证 profile 才覆盖为 `save_freq=1`，是验证工具而非正式配置）；
-  - 三个 profile：`smoke`（全驻留 `gpu_mem=0.40` 起点，`--max-train-steps 1` +
+  - 四个 profile：`smoke`（`gpu_mem=0.40` 起点，`--max-train-steps 1` +
     `save_freq=1`，验证管道/显存/checkpoint 生成）、`official-offload-smoke`
     （官方架构适配：`gpu_mem=0.60` + actor/optimizer/ref offload +
-    `max_num_seqs=64`，独立命名，不覆盖前两者记录）与 `formal`（正式配置）；
-    由环境变量选择，默认 `formal`；
+    `max_num_seqs=64`，独立命名，不覆盖前两者记录）、
+    `official-offload-resume-smoke`（**resume 验证**：与 offload-smoke 同架构，
+    `total_training_steps=2` + `save_freq=1`，从源 global_step_1 恢复后只执行一次
+    新更新到 global_step_2，`PROJECT3_RESUME_FROM` 必需且被 pin 到
+    .../global_step_1，禁止继续到 Step 3）与 `formal`（正式配置，默认；
+    save_freq=50；**当前 total_training_steps=50 仅为段配置，冻结前须按 §10-6
+    拆分 300 步总调度长度**）；由环境变量选择，默认 `formal`；
   - 其余（V0、max_model_len 2304、topk 3、timeout 180、lr 等）沿用训练基线，
     官方超参（lr/kl/optimizer 细节）落地前从官方 Search-R1 配置提取核验并写入
     resolved config。
@@ -199,7 +209,7 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 | 1 | 本设计（提交供审阅） | 用户批准设计（已批准步骤 2；本表按审阅意见更新） |
 | 2 | 官方训练语义实现（patch 0005 + wrapper + retriever 全局限流/压测） | CPU 逻辑测试 + 压测报告 + 严格线不受影响（现有测试全绿） |
 | 3 | **六卡 smoke（显存验证）** | 用户批准后执行；GPU 1,2,3,4,6,7 跑 1 步；**不做单卡模拟**（用户审阅删除）。2026-08-16 实测三段：**0.40 与 0.45 失败**于 vLLM `initialize_cache`（§4.1 画像，激活峰值 5.53 GiB 超预算，KV 0 blocks；均按用户指示停止、未自动调整）；**official-offload-smoke（0.60 + 全 offload + max_num_seqs=64）成功**（§4.1，一次通过，exit 0，checkpoint global_step_1 完整） |
-| 4 | 六卡 1 步 + 恢复 | GPU 1,2,3,4,6,7 跑 1 步 → 正常退出 → resume 续跑 1 步成功（此 profile 用 save_freq=1 以产生 checkpoint；正式配置仍 save_freq=50） |
+| 4 | 六卡 1 步 + 恢复 | 用户批准（2026-08-16）：`official-offload-resume-smoke`，从源 global_step_1（p3-official-offload-smoke…a/checkpoints/global_step_1，清单+SHA 已记录）resume 至 global_step_2，只执行一次新更新；源只读、新 run 全新目录；通过标准见 PROGRESS_SYNC（日志标记/rank 四态恢复/游标 66→132/无 OOM/清理） |
 | 5 | Retriever 并发压测 | §8 判据（全局限流已实现，压测选档） |
 | 6 | 冻结 resolved config | config 快照 + SHA 记录（含超参来源核验） |
 | 7 | 第二阶段预注册 | 提交（先于任何 Step 50+ 评测）；Step 50/100 为**开发门禁**（不设统计判据）、final-confirm512 为**唯一确认性检验**（预注册配对三档判定） |
@@ -213,7 +223,19 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 3. retriever 全局限流档位实测（§8 压测选档）；
 4. final-confirm512 构建（domain `searchr1-p3-final-confirm-v1`，排除
    dev32/confirm256/official-confirm256-v1/上游 train，512 题配额放大）；
-5. Step 0 基线的复用 vs 重跑（预注册中固定：复用受管 Base 结果，run id/SHA 在案）。
+5. Step 0 基线的复用 vs 重跑（预注册中固定：复用受管 Base 结果，run id/SHA 在案）；
+6. **LR schedule 分段问题（2026-08-16 记录，阻塞正式 Step 0–50 冻结，不阻塞
+   本次 Step 1→2 resume 工程验证）**：正式目标总 300 步，warmup ratio 0.285
+   ⇒ warmup ≈ 85 步。若 Step 0–50 段以 `total_training_steps=50` 创建 scheduler、
+   resume 时再改为 100/300，前 50 步 warmup 曲线会偏离官方配置（fork 在
+   `fsdp_workers.py:371-383` 按 `num_warmup_steps = int(ratio × total_steps)` 建
+   scheduler，`ray_trainer.py:622-638` 把 `trainer.total_training_steps` 注入
+   `actor.optim.total_training_steps`）。冻结 resolved config 前必须把**总调度
+   长度 300**（scheduler/DataLoader epoch 语义）与**本段停止点 50/100/300**
+   （段间停训评测）拆成两个独立配置概念（如 scheduler 恒用 300，段停止由单独
+   的 stop-at-step 机制控制），再冻结。另：0.47 GiB activation 为组合配置观测，
+   如需单变量归因须另行实验（§4.1）；formal 默认已切换为已验证架构
+   （0.60/64/offload=true）。
 
 ## 11. 声明边界
 
