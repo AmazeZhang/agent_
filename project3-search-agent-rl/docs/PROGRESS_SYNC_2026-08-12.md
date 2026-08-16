@@ -1023,3 +1023,73 @@ global_step_1 完整，退出清理干净。
 **resume 验证**（用户原定执行序列步骤 4：六卡 1 步 + 恢复）——从
 global_step_1 resume 续跑 1 步，验证 checkpoint 可恢复。之后按序列：冻结
 resolved config → 预注册 → Step 0–50（另行批准）。
+
+## 轮次：resume 验证成功（2026-08-16）——official-offload-resume-smoke
+
+**状态**：用户批准设计序列步骤 4（六卡 1 步 + 恢复）。**成功**：exit_code=0，
+从源 global_step_1 resume 续跑 1 步 → global_step_2，全部通过标准满足。
+
+### 配置与门禁
+
+- 新 profile `official-offload-resume-smoke`（commit `ef5af45` 落地）：
+  total_training_steps=2（resume 后恰好 1 次新更新，禁止 Step 3）、total_epochs=1、
+  save_freq=1、batch 66×5=330、gpu_mem=0.60、max_num_seqs=64、三 offload=true、
+  lr=1e-6 / warmup=-1 / ratio 0.285 / kl 0.001；PROJECT3_RESUME_FROM 必需且被
+  pin 到 .../global_step_1。formal 同步切换为已验证架构（0.60/64/offload=true，
+  原 0.45/无 offload 形式不再作为默认）。
+- 源 checkpoint：`p3-official-offload-smoke-fsdp6-b66-n5-s0-20260816a/
+  checkpoints/global_step_1`（27 文件：6 model + 6 optim + 6 extra_state +
+  6 tokenizer/config + data.pt），绝对路径、运行前后两次 SHA256 全量重哈希
+  **完全一致（只读确认）**；manifest 存于新 run 目录
+  `source_checkpoint_manifest.sha256`。
+- CPU 逻辑检查（运行前）：真实 data.pt `_snapshot_step=1`、`_iterator_finished=False`；
+  真实 len(train_dataloader)=2569（剩 2568 批 ≫ 2）；StatefulDataLoader 同
+  语义模拟（shuffle+seed 1234+batch 66+drop_last+num_workers=8）证明恢复后
+  首批 == 原流第 3 批（游标 66→132 续接，非从头重采）。
+- 运行：run `p3-official-offload-resume-smoke-fsdp6-b66-n5-s0-20260816b`，
+  14:57:42→15:15:09（17m27s）；resolved config SHA256
+  `0ad8ec4346f31af0d7cf4472a86a9adbd402a5d99542aff3a4d45474813299f9`；
+  CPU gate PASS（MemAvail 925.8 GiB、swap 0、RSS 60.9 GiB、磁盘 2719 GiB）。
+
+### 通过标准逐项
+
+| 标准 | 证据 |
+|---|---|
+| `Load from checkpoint folder: .../global_step_1` | stdout 出现（精确路径） |
+| `Setting global step to 1` | stdout 出现，随后 `Resuming from ...` |
+| 六 rank 恢复 model/optimizer/scheduler/DataLoader | rank-0..5 `Loading from ...model+optim+extra_state...`（repeated 5x）；extra_state 含 lr_scheduler+RNG；data.pt 存在 → load_state_dict |
+| `training/global_step=2.000` | step 2 指标行 |
+| 新 checkpoint global_step_2 | 6×model + 6×optim + 6×extra_state + data.pt + tokenizer/config 齐全 |
+| Step 2 用下一批样本 | data.pt `_snapshot_step` 1→2，`_iterator_finished=False` |
+| 66 prompts 不重叠 | step1/step2 rollout JSONL（546+540 条）input 全量 0 重叠 |
+| 游标 66→132 | _snapshot_step=2 即已消费 2×66 |
+| scheduler last_epoch 1→2 | extra_state：1→2（_step_count 2→3，_last_lr [1e-06] 不变） |
+| optimizer 非重初始化 | Adam step 计数 2→4；exp_avg 非零元素 51.9M/51.9M |
+| 模型参数/checkpoint SHA 变化 | 3 rank 抽查 model shard SHA 全部不同 |
+| Retriever 正常 0 超时 | 45 次成功、0 timeout、0 retry |
+| 无 OOM/NaN/swap | 0 匹配；swapfree 恒 2.0 GiB（delta 0）；VRAM 峰值 ≤19.2 GiB |
+| 退出清理 | exit 0；cleanup.log 6/6 compute_processes=none；6 卡回 18 MiB/0%；无残留进程 |
+
+### 显存/耗时
+
+- 各卡峰值（1s 采样）：GPU1 18,819 / GPU2 19,167 / GPU3 19,031 / GPU4 17,165 /
+  GPU6 18,717 / GPU7 17,980 MiB（<80% 卡容量）。
+- 阶段：init+resume 加载 ≈3m（14:57:42→~15:00:4x，比首跑多 checkpoint 读取）；
+  rollout+检索 ≈40s（15:01 完成，45 次检索）；训练更新 13m42s（timing_s/step
+  867s：gen 54 / old_log_prob 151 / ref 160 / update_actor 485）；checkpoint 14s；
+  退出清理 <10s。CPU 最低 MemAvailable 753.3 GiB。
+
+### 问题与解决
+
+- stdout 块缓冲（重定向管道）导致 resume 标记延迟刷出——用 stderr 时间线 + 最终
+  flush 核对，标记均存在且顺序正确。
+- `actor/lr:0.000` 为 1e-6 的显示精度（与 smoke step1 一致），scheduler
+  `_last_lr=[1e-06]` 确认实际值。
+- 源 checkpoint 只读性曾因 diff 未排序产生假警报，重比后 27 文件哈希全一致。
+
+### 下一步（等待批准）
+
+设计序列步骤 5（Retriever 并发压测）此前已完成选档（配置 B，max_concurrent_queries=64
+已在服务端生效）；resume 验证通过后剩余：**冻结 resolved config（须先解决 §10-6
+LR 调度分段问题：300 步总调度长度 vs 50/100/300 段停止点拆分）→ 预注册 →
+正式 Step 0–50**（另行批准，本次不含）。

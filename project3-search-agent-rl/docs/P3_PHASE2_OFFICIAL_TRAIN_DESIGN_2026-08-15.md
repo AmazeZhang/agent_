@@ -209,7 +209,7 @@ SearchEnv、无投影无惩罚、format_score=0.1）。训练侧由代码核查�
 | 1 | 本设计（提交供审阅） | 用户批准设计（已批准步骤 2；本表按审阅意见更新） |
 | 2 | 官方训练语义实现（patch 0005 + wrapper + retriever 全局限流/压测） | CPU 逻辑测试 + 压测报告 + 严格线不受影响（现有测试全绿） |
 | 3 | **六卡 smoke（显存验证）** | 用户批准后执行；GPU 1,2,3,4,6,7 跑 1 步；**不做单卡模拟**（用户审阅删除）。2026-08-16 实测三段：**0.40 与 0.45 失败**于 vLLM `initialize_cache`（§4.1 画像，激活峰值 5.53 GiB 超预算，KV 0 blocks；均按用户指示停止、未自动调整）；**official-offload-smoke（0.60 + 全 offload + max_num_seqs=64）成功**（§4.1，一次通过，exit 0，checkpoint global_step_1 完整） |
-| 4 | 六卡 1 步 + 恢复 | 用户批准（2026-08-16）：`official-offload-resume-smoke`，从源 global_step_1（p3-official-offload-smoke…a/checkpoints/global_step_1，清单+SHA 已记录）resume 至 global_step_2，只执行一次新更新；源只读、新 run 全新目录；通过标准见 PROGRESS_SYNC（日志标记/rank 四态恢复/游标 66→132/无 OOM/清理） |
+| 4 | 六卡 1 步 + 恢复 | **完成（2026-08-16，全部通过标准满足）**：`official-offload-resume-smoke` 从源 global_step_1（清单+SHA 记录，运行前后哈希一致=只读）resume 至 global_step_2；日志标记/rank 四态恢复/游标 66→132/scheduler 1→2/optimizer 非重初始化/模型 SHA 变化/0 超时/无 OOM/清理 6/6，详见 PROGRESS_SYNC |
 | 5 | Retriever 并发压测 | §8 判据（全局限流已实现，压测选档） |
 | 6 | 冻结 resolved config | config 快照 + SHA 记录（含超参来源核验） |
 | 7 | 第二阶段预注册 | 提交（先于任何 Step 50+ 评测）；Step 50/100 为**开发门禁**（不设统计判据）、final-confirm512 为**唯一确认性检验**（预注册配对三档判定） |
