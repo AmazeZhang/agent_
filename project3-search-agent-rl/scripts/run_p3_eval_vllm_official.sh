@@ -8,7 +8,7 @@
 # SearchEnv (no projection, no invalid penalty, format_score=0.1).
 #
 # Usage (must run inside run_managed.sh via start_tmux_run.sh):
-#   PROJECT3_EVAL_DATA=smoke|official-confirm256-v1
+#   PROJECT3_EVAL_DATA=smoke|official-confirm256-v1|final-confirm512
 #   PROJECT3_EVAL_MODEL=<absolute path to full model dir>   (default: official GRPO checkpoint)
 #   PROJECT3_EVAL_TOKENIZER=<absolute path to tokenizer>    (default: Qwen2.5-3B BASE tokenizer)
 #   bash scripts/run_p3_eval_vllm_official.sh
@@ -53,8 +53,13 @@ case "$eval_data" in
     manifest_path="${project_data}/datasets/searchr1-official-confirm256-v1/manifest.json"
     manifest_key="heldout"
     ;;
+  final-confirm512)
+    data_files="${project_data}/datasets/searchr1-final-confirm512/heldout.parquet"
+    manifest_path="${project_data}/datasets/searchr1-final-confirm512/manifest.json"
+    manifest_key="heldout"
+    ;;
   *)
-    echo "PROJECT3_EVAL_DATA must be smoke or official-confirm256-v1, got: ${eval_data}" >&2
+    echo "PROJECT3_EVAL_DATA must be smoke, official-confirm256-v1 or final-confirm512, got: ${eval_data}" >&2
     exit 19
     ;;
 esac
