@@ -31,8 +31,13 @@ finished_at 2026-08-17T07:35:05（exit_code=0）。
 
 ### 1.3 运行健康（全程监控，无停止条件触发）
 
-- 无 NaN/Inf、无 OOM（peak max_memory_reserved 34.7 GiB/卡，24.5 GiB 卡 × 6 全参
-  FSDP + offload 预期内）、无 GPU 掉卡/Xid、GPU0/5 持续空闲 0%；
+- 无 NaN/Inf、无 OOM、无 GPU 掉卡/Xid、GPU0/5 持续空闲 0%。**显存口径修正**：
+  日志 `perf/max_memory_reserved` 峰值 34.7 GiB（allocated 25.0 GiB）**不代表任何
+  单卡的同时占用**——实测本机单卡物理上限 23.52 GiB、分配 22 GiB 即 OOM，
+  该值超物理上限，判定为跨 6 rank 聚合的机器级观察值（verl `perf/` 指标族口径；
+  同族 `perf/cpu_memory_used_gb`=93.7 GiB 即 psutil 整机值可佐证；数值达峰后
+  41 步恒定，符合进程峰值而非时间累计）。÷6 ≈ 4.2 allocated / 5.8 reserved
+  GiB/rank，与 3B 全参 FSDP 分片 + 三项 offload 的实际每卡占用吻合；
 - 422 API 拒绝 = 既有宽松语义行为（smoke 亦同，~0.6% 请求），retriever 全程健康；
 - 无配置指纹不一致、checkpoint 每步保存完整；
 - 节奏 ~866 s/step → 逐步加速至 Step 50 的 585 s/step（update_actor 495→323 s）。
@@ -46,7 +51,8 @@ finished_at 2026-08-17T07:35:05（exit_code=0）。
 | 25 | 0.101 | 0.045 | 0.564 | 172.9 | 819.2 s |
 | 50 | 0.152 | 0.061 | 0.082 | 161.7 | 585.2 s |
 
-趋势：训练内 reward 与 success 单调上升（0.064→0.152、0.018→0.061）；Step 50
+趋势：**表述修正**——仅 Step 1/10/25/50 四个授权快照点依次上升（0.064→0.152、
+0.018→0.061），未对 50 步全程作单调性声明；Step 50
 critic/rewards/mean 0.147、max 1.0、advantages mean -0.012；gen 39.3 s / old_log_prob
 100.3 s / ref 105.8 s / update_actor 323.3 s。
 
