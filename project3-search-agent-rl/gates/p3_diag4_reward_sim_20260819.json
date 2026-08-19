@@ -1,0 +1,358 @@
+{
+  "prereg_ref": "docs/P3_PHASE4_SEARCH_CAUSAL_DIAG_PREREG_2026-08-19.md section 5",
+  "anti_hack_suite": [
+    {
+      "candidate": "C0-current-baseline",
+      "rewards": {
+        "T1 no-search direct correct": 1.0,
+        "T2 valid search + evidence + correct": 1.0,
+        "T3 search relevant evidence but wrong (format)": 0.1,
+        "T4 search irrelevant docs, correct from memory": 1.0,
+        "T5 invalid query, no answer": 0.0,
+        "T6 redundant search spam x2, evidence, correct": 1.0,
+        "T7 ground-truth answer leaked into query, correct": 1.0,
+        "T8 format-only correct, wrong answer, no search": 0.1
+      },
+      "checks": {
+        "T2 > T1": false,
+        "T1 > T3": true,
+        "T3 > T5": true,
+        "T6 <= T1 (spam guard)": true,
+        "alpha <= 0.05 (search-call cap)": true,
+        "T8 (format farming) < T1": true,
+        "mu >= a+b+g": true
+      },
+      "pass": false,
+      "note_T7": "T7 == T2 by construction: answer-in-query is undetectable from reward alone; mitigation lives in a query-validation layer (count it in historical data instead)"
+    },
+    {
+      "candidate": "C1-conservative",
+      "rewards": {
+        "T1 no-search direct correct": 1.0,
+        "T2 valid search + evidence + correct": 1.17,
+        "T3 search relevant evidence but wrong (format)": 0.17,
+        "T4 search irrelevant docs, correct from memory": 1.02,
+        "T5 invalid query, no answer": -0.1,
+        "T6 redundant search spam x2, evidence, correct": 0.97,
+        "T7 ground-truth answer leaked into query, correct": 1.17,
+        "T8 format-only correct, wrong answer, no search": 0.1
+      },
+      "checks": {
+        "T2 > T1": true,
+        "T1 > T3": true,
+        "T3 > T5": true,
+        "T6 <= T1 (spam guard)": true,
+        "alpha <= 0.05 (search-call cap)": true,
+        "T8 (format farming) < T1": true,
+        "mu >= a+b+g": true
+      },
+      "pass": true,
+      "note_T7": "T7 == T2 by construction: answer-in-query is undetectable from reward alone; mitigation lives in a query-validation layer (count it in historical data instead)"
+    },
+    {
+      "candidate": "C2-moderate",
+      "rewards": {
+        "T1 no-search direct correct": 1.0,
+        "T2 valid search + evidence + correct": 1.32,
+        "T3 search relevant evidence but wrong (format)": 0.22,
+        "T4 search irrelevant docs, correct from memory": 1.02,
+        "T5 invalid query, no answer": -0.2,
+        "T6 redundant search spam x2, evidence, correct": 0.97,
+        "T7 ground-truth answer leaked into query, correct": 1.32,
+        "T8 format-only correct, wrong answer, no search": 0.1
+      },
+      "checks": {
+        "T2 > T1": true,
+        "T1 > T3": true,
+        "T3 > T5": true,
+        "T6 <= T1 (spam guard)": true,
+        "alpha <= 0.05 (search-call cap)": true,
+        "T8 (format farming) < T1": true,
+        "mu >= a+b+g": true
+      },
+      "pass": true,
+      "note_T7": "T7 == T2 by construction: answer-in-query is undetectable from reward alone; mitigation lives in a query-validation layer (count it in historical data instead)"
+    },
+    {
+      "candidate": "C3-format-0.05",
+      "rewards": {
+        "T1 no-search direct correct": 1.0,
+        "T2 valid search + evidence + correct": 1.17,
+        "T3 search relevant evidence but wrong (format)": 0.12,
+        "T4 search irrelevant docs, correct from memory": 1.02,
+        "T5 invalid query, no answer": -0.1,
+        "T6 redundant search spam x2, evidence, correct": 0.97,
+        "T7 ground-truth answer leaked into query, correct": 1.17,
+        "T8 format-only correct, wrong answer, no search": 0.05
+      },
+      "checks": {
+        "T2 > T1": true,
+        "T1 > T3": true,
+        "T3 > T5": true,
+        "T6 <= T1 (spam guard)": true,
+        "alpha <= 0.05 (search-call cap)": true,
+        "T8 (format farming) < T1": true,
+        "mu >= a+b+g": true
+      },
+      "pass": true,
+      "note_T7": "T7 == T2 by construction: answer-in-query is undetectable from reward alone; mitigation lives in a query-validation layer (count it in historical data instead)"
+    },
+    {
+      "candidate": "C4-format-0.0",
+      "rewards": {
+        "T1 no-search direct correct": 1.0,
+        "T2 valid search + evidence + correct": 1.17,
+        "T3 search relevant evidence but wrong (format)": 0.07,
+        "T4 search irrelevant docs, correct from memory": 1.02,
+        "T5 invalid query, no answer": -0.1,
+        "T6 redundant search spam x2, evidence, correct": 0.97,
+        "T7 ground-truth answer leaked into query, correct": 1.17,
+        "T8 format-only correct, wrong answer, no search": 0.0
+      },
+      "checks": {
+        "T2 > T1": true,
+        "T1 > T3": true,
+        "T3 > T5": true,
+        "T6 <= T1 (spam guard)": true,
+        "alpha <= 0.05 (search-call cap)": true,
+        "T8 (format farming) < T1": true,
+        "mu >= a+b+g": true
+      },
+      "pass": true,
+      "note_T7": "T7 == T2 by construction: answer-in-query is undetectable from reward alone; mitigation lives in a query-validation layer (count it in historical data instead)"
+    },
+    {
+      "candidate": "C5-evidence-driven-a0",
+      "rewards": {
+        "T1 no-search direct correct": 1.0,
+        "T2 valid search + evidence + correct": 1.45,
+        "T3 search relevant evidence but wrong (format)": 0.25,
+        "T4 search irrelevant docs, correct from memory": 1.0,
+        "T5 invalid query, no answer": -0.2,
+        "T6 redundant search spam x2, evidence, correct": 1.0,
+        "T7 ground-truth answer leaked into query, correct": 1.45,
+        "T8 format-only correct, wrong answer, no search": 0.1
+      },
+      "checks": {
+        "T2 > T1": true,
+        "T1 > T3": true,
+        "T3 > T5": true,
+        "T6 <= T1 (spam guard)": true,
+        "alpha <= 0.05 (search-call cap)": true,
+        "T8 (format farming) < T1": true,
+        "mu >= a+b+g": true
+      },
+      "pass": true,
+      "note_T7": "T7 == T2 by construction: answer-in-query is undetectable from reward alone; mitigation lives in a query-validation layer (count it in historical data instead)"
+    },
+    {
+      "candidate": "C6-spam-averse",
+      "rewards": {
+        "T1 no-search direct correct": 1.0,
+        "T2 valid search + evidence + correct": 1.35,
+        "T3 search relevant evidence but wrong (format)": 0.25,
+        "T4 search irrelevant docs, correct from memory": 1.05,
+        "T5 invalid query, no answer": -0.3,
+        "T6 redundant search spam x2, evidence, correct": 0.95,
+        "T7 ground-truth answer leaked into query, correct": 1.35,
+        "T8 format-only correct, wrong answer, no search": 0.1
+      },
+      "checks": {
+        "T2 > T1": true,
+        "T1 > T3": true,
+        "T3 > T5": true,
+        "T6 <= T1 (spam guard)": true,
+        "alpha <= 0.05 (search-call cap)": true,
+        "T8 (format farming) < T1": true,
+        "mu >= a+b+g": true
+      },
+      "pass": true,
+      "note_T7": "T7 == T2 by construction: answer-in-query is undetectable from reward alone; mitigation lives in a query-validation layer (count it in historical data instead)"
+    }
+  ],
+  "all_shaping_candidates_pass": true,
+  "baseline_reference_info": {
+    "candidate": "C0-current-baseline",
+    "rewards": {
+      "T1 no-search direct correct": 1.0,
+      "T2 valid search + evidence + correct": 1.0,
+      "T3 search relevant evidence but wrong (format)": 0.1,
+      "T4 search irrelevant docs, correct from memory": 1.0,
+      "T5 invalid query, no answer": 0.0,
+      "T6 redundant search spam x2, evidence, correct": 1.0,
+      "T7 ground-truth answer leaked into query, correct": 1.0,
+      "T8 format-only correct, wrong answer, no search": 0.1
+    },
+    "checks": {
+      "T2 > T1": false,
+      "T1 > T3": true,
+      "T3 > T5": true,
+      "T6 <= T1 (spam guard)": true,
+      "alpha <= 0.05 (search-call cap)": true,
+      "T8 (format farming) < T1": true,
+      "mu >= a+b+g": true
+    },
+    "pass": false,
+    "note_T7": "T7 == T2 by construction: answer-in-query is undetectable from reward alone; mitigation lives in a query-validation layer (count it in historical data instead)"
+  },
+  "candidates": {
+    "C0-current-baseline": {
+      "coefs": {
+        "format": 0.1,
+        "a": 0.0,
+        "b": 0.0,
+        "g": 0.0,
+        "l": 0.0,
+        "m": 0.0
+      },
+      "n_trajs": 29838,
+      "n_groups": 6596,
+      "reward_mean": 0.16291976674039818,
+      "reward_std": 0.2294970435968451,
+      "intra_group_variance_mean": 0.02802167601576713,
+      "all_same_reward_group_ratio": 0.8248938750758035,
+      "search_frac": 0.15161874120249347,
+      "search_adv_mean": -0.04334137315797488,
+      "nosearch_adv_mean": 0.0077457680400836665,
+      "n_search_trajs": 4524,
+      "n_nosearch_trajs": 25314
+    },
+    "C1-conservative": {
+      "coefs": {
+        "format": 0.1,
+        "a": 0.02,
+        "b": 0.05,
+        "g": 0.1,
+        "l": 0.1,
+        "m": 0.2
+      },
+      "n_trajs": 29838,
+      "n_groups": 6596,
+      "reward_mean": 0.15409176218245194,
+      "reward_std": 0.23483908953628724,
+      "intra_group_variance_mean": 0.02950390780186645,
+      "all_same_reward_group_ratio": 0.5142510612492419,
+      "search_frac": 0.15161874120249347,
+      "search_adv_mean": -0.35946730147463435,
+      "nosearch_adv_mean": 0.06424231934389055,
+      "n_search_trajs": 4524,
+      "n_nosearch_trajs": 25314
+    },
+    "C2-moderate": {
+      "coefs": {
+        "format": 0.1,
+        "a": 0.02,
+        "b": 0.1,
+        "g": 0.2,
+        "l": 0.2,
+        "m": 0.35
+      },
+      "n_trajs": 29838,
+      "n_groups": 6596,
+      "reward_mean": 0.14439439640726592,
+      "reward_std": 0.24451803176426165,
+      "intra_group_variance_mean": 0.03237087770365878,
+      "all_same_reward_group_ratio": 0.5142510612492419,
+      "search_frac": 0.15161874120249347,
+      "search_adv_mean": -0.37417915544949315,
+      "nosearch_adv_mean": 0.06687155326117983,
+      "n_search_trajs": 4524,
+      "n_nosearch_trajs": 25314
+    },
+    "C3-format-0.05": {
+      "coefs": {
+        "format": 0.05,
+        "a": 0.02,
+        "b": 0.05,
+        "g": 0.1,
+        "l": 0.1,
+        "m": 0.2
+      },
+      "n_trajs": 29838,
+      "n_groups": 6596,
+      "reward_mean": 0.10758730477914069,
+      "reward_std": 0.24746395240011035,
+      "intra_group_variance_mean": 0.032743140143858235,
+      "all_same_reward_group_ratio": 0.5142510612492419,
+      "search_frac": 0.15161874120249347,
+      "search_adv_mean": -0.35930798117167817,
+      "nosearch_adv_mean": 0.0642138463625137,
+      "n_search_trajs": 4524,
+      "n_nosearch_trajs": 25314
+    },
+    "C4-format-0.0": {
+      "coefs": {
+        "format": 0.0,
+        "a": 0.02,
+        "b": 0.05,
+        "g": 0.1,
+        "l": 0.1,
+        "m": 0.2
+      },
+      "n_trajs": 29838,
+      "n_groups": 6596,
+      "reward_mean": 0.06108284737582948,
+      "reward_std": 0.2601010075419051,
+      "intra_group_variance_mean": 0.03615534579458932,
+      "all_same_reward_group_ratio": 0.5142510612492419,
+      "search_frac": 0.15161874120249347,
+      "search_adv_mean": -0.3591623522809882,
+      "nosearch_adv_mean": 0.06418782024647193,
+      "n_search_trajs": 4524,
+      "n_nosearch_trajs": 25314
+    },
+    "C5-evidence-driven-a0": {
+      "coefs": {
+        "format": 0.1,
+        "a": 0.0,
+        "b": 0.15,
+        "g": 0.3,
+        "l": 0.2,
+        "m": 0.45
+      },
+      "n_trajs": 29838,
+      "n_groups": 6596,
+      "reward_mean": 0.1446427374488907,
+      "reward_std": 0.2456666564519324,
+      "intra_group_variance_mean": 0.0327872619558992,
+      "all_same_reward_group_ratio": 0.5535172832019406,
+      "search_frac": 0.15161874120249347,
+      "search_adv_mean": -0.4837048364513284,
+      "nosearch_adv_mean": 0.08644547207497075,
+      "n_search_trajs": 4524,
+      "n_nosearch_trajs": 25314
+    },
+    "C6-spam-averse": {
+      "coefs": {
+        "format": 0.1,
+        "a": 0.05,
+        "b": 0.1,
+        "g": 0.2,
+        "l": 0.3,
+        "m": 0.4
+      },
+      "n_trajs": 29838,
+      "n_groups": 6596,
+      "reward_mean": 0.13488337019907504,
+      "reward_std": 0.2570276499137243,
+      "intra_group_variance_mean": 0.03630065338420591,
+      "all_same_reward_group_ratio": 0.5142510612492419,
+      "search_frac": 0.15161874120249347,
+      "search_adv_mean": -0.37517643163529385,
+      "nosearch_adv_mean": 0.06704978180919925,
+      "n_search_trajs": 4524,
+      "n_nosearch_trajs": 25314
+    }
+  },
+  "historical_search_quality": {
+    "valid": 1297,
+    "evidence": 585,
+    "correct": 85,
+    "valid_and_evidence": 585,
+    "correct_with_evidence_search": 41,
+    "searched_total": 4524,
+    "search_steps_total": 4524,
+    "redundant_sum": 0
+  },
+  "note": "coefficient RANGES only, not frozen; see result doc. Advantage direction is a property of historical (off-policy) trajectories, not a prediction for a policy trained under the candidate reward."
+}
