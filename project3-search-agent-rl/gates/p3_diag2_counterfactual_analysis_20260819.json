@@ -1,0 +1,117 @@
+{
+  "n": 256,
+  "base": {
+    "em": {
+      "no-evidence": 22,
+      "real-top3": 30,
+      "oracle": 52,
+      "shuffled": 2
+    },
+    "compliance": {
+      "no-evidence": 125,
+      "real-top3": 174,
+      "oracle": 139,
+      "shuffled": 175
+    },
+    "deltas": {
+      "real-top3 - no-evidence": {
+        "n01": 26,
+        "n10": 18,
+        "p": 0.2912152365458951
+      },
+      "oracle - no-evidence": {
+        "n01": 46,
+        "n10": 16,
+        "p": 0.00017632711255144299
+      },
+      "real-top3 - shuffled": {
+        "n01": 29,
+        "n10": 1,
+        "p": 5.774199962615967e-08
+      }
+    },
+    "oracle": {
+      "evidence_hit": 167,
+      "em_on_hit": "51/167",
+      "em_on_hit_no_evidence": "20/167",
+      "mcnemar_p_on_hit": 6.530630444913366e-05,
+      "em_on_nohit": "1/89"
+    }
+  },
+  "gs300": {
+    "em": {
+      "no-evidence": 48,
+      "real-top3": 68,
+      "oracle": 105,
+      "shuffled": 27
+    },
+    "compliance": {
+      "no-evidence": 256,
+      "real-top3": 255,
+      "oracle": 256,
+      "shuffled": 256
+    },
+    "deltas": {
+      "real-top3 - no-evidence": {
+        "n01": 43,
+        "n10": 23,
+        "p": 0.01865726035402101
+      },
+      "oracle - no-evidence": {
+        "n01": 67,
+        "n10": 10,
+        "p": 1.696740832819895e-11
+      },
+      "real-top3 - shuffled": {
+        "n01": 47,
+        "n10": 6,
+        "p": 5.805322444984995e-09
+      }
+    },
+    "oracle": {
+      "evidence_hit": 167,
+      "em_on_hit": "97/167",
+      "em_on_hit_no_evidence": "39/167",
+      "mcnemar_p_on_hit": 6.9644370929921e-13,
+      "em_on_nohit": "8/89"
+    }
+  },
+  "searchr1": {
+    "em": {
+      "no-evidence": 34,
+      "real-top3": 65,
+      "oracle": 97,
+      "shuffled": 22
+    },
+    "compliance": {
+      "no-evidence": 211,
+      "real-top3": 240,
+      "oracle": 244,
+      "shuffled": 242
+    },
+    "deltas": {
+      "real-top3 - no-evidence": {
+        "n01": 45,
+        "n10": 14,
+        "p": 6.530630444913366e-05
+      },
+      "oracle - no-evidence": {
+        "n01": 73,
+        "n10": 10,
+        "p": 5.800664942039543e-13
+      },
+      "real-top3 - shuffled": {
+        "n01": 49,
+        "n10": 6,
+        "p": 1.822834494458192e-09
+      }
+    },
+    "oracle": {
+      "evidence_hit": 167,
+      "em_on_hit": "93/167",
+      "em_on_hit_no_evidence": "29/167",
+      "mcnemar_p_on_hit": 5.375095844566712e-14,
+      "em_on_nohit": "4/89"
+    }
+  }
+}

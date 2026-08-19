@@ -1,0 +1,83 @@
+{
+  "Base": {
+    "n_search": 124,
+    "n_nosearch": 132,
+    "source_search": {
+      "nq": 30,
+      "hotpotqa": 33,
+      "popqa": 20,
+      "2wikimultihopqa": 10,
+      "triviaqa": 15,
+      "musique": 10,
+      "bamboogle": 6
+    },
+    "source_nosearch": {
+      "nq": 34,
+      "hotpotqa": 31,
+      "popqa": 12,
+      "2wikimultihopqa": 22,
+      "triviaqa": 17,
+      "musique": 6,
+      "bamboogle": 10
+    },
+    "q_len_search_mean": 16.06451612903226,
+    "q_len_nosearch_mean": 15.856060606060606,
+    "multihop_share_search": 0.4274193548387097,
+    "multihop_share_nosearch": 0.44696969696969696,
+    "em_search": "0/124",
+    "em_nosearch": "20/132"
+  },
+  "SearchR1": {
+    "n_search": 40,
+    "n_nosearch": 216,
+    "source_search": {
+      "nq": 11,
+      "hotpotqa": 9,
+      "popqa": 5,
+      "2wikimultihopqa": 9,
+      "triviaqa": 2,
+      "musique": 4
+    },
+    "source_nosearch": {
+      "nq": 53,
+      "hotpotqa": 55,
+      "popqa": 27,
+      "2wikimultihopqa": 23,
+      "triviaqa": 30,
+      "musique": 12,
+      "bamboogle": 16
+    },
+    "q_len_search_mean": 16.5,
+    "q_len_nosearch_mean": 15.856481481481481,
+    "multihop_share_search": 0.55,
+    "multihop_share_nosearch": 0.4166666666666667,
+    "em_search": "0/40",
+    "em_nosearch": "32/216"
+  },
+  "Step300": {
+    "n_search": 0,
+    "n_nosearch": 256,
+    "source_search": {},
+    "source_nosearch": {
+      "nq": 64,
+      "hotpotqa": 64,
+      "popqa": 32,
+      "2wikimultihopqa": 32,
+      "triviaqa": 32,
+      "musique": 16,
+      "bamboogle": 16
+    },
+    "q_len_search_mean": null,
+    "q_len_nosearch_mean": 15.95703125,
+    "multihop_share_search": null,
+    "multihop_share_nosearch": 0.4375,
+    "em_search": "0/0",
+    "em_nosearch": "49/256"
+  },
+  "base_em_on_searchr1_searched": "4/40",
+  "base_em_on_step300_searched": "0/0",
+  "oracle_em_on_searchr1_searched_subset": "15/25",
+  "oracle_em_on_gs300_searched_subset": "0/0",
+  "oracle_em_on_base_searched_subset": "25/79",
+  "note": "Exploratory selection-bias material (prereg s4): searched questions being harder is selection bias, not proof search is useless."
+}

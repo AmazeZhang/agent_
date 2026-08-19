@@ -93,8 +93,10 @@ def main() -> None:
         print(f"\n=== {m}: search={n_s}, no-search={n_ns} ===")
         print(f"  source search: {dict(src_s)}")
         print(f"  source no-search: {dict(src_ns)}")
-        print(f"  q-len mean search={row['q_len_search_mean']:.1f} no-search={row['q_len_nosearch_mean']:.1f}")
-        print(f"  multi-hop share search={row['multihop_share_search']:.2f} no-search={row['multihop_share_nosearch']:.2f}")
+        print(f"  q-len mean search={row['q_len_search_mean'] if row['q_len_search_mean'] is not None else 'n/a'} "
+              f"no-search={row['q_len_nosearch_mean']:.1f}")
+        print(f"  multi-hop share search={row['multihop_share_search'] if row['multihop_share_search'] is not None else 'n/a'} "
+              f"no-search={row['multihop_share_nosearch']:.2f}")
         print(f"  EM search={em_s}/{n_s}, EM no-search={em_ns}/{n_ns}")
 
     # Base direct-answer EM on the SearchR1 searched subset (selection bias)

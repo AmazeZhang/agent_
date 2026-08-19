@@ -94,6 +94,12 @@
         "success_with_evidence": 24
       },
       "empty_query": 0
+    },
+    "Step300": {
+      "search_steps": 0,
+      "statuses": {},
+      "classes": {},
+      "empty_query": 0
     }
   }
 }

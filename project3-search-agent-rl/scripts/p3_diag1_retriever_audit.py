@@ -36,7 +36,7 @@ OUT_PATH = Path("/home/imc/yzy/agent/project3-search-agent-rl/gates/p3_diag1_ret
 MODEL_RUNS = {
     "Base": "p3-eval-official-confirm256-base3b-s0-20260815a",
     "SearchR1": "p3-eval-official-confirm256-official3b-s0-20260815a",
-    "Step300": None,  # dev256 episodes generated in a later GPU1 managed run
+    "Step300": "p3-eval-official-confirm256-gs300-20260819a",
 }
 
 
