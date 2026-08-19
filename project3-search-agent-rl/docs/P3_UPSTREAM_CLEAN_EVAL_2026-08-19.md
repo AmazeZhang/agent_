@@ -1,8 +1,17 @@
-# P3 干净 upstream 20bd331b 评测：管线交付与 smoke-16 结果（2026-08-19）
+# P3 干净 upstream 20bd331b 评测：管线交付与官方模型评测（2026-08-19）
 
-状态：**评测管线完成并验证**；GPU1 smoke-16 跑通但 **fail-closed 生效**——官方 3B
-GRPO checkpoint 在干净上游语义 + greedy 下 16/16 条第 1 轮直接 `<answer>`、零搜索、
-EM 0/16。该结果是**模型行为**（非管线缺陷），管线各环节已与上游训练逐行对齐验证。
+状态：**评测管线完成并验证**。首轮 smoke-16 使用了**错误的模型**（自训 Step300
+`p3-formal-segment-100-300-gs300-merged-20260817b`，其 greedy 零搜索是**已知坍缩**，
+不能回答官方模型行为问题）——该结果已更正，见 §4/§5。以下评测以**真官方
+Search-R1 checkpoint**（`SearchR1-nq_hotpotqa_train-qwen2.5-3b-em-grpo`）进行。
+
+## 0. 更正：模型身份（用户指正，2026-08-19）
+
+首版 smoke-16（run p3-eval-upstream-clean-smoke16-20260819a）误把自训模型
+`p3-formal-segment-100-300-gs300-merged-20260817b`（Step300）当作官方
+Search-R1 3B checkpoint。该模型 greedy 零搜索属**训练坍缩**，不能代表官方
+模型行为；原 §4 中"官方 checkpoint 在 greedy 下从不搜索"的表述作废。管线本身
+（门禁、生成、env 交互、记录、fail-closed）不受影响，协议对齐验证（§1）仍成立。
 
 ## 1. 评测管线（commit f65c929，已推送）
 
@@ -41,47 +50,48 @@ clean tree pin 20bd331b + `status --porcelain` 空 + 全树无 `search_aware_ste
 /health 21,015,324 向量 ready；数据 SHA256 与 manifest 一致；smoke 16 条 ∩ 训练 0
 重叠；VLLM_USE_V1=0（训练 rollout 引擎路径）。
 
-## 2. smoke-16 结果（run p3-eval-upstream-clean-smoke16-20260819a，GPU1）
+## 2. 首轮 smoke-16（自训 Step300，已更正，保留作历史）
 
-- 16 条全部第 1 轮输出 `<think>…</think>\n<answer>…</answer>`（raw action 完整，
-  无截断：len 85–241，16/16 含闭合标签）；
-- **16/16 条 raw action 中从未出现 `<search>` 标签**（零搜索倾向）；
-- 全部第 1 轮即 done（`<answer>` 双标签）→ 无第二轮；
-- EM = 0/16（模型直接回答且全部幻觉答错）；
-- `check_round2_prompts` → `checked_episodes=0`（无"第 1 步搜索且继续"的 episode）→
-  **fail-closed 生效，脚本 exit 2，confirm-256 未启动**（按用户流程设计）。
+run p3-eval-upstream-clean-smoke16-20260819a（模型 = 自训
+`p3-formal-segment-100-300-gs300-merged-20260817b`）：16/16 条第 1 轮直接
+`<answer>`、零搜索、EM 0/16、`checked_episodes=0` → fail-closed exit 2。该行为
+是**自训模型的已知坍缩**，不反映官方模型。管线在此 run 上验证通过（门禁、
+生成、env 交互、记录、fail-closed 全按设计）。
 
-## 3. 交叉验证：不是管线缺陷
+## 3. 官方模型资产指纹（启动前记录，2026-08-19）
 
-| 项 | official 线（此前 confirm256-gs50） | 本干净线 smoke-16 |
-|---|---|---|
-| prompt | 裸问题（`_sync_reset` 原样返回 question） | SEARCH_TEMPLATE_NO_HIS |
-| 第 1 轮直接 `<answer>` | 218/256（85%） | 16/16（100%） |
-| 出现 `<search>` 标签 | **0 次**（38 条"tool_calling"为无格式开放文本，query=None → 工具 error） | 0 次 |
-| EM | 30/256 = 11.7% | 0/16 |
+- 绝对路径：`/media/imc/data/project3-search-agent-rl/models/SearchR1-nq_hotpotqa_train-qwen2.5-3b-em-grpo`
+- `config.json` SHA256：`b27a7aadfdb9c5967ccb48edb034c6dc7edddc8c0600e9e9d47db3f445a39fcd`
+- 权重 SHA256：
+  - `model-00001-of-00003.safetensors` `7ac54e1b9762c3c6d639da28a2cca177fe7db092ff5cf6e5a9a7849a36a9dabf`
+  - `model-00002-of-00003.safetensors` `98b373c4a6805af7723f2b31a5e72a919f4d7c021b6f4e67d91f579a08db8c67`
+  - `model-00003-of-00003.safetensors` `f1607045409131e298ad87b485a7fb74d02891178a0106a2df79cf8daf7b2c54`
+  - `model.safetensors.index.json` `3a899e7f6ef595e15c34b5ffc7e4a1df6131d7c371418b1a6e8f823ab8a7302d`
+- 结构：Qwen2.5-3B（36 层 / 16 heads / 2 kv heads / hidden 2048 / vocab 151936 /
+  tie_word_embeddings），`_name_or_path=Qwen/Qwen2.5-3B`
+- wrapper 默认 `PROJECT3_EVAL_MODEL` 已改为该官方模型；指纹写入 wrapper 注释与
+  results.json（model_path）。
 
-- 两条线独立实现（raw action 直进 env vs 完整 manager+投影），**官方 checkpoint
-  greedy 解码下从不按格式搜索**为一致结论；
-- 训练第一轮 prompt 即 SEARCH_TEMPLATE_NO_HIS（含"可以搜索"的措辞），但 greedy
-  收敛到最高概率路径 = 直接回答（GRPO 模型在确定性解码下的已知倾向）；
-- 此前 official 线 19.1% EM（49/256）同为第 1 轮直接答对的子集，与搜索无关。
+## 4. 官方模型评测计划（2026-08-19 起，用户指令）
 
-## 4. 结论与待决策
+1. **greedy 主评测 smoke-16**（temperature=0，run 前缀
+   `p3-eval-upstream-clean-official-smoke16-*`）：round-2 prompt 检查（原问题 +
+   search query + information）通过 → 进 confirm-256；
+2. **行为诊断**（同 16 题，temperature=1、每题 5 rollout、固定 seed：
+   rollout i 用 seed 0+i）：验证"搜索→answer→correct"链路是否存在，策略支持
+   性质，**不设 fail-closed 门**；
+3. 两组均报告 **search→answer / search→correct**（episode 粒度 + per-question
+   聚合）；greedy 仍是主评测口径，采样只作策略支持诊断；
+4. 不启动任何训练、不修改自研 Reward；patch 0009 不进行。
 
-- **评测管线本身已交付并验证**（门禁、生成、env 交互、记录、fail-closed 全部按
-  设计工作）；
-- 用户要求的"第二轮 prompt 含原问题 + search query + information"检查**无检查对象**
-  （模型不搜索）——这是官方 checkpoint 在 greedy 下的真实基线行为；
-- 待用户决策（不启动任何训练、不修改自研 Reward）：
-  - A. 保持 greedy 直接跑 confirm-256：获得 256 条规模 EM 基线（预期 ≈ 直接答对率，
-    搜索链路指标如实报告为 0/不存在）；
-  - B. 采样（temperature>0）重试 smoke：验证"搜索→answer→correct"链路是否存在
-    （改评测解码口径，需批准）；
-  - C. 暂停，先确认官方 checkpoint 的预期行为/训练设置。
+## 5. 待填结果（官方模型跑完后回填）
 
-## 5. 资源状态
+- greedy smoke-16 / 行为诊断 / confirm-256 结果与指标。
 
-- 评测进程正常退出（exit 2，fail-closed 路径），GPU1 回 18MiB 基线，无残留进程；
+## 6. 资源状态
+
+- 首轮 smoke-16（Step300）正常退出（exit 2，fail-closed 路径），GPU1 回 18MiB
+  基线，无残留进程；
 - run 目录完整：`runs/p3-eval-upstream-clean-smoke16-20260819a/`（results.json +
   episodes.jsonl + metadata.env + stdout/stderr.log）；
 - Retriever 未受影响（21,015,324 向量就绪）。

@@ -303,6 +303,41 @@ def aggregate_metrics(episodes: list[dict[str, Any]]) -> dict[str, Any]:
             no_search_episodes += 1
             no_search_correct += 1 if episode["reward"] >= 1.0 else 0
 
+    # Per-question aggregation (rollout-level, e.g. behaviour diagnosis with
+    # num_rollouts=5): a question counts as searched/answered/correct if ANY of
+    # its rollouts satisfies the condition.
+    per_question: dict[int, dict[str, Any]] = {}
+    for episode in episodes:
+        qid = episode.get("question_id", 0)
+        bucket = per_question.setdefault(
+            qid,
+            {
+                "n": 0,
+                "searched": 0,
+                "answered": 0,
+                "correct": 0,
+                "search_success": 0,
+            },
+        )
+        bucket["n"] += 1
+        episode_searched = any(
+            step_search_query(step) is not None for step in episode["steps"]
+        )
+        episode_answered = bool(episode["offline"]["has_answer"])
+        episode_correct = episode["reward"] >= 1.0
+        if episode_searched:
+            bucket["searched"] += 1
+            if any(step_search_succeeded(step) for step in episode["steps"]):
+                bucket["search_success"] += 1
+        if episode_answered:
+            bucket["answered"] += 1
+        if episode_correct:
+            bucket["correct"] += 1
+    n_questions = len(per_question)
+    questions_searched = sum(1 for b in per_question.values() if b["searched"] > 0)
+    questions_answered = sum(1 for b in per_question.values() if b["answered"] > 0)
+    questions_correct = sum(1 for b in per_question.values() if b["correct"] > 0)
+
     def rates(bucket: dict[str, Any]) -> dict[str, float]:
         n = max(bucket["n"], 1)
         return {
@@ -312,6 +347,23 @@ def aggregate_metrics(episodes: list[dict[str, Any]]) -> dict[str, Any]:
         }
 
     return {
+        "per_question": {
+            "n_questions": n_questions,
+            "questions_searched": questions_searched,
+            "questions_searched_rate": questions_searched / max(n_questions, 1),
+            "questions_answered": questions_answered,
+            "questions_answered_rate": questions_answered / max(n_questions, 1),
+            "questions_correct": questions_correct,
+            "questions_correct_rate": questions_correct / max(n_questions, 1),
+            "search_to_answer_question_level": sum(
+                1 for b in per_question.values() if b["searched"] > 0 and b["answered"] > 0
+            )
+            / max(questions_searched, 1),
+            "search_to_correct_question_level": sum(
+                1 for b in per_question.values() if b["searched"] > 0 and b["correct"] > 0
+            )
+            / max(questions_searched, 1),
+        },
         "overall": {
             "n": len(episodes),
             "em": sum(b["em"] for b in per_source.values()),
@@ -413,7 +465,13 @@ def build_engine(tokenizer, args: argparse.Namespace) -> vllm.LLM:
     return vllm.LLM(**engine_kwargs)
 
 
-def generate_actions(llm: vllm.LLM, tokenizer, prompts: list[str], args: argparse.Namespace) -> list[str]:
+def generate_actions(
+    llm: vllm.LLM, tokenizer, prompts: list[str], seeds: list[int], args: argparse.Namespace
+) -> list[str]:
+    """Generate one action per prompt. In diagnose mode (temperature>0) each
+    rollout carries a FIXED per-rollout seed (args.seed + rollout index), so the
+    whole behaviour-diagnosis run is reproducible. In main mode (temperature=0)
+    the seed is irrelevant (greedy)."""
     chats = [
         tokenizer.apply_chat_template(
             [{"role": "user", "content": prompt}],
@@ -430,13 +488,17 @@ def generate_actions(llm: vllm.LLM, tokenizer, prompts: list[str], args: argpars
         max_length=args.max_input_tokens,
     )
     prompt_token_ids = inputs["input_ids"]
-    sampling_params = vllm.SamplingParams(
-        temperature=0.0,
-        top_p=1.0,
-        top_k=-1,
-        max_tokens=args.max_new_tokens,
-        ignore_eos=False,
-    )
+    sampling_params = [
+        vllm.SamplingParams(
+            temperature=args.temperature,
+            top_p=1.0,
+            top_k=-1,
+            max_tokens=args.max_new_tokens,
+            ignore_eos=False,
+            seed=seed,
+        )
+        for seed in seeds
+    ]
     outputs = llm.generate(
         prompt_token_ids=prompt_token_ids,
         sampling_params=sampling_params,
@@ -482,6 +544,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-input-tokens", type=int, default=3072)
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="decoding temperature: 0.0 = greedy main evaluation; >0 = behaviour diagnosis",
+    )
+    parser.add_argument(
+        "--num-rollouts",
+        type=int,
+        default=1,
+        help="rollouts per question (main mode: 1; behaviour diagnosis: 5). "
+        "Each rollout i uses seed = --seed + i for reproducibility.",
+    )
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
@@ -503,6 +578,17 @@ def main() -> int:
     data_hash = verify_data_hash(args.data_files, args.manifest, args.manifest_key)
 
     records = load_eval_records(args.data_files)
+    if args.num_rollouts < 1:
+        raise ValueError(f"--num-rollouts must be >= 1, got {args.num_rollouts}")
+    main_mode = args.temperature == 0.0 and args.num_rollouts == 1
+    # Behaviour diagnosis (num_rollouts>1): replicate each question, tagging
+    # the rollout index; each rollout i is seeded with --seed + i so the whole
+    # run is reproducible. Main mode (greedy, 1 rollout): no replication.
+    expanded: list[dict[str, Any]] = []
+    for question_index, record in enumerate(records):
+        for rollout_index in range(args.num_rollouts):
+            expanded.append({**record, "question_id": question_index, "rollout_index": rollout_index})
+    records = expanded
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     torch.backends.cuda.matmul.allow_tf32 = False
@@ -521,6 +607,8 @@ def main() -> int:
             "question": record["question"],
             "answers": record["answers"],
             "source": record["data_source"],
+            "question_id": record["question_id"],
+            "rollout_index": record["rollout_index"],
             "steps": [],
             "reward": 0.0,
             "done": False,
@@ -581,7 +669,11 @@ def main() -> int:
                     if not active_before.any():
                         break
                     generation_started = time.monotonic()
-                    raw_actions = generate_actions(llm, tokenizer, observations["text"], args)
+                    seeds = [
+                        args.seed + batch_records[local_index]["rollout_index"]
+                        for local_index in range(len(batch_records))
+                    ]
+                    raw_actions = generate_actions(llm, tokenizer, observations["text"], seeds, args)
                     projected_actions, valids = search_projection(raw_actions)
                     next_observations, rewards, step_done, infos = manager.step(raw_actions)
                     generation_seconds = time.monotonic() - generation_started
@@ -687,6 +779,8 @@ def main() -> int:
         "logical_cuda_device": torch.cuda.get_device_name(0),
         "parameters": {
             "seed": args.seed,
+            "temperature": args.temperature,
+            "num_rollouts": args.num_rollouts,
             "max_steps": args.max_steps,
             "history_length": args.history_length,
             "topk": args.topk,
@@ -694,6 +788,7 @@ def main() -> int:
             "max_envs_per_batch": args.max_envs_per_batch,
             "max_input_tokens": args.max_input_tokens,
             "max_new_tokens": args.max_new_tokens,
+            "main_mode": main_mode,
         },
         "metrics": metrics,
         "prompt_check": prompt_check,
@@ -715,8 +810,12 @@ def main() -> int:
             print(json.dumps(failure, ensure_ascii=False))
     print(f"output={output_path}")
     print(f"episodes={episodes_path}")
-    # Fail-closed: smoke-16 must PASS the round-2 prompt check before confirm-256.
-    if not prompt_check["passed"]:
+    print(f"main_mode={main_mode}")
+    # Fail-closed gate applies ONLY to main mode (greedy, 1 rollout): smoke-16
+    # must PASS the round-2 prompt check before confirm-256. Behaviour
+    # diagnosis (temperature>0 / num_rollouts>1) is a strategy-support probe:
+    # it reports the same metrics but never blocks.
+    if main_mode and not prompt_check["passed"]:
         print("SMOKE GATE FAILED: round-2 prompt check not satisfied (checked_episodes >= 1 and all three components present)", file=sys.stderr)
         return 2
     return 0

@@ -12,8 +12,10 @@
 #
 # Usage (must run inside run_managed.sh via start_tmux_run.sh):
 #   PROJECT3_EVAL_DATA=smoke|official-confirm256-v1
-#   PROJECT3_EVAL_MODEL=<absolute path to full model dir>   (default: official 3B GRPO merged checkpoint)
+#   PROJECT3_EVAL_MODEL=<absolute path to full model dir>   (default: official Search-R1 3B checkpoint)
 #   PROJECT3_EVAL_TOKENIZER=<absolute path to tokenizer>    (default: Qwen2.5-3B BASE tokenizer)
+#   PROJECT3_EVAL_TEMPERATURE=<0.0 greedy main | >0 diagnosis>   (default: 0.0)
+#   PROJECT3_EVAL_NUM_ROLLOUTS=<1 main | 5 diagnosis>            (default: 1)
 #   bash scripts/run_p3_eval_upstream_clean.sh
 #
 # --tokenizer is pinned to the Qwen2.5-3B BASE tokenizer so that Base and the
@@ -53,10 +55,17 @@ fi
 data_root="${PROJECT3_DATA_ROOT:-/media/imc/data}"
 project_data="${data_root}/project3-search-agent-rl"
 python_bin="${project_data}/envs/searchr1-repro-cu124/bin/python"
-model_path="${PROJECT3_EVAL_MODEL:-${project_data}/models/p3-formal-segment-100-300-gs300-merged-20260817b}"
+# TRUE official Search-R1 3B checkpoint (Search-R1 official repo model,
+# nq+hotpotqa train, EM reward). NOT the self-trained Step300 model.
+# Fingerprint recorded before any run: config.json SHA
+# b27a7aadfdb9c5967ccb48edb034c6dc7edddc8c0600e9e9d47db3f445a39fcd, weight
+# shards 7ac54e1b…/98b373c4…/f1607045… (see docs/P3_UPSTREAM_CLEAN_EVAL_2026-08-19.md).
+model_path="${PROJECT3_EVAL_MODEL:-${project_data}/models/SearchR1-nq_hotpotqa_train-qwen2.5-3b-em-grpo}"
 # Fixed: the BASE tokenizer renders inputs for BOTH models (see above).
 tokenizer_path="${PROJECT3_EVAL_TOKENIZER:-${project_data}/models/Qwen2.5-3B}"
 eval_data="${PROJECT3_EVAL_DATA:-smoke}"
+eval_temperature="${PROJECT3_EVAL_TEMPERATURE:-0.0}"
+eval_num_rollouts="${PROJECT3_EVAL_NUM_ROLLOUTS:-1}"
 retriever_url="${PROJECT3_RETRIEVER_URL:-http://127.0.0.1:18080/retrieve}"
 run_dir="${PROJECT3_RUN_DIR:-${project_data}/dry-run/p3-eval-upstream-clean}"
 
@@ -148,4 +157,5 @@ exec "$python_bin" "${script_dir}/run_p3_eval_upstream_clean.py" \
   --search-url "$retriever_url" \
   --max-steps 4 --history-length 4 --topk 3 --timeout 180 \
   --max-input-tokens 3072 --max-new-tokens 256 --seed 0 \
+  --temperature "$eval_temperature" --num-rollouts "$eval_num_rollouts" \
   --max-envs-per-batch 24

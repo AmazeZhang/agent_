@@ -170,7 +170,7 @@ class TestSearchEnvironmentManager:
         assert "is_action_valid" in infos[0]
 
 
-def make_episode(question="What is the capital of France?", searched=True, correct=True, answer_present=True):
+def make_episode(question="What is the capital of France?", searched=True, correct=True, answer_present=True, question_id=0, rollout_index=0):
     steps = []
     if searched:
         steps.append(
@@ -217,6 +217,8 @@ def make_episode(question="What is the capital of France?", searched=True, corre
         "question": question,
         "answers": ["Paris"],
         "source": "test",
+        "question_id": question_id,
+        "rollout_index": rollout_index,
         "steps": steps,
         "reward": final_reward,
         "done": True,
@@ -340,6 +342,25 @@ class TestAggregateMetrics:
         metrics = eval_mod.aggregate_metrics([episode])
         assert metrics["per_source"]["hotpotqa"]["n"] == 1
         assert metrics["per_source"]["hotpotqa"]["em_rate"] == 1.0
+
+    def test_per_question_diagnosis_aggregation(self):
+        # 2 questions x 2 rollouts: q0 searches (rollout0 correct, rollout1
+        # wrong), q1 never searches (rollout0 correct).
+        episodes = [
+            make_episode(question_id=0, rollout_index=0, searched=True, correct=True),
+            make_episode(question_id=0, rollout_index=1, searched=True, correct=False, answer_present=False),
+            make_episode(question_id=1, rollout_index=0, searched=False, correct=True),
+            make_episode(question_id=1, rollout_index=1, searched=False, correct=False, answer_present=False),
+        ]
+        metrics = eval_mod.aggregate_metrics(episodes)
+        pq = metrics["per_question"]
+        assert pq["n_questions"] == 2
+        assert pq["questions_searched"] == 1
+        assert pq["questions_answered"] == 2
+        assert pq["questions_correct"] == 2
+        # q0 (searched): answered via rollout0, correct via rollout0.
+        assert pq["search_to_answer_question_level"] == 1.0
+        assert pq["search_to_correct_question_level"] == 1.0
 
 
 class TestOfflineRescore:
