@@ -147,10 +147,65 @@ class V1IrrelevantAndLeakGatesTest(unittest.TestCase):
     # the tests, per Phase 4B requirement 3)
     def test_short_aliases_excluded_from_leak_rule(self):
         aliases = valid_aliases(["P", "", "pa", "paris"])
-        self.assertNotIn("p", aliases)
-        self.assertNotIn("", aliases)
-        self.assertEqual(len(aliases), 2)
+        self.assertEqual(aliases, [["pa"], ["paris"]])
         self.assertEqual(answer_leak_in_query("P xyz", aliases, QUESTION)["leak"], False)
+
+
+class V1AliasTokenBoundaryTest(unittest.TestCase):
+    """Phase 4B.1 item 4: token-boundary alias matching.
+
+    Two-character aliases hit ONLY as standalone tokens -- never inside a
+    longer word ("it" in "britain", "us" in "museum"). Multi-word aliases are
+    contiguous token phrases with whitespace/punctuation folded. Question
+    exclusion is per-phrase on the same token basis.
+    """
+
+    # negative: "it" never matches inside "britain"
+    def test_two_char_alias_it_never_hits_inside_britain(self):
+        self.assertFalse(evidence_hit_in_docs("Britain is an island in the Atlantic", [["it"]]))
+        # same for the leak rule: the query contains "britain", not the token "it"
+        self.assertEqual(answer_leak_in_query("britain capital", [["it"]], QUESTION)["leak"], False)
+
+    # negative: "us" never matches inside "museum" (or any other longer word)
+    def test_two_char_alias_us_never_hits_inside_museum(self):
+        self.assertFalse(evidence_hit_in_docs("The museum opens at nine", [["us"]]))
+        self.assertEqual(answer_leak_in_query("museum hours", [["us"]], QUESTION)["leak"], False)
+        # "usa" is a different token than "us"
+        self.assertFalse(evidence_hit_in_docs("USA is a country", [["us"]]))
+
+    # positive: "US" as a standalone token DOES hit (case-insensitive)
+    def test_us_standalone_token_hits(self):
+        self.assertTrue(evidence_hit_in_docs("US economy grew last quarter", [["us"]]))
+        leak = answer_leak_in_query("US GDP report", [["us"]], QUESTION)
+        self.assertEqual(leak, {"leak": True, "alias": "us"})
+        # the same token already present in the question is NOT a new leak
+        self.assertEqual(
+            answer_leak_in_query("US GDP report", [["us"]], "What was the US GDP in 2023?")["leak"], False
+        )
+
+    # multi-word aliases: contiguous token phrase, punctuation/whitespace folded
+    def test_multi_word_alias_is_contiguous_token_phrase(self):
+        alias = [["the", "city", "of", "lights"]]
+        self.assertTrue(evidence_hit_in_docs("the city of lights shines", alias))
+        self.assertTrue(evidence_hit_in_docs("The City—of—Lights is a nickname.", alias))
+        self.assertFalse(evidence_hit_in_docs("the city shines with bright lights", alias))  # not contiguous
+        leak = answer_leak_in_query("the city of lights parade", alias, QUESTION)
+        self.assertEqual(leak, {"leak": True, "alias": "the city of lights"})
+        # alias already present in the question is not a leak
+        self.assertEqual(
+            answer_leak_in_query("the city of lights parade", alias, "Where is the city of lights?")["leak"],
+            False,
+        )
+
+    # two-char alias inside a multi-word phrase matches its OWN token only
+    def test_two_char_alias_in_phrase_matches_own_token(self):
+        self.assertTrue(evidence_hit_in_docs("us states number fifty", [["us", "states"]]))
+        self.assertFalse(evidence_hit_in_docs("states of us", [["us", "states"]]))  # reversed, not phrase
+        self.assertFalse(evidence_hit_in_docs("museum states", [["us", "states"]]))  # "us" not its own token
+
+    # case-insensitive single-token alias still matches across case
+    def test_single_token_alias_case_insensitive(self):
+        self.assertTrue(evidence_hit_in_docs("PARIS is the capital", [["paris"]]))
 
 
 class V1InvalidAndNoSearchTest(unittest.TestCase):

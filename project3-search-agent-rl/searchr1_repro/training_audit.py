@@ -51,6 +51,12 @@ def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, mult
     token_level_scores = (
         batch["token_level_scores"].detach().cpu() if "token_level_scores" in batch else None
     )
+    # P3 v1 trajectory-return GRPO (patch 0008): per-record trajectory advantage.
+    # In v1 trajectory-return mode the SAME trajectory advantage is broadcast to
+    # every valid token of every record of the trajectory, so the max over the
+    # response part IS the trajectory advantage (masked/padded tokens are 0).
+    # In default mode it is informational (max per-token advantage).
+    advantages = batch["advantages"].detach().cpu() if "advantages" in batch else None
     prompt_width = prompts.shape[1]
     response_width = responses.shape[1]
     if input_ids.shape[1] != prompt_width + response_width:
@@ -68,9 +74,10 @@ def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, mult
 
     selected_metadata = (
         "uid", "traj_uid", "env_step", "retrieval", "retrieval_failed", "is_action_valid",
-        # P3 v1 (patch 0007): per-step shaping components + per-episode component
-        # totals, for offline replay verification and sum-consistency checks.
-        "search_v1", "search_v1_episode",
+        # P3 v1 (patch 0007): per-step shaping components + per-trajectory
+        # component totals, for offline replay verification and sum-consistency
+        # checks. search_v1_group (patch 0008) is the informational per-uid rollup.
+        "search_v1", "search_v1_episode", "search_v1_group",
     )
     records = []
     for index in range(input_ids.shape[0]):
@@ -101,6 +108,9 @@ def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, mult
                 "policy_loss_mask": full_policy_mask.tolist(),
                 "record_score": (
                     float(token_level_scores[index].sum()) if token_level_scores is not None else None
+                ),
+                "trajectory_advantage": (
+                    float(advantages[index].max()) if advantages is not None else None
                 ),
                 "metadata": metadata,
             }

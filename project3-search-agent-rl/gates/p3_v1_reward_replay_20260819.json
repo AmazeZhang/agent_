@@ -5,12 +5,12 @@
       "pass": true,
       "mean_useful_cents": 145.0,
       "mean_direct_cents": 100.0,
-      "n_useful": 34,
+      "n_useful": 30,
       "n_direct": 12928
     },
     "2_irrelevant_search_correct_le_direct": {
       "pass": true,
-      "n_members": 51,
+      "n_members": 55,
       "max_cents": 100,
       "n_excess": 0
     },
@@ -29,38 +29,128 @@
     "5_invalid_lt_format_wrong_lt_direct": {
       "pass": true,
       "mean_invalid_cents": -20.0,
-      "mean_format_cents": 10.036875500680289,
+      "mean_format_cents": 10.036048980837455,
       "mean_direct_cents": 100.0,
       "n_invalid": 2411,
       "n_format": 78643
+    },
+    "6_useful_search_records_positive_adv": {
+      "pass": true,
+      "useful_search_record_adv_mean": 1.5229479119873444,
+      "n_useful": 30
+    },
+    "7_useful_gt_direct_trajectory_adv": {
+      "pass": true,
+      "useful_traj_adv_mean": 1.5229479119873444,
+      "direct_traj_adv_mean": 0.5836390582271298
+    },
+    "8_irrelevant_not_above_direct_in_group": {
+      "pass": true,
+      "n_violations": 0,
+      "samples": [],
+      "irrelevant_traj_adv_mean": 0.6309394253298454,
+      "direct_traj_adv_mean": 0.5836390582271298,
+      "note": "class means are cross-group composition artifacts; the gate is the matched in-group max comparison"
+    },
+    "9_leak_not_above_direct_in_group": {
+      "pass": true,
+      "n_violations": 0,
+      "samples": [],
+      "leak_traj_adv_mean": null,
+      "direct_traj_adv_mean": 0.5836390582271298
+    },
+    "10_no_traj_uid_across_uids": {
+      "pass": true,
+      "n_uid_crossing_in_load": 0,
+      "n_duplicate_traj_uid_across_uids": 0,
+      "group_size_distribution": {
+        "1": 35,
+        "2": 201,
+        "3": 567,
+        "4": 1385,
+        "5": 17608
+      },
+      "n_groups_not_exactly_5": 2188
+    },
+    "11_null_hit_rate_lt_real_hit_rate": {
+      "pass": true,
+      "n_searched_episodes": 4630,
+      "n_search_steps": 4630,
+      "real_hit_rate": 0.12267818574514039,
+      "null_hit_rate_token_rule": 0.005183585313174946,
+      "null_hit_rate_old_substring_rule": 0.012742980561555076,
+      "oracle_hit_rate_diag2_confirm256_context": 0.65234375
     }
   },
-  "group_stats": {
-    "n_trajs": 95718,
+  "trainer_exact_grpo": {
     "n_groups": 19796,
-    "reward_mean": 0.21313389331160285,
-    "reward_std": 0.3166540123459563,
-    "intra_group_variance_mean": 0.03408718834893693,
-    "all_same_reward_group_ratio": 0.696958981612447,
-    "search_frac": 0.04837125723479387,
-    "search_adv_mean": -0.5816290725864413,
-    "nosearch_adv_mean": 0.029564186348094393,
-    "n_search_trajs": 4630,
-    "n_nosearch_trajs": 91088
+    "group_size_distribution": {
+      "1": 35,
+      "2": 201,
+      "3": 567,
+      "4": 1385,
+      "5": 17608
+    },
+    "n_groups_not_exactly_5": 2188,
+    "groups_not_exactly_5_sample": [
+      "000b41e6-b403-4e79-af22-4ac91d18de32",
+      "001d5e80-ca6a-4c5d-92fd-5d12a6e231f7",
+      "0024d935-cceb-4f42-8f96-40d1e4f5ec75",
+      "00289f64-3972-4577-ba5e-312a486cdfcf",
+      "008a5b53-f7cc-4e06-bb83-2df786f34b4f"
+    ],
+    "n_duplicate_traj_uid_across_uids": 0,
+    "duplicate_traj_uid_sample": [],
+    "class_trajectory_adv": {
+      "useful_search_correct": {
+        "n": 30,
+        "traj_adv_mean": 1.5229479119873444,
+        "search_record_adv_mean": 1.5229479119873444
+      },
+      "direct_correct": {
+        "n": 12928,
+        "traj_adv_mean": 0.5836390582271298,
+        "search_record_adv_mean": null
+      },
+      "irrelevant_search_correct": {
+        "n": 55,
+        "traj_adv_mean": 0.6309394253298454,
+        "search_record_adv_mean": 0.6309394253298454
+      },
+      "answer_leak_correct": {
+        "n": 0,
+        "traj_adv_mean": null,
+        "search_record_adv_mean": null
+      },
+      "invalid_no_answer": {
+        "n": 2411,
+        "traj_adv_mean": -0.8859629413620453,
+        "search_record_adv_mean": -0.8859629413620453
+      }
+    }
   },
+  "alias_null_hit": {
+    "n_searched_episodes": 4630,
+    "n_search_steps": 4630,
+    "real_hit_rate": 0.12267818574514039,
+    "null_hit_rate_token_rule": 0.005183585313174946,
+    "null_hit_rate_old_substring_rule": 0.012742980561555076,
+    "oracle_hit_rate_diag2_confirm256_context": 0.65234375
+  },
+  "uid_crossing_violations": [],
   "component_totals_cents": {
     "answer_reward_c": 1301300,
     "format_reward_c": 794780,
-    "evidence_hit_reward_c": 8835,
-    "searched_correct_bonus_c": 1020,
+    "evidence_hit_reward_c": 8400,
+    "searched_correct_bonus_c": 900,
     "invalid_penalty_c": -65620,
     "redundant_penalty_c": 0,
-    "answer_leak_penalty_c": -240
+    "answer_leak_penalty_c": -160
   },
   "component_trigger_counts": {
-    "episodes_with_evidence_credit": 589,
-    "episodes_with_evidence_effective": 589,
-    "episodes_with_leak": 12,
+    "episodes_with_evidence_credit": 560,
+    "episodes_with_evidence_effective": 560,
+    "episodes_with_leak": 8,
     "episodes_with_invalid": 3281,
     "episodes_with_redundant_search": 0,
     "search_steps_total": 4630,
@@ -74,8 +164,8 @@
   },
   "class_sizes": {
     "direct_correct": 12928,
-    "useful_search_correct": 34,
-    "irrelevant_search_correct": 51,
+    "useful_search_correct": 30,
+    "irrelevant_search_correct": 55,
     "answer_leak_search_correct": 0,
     "redundant_search_correct": 0,
     "invalid_no_answer": 2411,

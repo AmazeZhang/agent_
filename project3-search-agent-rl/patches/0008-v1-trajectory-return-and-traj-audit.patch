@@ -1,0 +1,345 @@
+--- a/agent_system/environments/env_package/search/envs.py
++++ b/agent_system/environments/env_package/search/envs.py
+@@ -79,6 +79,12 @@
+         for idx in range(self.batch_size):
+             cfg_i = deepcopy(search_cfg)
+             cfg_i.search_url = search_urls[idx % n_clients]
++            # P3 patch 0008: SearchEnv reads the v1 flag from ITS OWN per-env
++            # config (a deepcopy of env.search); propagate the top-level
++            # env.search_aware_step_reward=true here, or the flag never reaches
++            # the env and the reward manager's fail-closed check aborts every
++            # step of a v1 run.
++            cfg_i.search_aware_step_reward = bool(getattr(env_config, "search_aware_step_reward", False))
+             self.envs.append(SearchEnv(cfg_i))
+ 
+         max_workers = min(self.batch_size, 256)
+@@ -91,7 +97,11 @@
+         extras = {
+             "ground_truth": kwargs["ground_truth"],
+             "max_turns": self.max_steps,
+-            "data_source": kwargs.get("data_source", "unknown")
++            "data_source": kwargs.get("data_source", "unknown"),
++            # P3 patch 0008: the v1 answer-leak rule needs the raw question text
++            # inside the env (SearchEnv.question); without this field it stays
++            # None and every query is judged against an empty question.
++            "question": kwargs["question"],
+         }
+         env.reset(extras)
+         obs = SEARCH_PROMPT_PREFIX + kwargs["question"]
+--- a/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
++++ b/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
+@@ -172,11 +172,14 @@
+             # reward manager (episode.py) places it at THIS step's last token.
+             from searchr1_repro.search_v1_reward import search_step_components, valid_aliases
+             step_query = query[0] if query and query[0] else None
++            # P3 patch 0008: padded slots (batch < env count) get ground_truth=""
++            # -- index it defensively so a padded step never crashes the v1 path.
++            gt_targets = self.ground_truth.get("target") if isinstance(self.ground_truth, dict) else None
+             sv = search_step_components(
+                 query=step_query,
+                 status=retrieval_metadata.get("status") if retrieval_metadata else None,
+                 doc_text=observation if observation else None,
+-                gt_aliases=valid_aliases(self.ground_truth["target"]),
++                gt_aliases=valid_aliases(gt_targets if gt_targets else []),
+                 question=self.question,
+                 prior_search_count=self.search_count,
+             )
+--- a/agent_system/reward_manager/episode.py
++++ b/agent_system/reward_manager/episode.py
+@@ -24,7 +24,7 @@
+     accumulated episode reward is placed at every step record's last valid
+     response token (upstream behavior).
+ 
+-    v1 mode (search_aware_step_reward=True, P3 patch 0007): step-attributed
++    v1 mode (search_aware_step_reward=True, P3 patches 0007+0008): step-attributed
+     placement of the frozen search-aware GRPO v1 reward
+     (searchr1_repro/search_v1_reward.py, docs .../P3_PHASE4_SEARCH_CAUSAL_DIAG_RESULT_2026-08-19.md §9):
+       - each search step record gets its own shaping sum at its last valid token
+@@ -32,9 +32,11 @@
+         search steps)
+       - the terminal answer step record gets R_answer (+ format) + the sce bonus
+         at its last valid token
+-      - per-episode the 8 reward components are recorded into
++      - per-trajectory (traj_uid) the 8 reward components are recorded into
+         non_tensor_batch['search_v1_episode'] and their sum is asserted equal to
+-        the per-record placed scores for that uid (exact cents arithmetic)
++        the per-record placed scores for that trajectory (exact cents arithmetic);
++        non_tensor_batch['search_v1_group'] carries the informational per-uid
++        rollup (5 trajectories per question are NEVER merged into one episode)
+     """
+ 
+     def __init__(self, tokenizer, num_examine, normalize_by_length=False, search_aware_step_reward=False) -> None:
+@@ -123,18 +125,31 @@
+             return reward_tensor
+ 
+     def _apply_search_aware_v1(self, data: DataProto, reward_tensor: torch.Tensor) -> None:
+-        """Step-attributed v1 reward placement + per-episode component recording.
++        """Step-attributed v1 reward placement + per-trajectory component recording.
+ 
+         Fail-closed: every record must carry env-computed `search_v1` metadata
+         (the v1 profile enables it on both the env and the reward manager); a
+         missing dict is a config error, not a zero reward.
++
++        Episode audit is per traj_uid (Phase 4B.1 item 2): one traj_uid is ONE
++        real trajectory, while the same question (uid) has 5 distinct traj_uids
++        (GRPO n=5). Accumulating by uid would merge 5 trajectories into one
++        fake "episode" and hide per-trajectory totals, so:
++          - search_v1_episode records the 8 components per traj_uid (one entry
++            per real trajectory, carrying its uid)
++          - search_v1_group additionally rolls the same components up per uid
++            (informational only; never a substitute for the episode audit)
++        Fail-closed: a traj_uid observed under two different uids is an error.
+         """
+         from searchr1_repro.search_v1_reward import reward_float
+ 
+-        # uid -> {placed_cents, per-step component cents, record count}
++        # traj_uid -> {placed_cents, per-step component cents, record count, uid}
+         acc: dict[str, dict] = {}
+-        # per-record audit: episode-level component dict (filled per uid below)
++        # uid -> record indices (for the informational group rollup)
++        uid_records: dict[str, list[int]] = {}
++        # per-record audit: trajectory-level component dict (filled per traj below)
+         data.non_tensor_batch['search_v1_episode'] = np.empty(len(data), dtype=object)
++        data.non_tensor_batch['search_v1_group'] = np.empty(len(data), dtype=object)
+ 
+         for i in range(len(data)):
+             data_item = data[i]
+@@ -158,11 +173,22 @@
+             uid = data_item.non_tensor_batch.get('uid')
+             if uid is None:
+                 raise RuntimeError("v1 step reward requires uid grouping metadata")
+-            bucket = acc.setdefault(uid, {"placed_cents": 0, "components": {
++            traj_uid = data_item.non_tensor_batch.get('traj_uid')
++            if traj_uid is None:
++                raise RuntimeError("v1 step reward requires traj_uid grouping metadata")
++            bucket = acc.setdefault(traj_uid, {"placed_cents": 0, "components": {
+                 "answer_reward_c": 0, "format_reward_c": 0, "evidence_hit_reward_c": 0,
+                 "searched_correct_bonus_c": 0, "invalid_penalty_c": 0,
+                 "redundant_penalty_c": 0, "answer_leak_penalty_c": 0,
+-            }, "records": []})
++            }, "records": [], "uid": None})
++            if bucket["uid"] is None:
++                bucket["uid"] = uid
++            elif bucket["uid"] != uid:
++                raise RuntimeError(
++                    f"traj_uid {traj_uid} maps to multiple uids "
++                    f"({bucket['uid']} and {uid}): trajectory grouping is broken"
++                )
++            uid_records.setdefault(uid, []).append(i)
+             bucket["placed_cents"] += placed_c
+             bucket["records"].append(i)
+             comps = bucket["components"]
+@@ -180,22 +206,47 @@
+                 if sv.get("answer_leak"):
+                     comps["answer_leak_penalty_c"] -= 20
+ 
+-        # per-episode component sum == per-record placed score sum (exact cents)
+-        for uid, bucket in acc.items():
++        # per-trajectory component sum == per-record placed score sum (exact cents)
++        for traj_uid, bucket in acc.items():
+             comps = bucket["components"]
+             comp_sum = sum(comps.values())
+             if comp_sum != bucket["placed_cents"]:
+                 raise RuntimeError(
+-                    f"v1 reward sum-consistency failed for uid {uid}: "
+-                    f"components {comps} sum to {comp_sum}, placed {bucket['placed_cents']}"
++                    f"v1 reward sum-consistency failed for traj_uid {traj_uid} "
++                    f"(uid {bucket['uid']}): components {comps} sum to {comp_sum}, "
++                    f"placed {bucket['placed_cents']}"
+                 )
+             episode = dict(comps)
+             episode["total_reward_c"] = comp_sum
+             episode["n_records"] = len(bucket["records"])
+-            # attach to every record of this uid so the rollout audit records it
++            episode["uid"] = bucket["uid"]
++            # attach to every record of this trajectory so the audit records it
+             for ridx in bucket["records"]:
+                 data.non_tensor_batch['search_v1_episode'][ridx] = episode
+ 
+-        # sanity: every batch record belongs to exactly one uid accumulation
++        # per-uid rollup (informational; the traj-level audit above is canonical)
++        group_acc: dict[str, dict] = {}
++        for traj_uid, bucket in acc.items():
++            g = group_acc.setdefault(bucket["uid"], {
++                "components": {k: 0 for k in ("answer_reward_c", "format_reward_c",
++                                              "evidence_hit_reward_c", "searched_correct_bonus_c",
++                                              "invalid_penalty_c", "redundant_penalty_c",
++                                              "answer_leak_penalty_c")},
++                "n_trajectories": 0, "traj_uids": [],
++            })
++            for k, v in bucket["components"].items():
++                g["components"][k] += v
++            g["n_trajectories"] += 1
++            g["traj_uids"].append(traj_uid)
++        for uid, g in group_acc.items():
++            group = dict(g["components"])
++            group["total_reward_c"] = sum(g["components"].values())
++            group["uid"] = uid
++            group["n_trajectories"] = g["n_trajectories"]
++            group["traj_uids"] = sorted(g["traj_uids"])
++            for ridx in uid_records.get(uid, []):
++                data.non_tensor_batch['search_v1_group'][ridx] = group
++
++        # sanity: every batch record belongs to exactly one traj accumulation
+         if sum(len(b["records"]) for b in acc.values()) != len(data):
+-            raise RuntimeError("v1 step reward uid accounting mismatch")
++            raise RuntimeError("v1 step reward traj_uid accounting mismatch")
+--- a/verl/trainer/ppo/core_algos.py
++++ b/verl/trainer/ppo/core_algos.py
+@@ -174,6 +174,89 @@
+     return scores, scores
+ 
+ 
++def compute_grpo_trajectory_return_advantage(
++    token_level_rewards: torch.Tensor,
++    response_mask: torch.Tensor,
++    index: np.ndarray,
++    traj_index: np.ndarray,
++    epsilon: float = 1e-6,
++    norm_adv_by_std_in_grpo: bool = True,
++):
++    """Search-aware GRPO v1 trajectory-return advantage (P3 patch 0008).
++
++    Fixes the per-record normalization of compute_grpo_outcome_advantage for
++    step-attributed rewards: with the v1 step reward, each step record carries
++    only a PART of its trajectory's reward (a search step +0.15, the terminal
++    step +1.00/+1.30), and normalizing every record's partial sum inside the
++    uid group lets a useful search step score a NEGATIVE advantage against the
++    terminal score of the same trajectory. This function instead:
++
++      1. each record's reward          = token_level_rewards.sum(-1) per record
++      2. trajectory return             = sum over that traj_uid's records
++      3. group                         = the 5 trajectory returns of one uid
++                                         (GRPO n=5; fail-closed: one traj_uid
++                                         maps to exactly one uid)
++      4. GRPO mean/std over trajectory returns (len==1 group -> mean 0/std 1,
++                                         mirroring compute_grpo_outcome_advantage)
++      5. trajectory advantage          = (return - mean) / (std + epsilon),
++                                         broadcast to EVERY record of the
++                                         trajectory (all its model-action tokens)
++      6. adv.unsqueeze(-1) * response_mask: Observation tokens stay masked
++                                         (response_mask is the policy loss mask
++                                         tail: observation positions are 0)
++
++    Returns (advantages, returns), both shaped (bs, response_length).
++    """
++    scores = token_level_rewards.sum(dim=-1)  # per-record reward
++
++    with torch.no_grad():
++        bsz = scores.shape[0]
++        # 1+2: trajectory return per traj_uid, with uid-consistency fail-closed
++        traj2uid: dict = {}
++        traj2score: dict = defaultdict(float)
++        for i in range(bsz):
++            uid = index[i]
++            tid = traj_index[i]
++            if tid in traj2uid and traj2uid[tid] != uid:
++                raise ValueError(
++                    f"traj_uid {tid} maps to multiple uids ({traj2uid[tid]} and {uid}): "
++                    "trajectory grouping is broken"
++                )
++            traj2uid[tid] = uid
++            traj2score[tid] += float(scores[i])
++
++        # 3: group the DISTINCT trajectory returns of each uid
++        uid2scores: dict = defaultdict(list)
++        for tid, uid in traj2uid.items():
++            uid2scores[uid].append(traj2score[tid])
++        id2mean = {}
++        id2std = {}
++        for idx in uid2scores:
++            if len(uid2scores[idx]) == 1:
++                id2mean[idx] = torch.tensor(0.0)
++                id2std[idx] = torch.tensor(1.0)
++            elif len(uid2scores[idx]) > 1:
++                id2mean[idx] = torch.mean(torch.tensor(uid2scores[idx]))
++                id2std[idx] = torch.std(torch.tensor([uid2scores[idx]]))
++            else:
++                raise ValueError(f"no score in prompt index: {idx}")
++
++        # 4+5+6: trajectory advantage broadcast to all records of the trajectory
++        traj_adv = {}
++        for tid, ret in traj2score.items():
++            uid = traj2uid[tid]
++            if norm_adv_by_std_in_grpo:
++                traj_adv[tid] = (ret - id2mean[uid]) / (id2std[uid] + epsilon)
++            else:
++                traj_adv[tid] = ret - id2mean[uid]
++        advantages = torch.zeros_like(scores)
++        for i in range(bsz):
++            advantages[i] = traj_adv[traj_index[i]]
++        advantages = advantages.unsqueeze(-1) * response_mask
++
++    return advantages, advantages
++
++
+ def compute_grpo_passk_outcome_advantage(
+     token_level_rewards: torch.Tensor,
+     response_mask: torch.Tensor,
+--- a/verl/trainer/ppo/ray_trainer.py
++++ b/verl/trainer/ppo/ray_trainer.py
+@@ -286,14 +286,28 @@
+             # If multi-turn, replace the mask with the relevant part of loss_mask
+             response_length = grpo_calculation_mask.size(1)  # Get length from the initial response mask
+             grpo_calculation_mask = data.batch["loss_mask"][:, -response_length:]  # This mask is the one intended for GRPO
+-        # Call compute_grpo_outcome_advantage with parameters matching its definition
+-        advantages, returns = core_algos.compute_grpo_outcome_advantage(
+-            token_level_rewards=data.batch["token_level_rewards"],
+-            response_mask=grpo_calculation_mask,
+-            index=data.non_tensor_batch["uid"],
+-            traj_index=data.non_tensor_batch['traj_uid'],
+-            norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
+-        )
++        # P3 patch 0008: search_v1_trajectory_return=true switches the GRPO
++        # normalization from per-record to trajectory-return (sum a trajectory's
++        # step records, GRPO-normalize the 5 trajectory returns per uid, broadcast
++        # the trajectory advantage back to all its records). Default off: the
++        # official-loose baseline keeps compute_grpo_outcome_advantage unchanged.
++        if kwargs.get("search_v1_trajectory_return", False):
++            advantages, returns = core_algos.compute_grpo_trajectory_return_advantage(
++                token_level_rewards=data.batch["token_level_rewards"],
++                response_mask=grpo_calculation_mask,
++                index=data.non_tensor_batch["uid"],
++                traj_index=data.non_tensor_batch['traj_uid'],
++                norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
++            )
++        else:
++            # Call compute_grpo_outcome_advantage with parameters matching its definition
++            advantages, returns = core_algos.compute_grpo_outcome_advantage(
++                token_level_rewards=data.batch["token_level_rewards"],
++                response_mask=grpo_calculation_mask,
++                index=data.non_tensor_batch["uid"],
++                traj_index=data.non_tensor_batch['traj_uid'],
++                norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
++            )
+         data.batch["advantages"] = advantages
+         data.batch["returns"] = returns
+     elif adv_estimator == AdvantageEstimator.GRPO_PASSK:
+@@ -1264,6 +1278,8 @@
+                             lam=self.config.algorithm.lam,
+                             num_repeat=self.config.actor_rollout_ref.rollout.n,
+                             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
++                            # P3 patch 0008: v1 trajectory-return GRPO (default off)
++                            search_v1_trajectory_return=self.config.algorithm.get("search_v1_trajectory_return", False),
+                             multi_turn=self.config.actor_rollout_ref.rollout.multi_turn.enable,
+                             use_pf_ppo=self.config.algorithm.use_pf_ppo,
+                             pf_ppo_reweight_method=self.config.algorithm.pf_ppo.reweight_method,
+--- a/verl/trainer/main_ppo.py
++++ b/verl/trainer/main_ppo.py
+@@ -167,6 +167,16 @@
+         # (reward_model.search_aware_step_reward=true, must match
+         # env.search_aware_step_reward=true -- the reward manager is fail-closed).
+         search_aware_step_reward = config.reward_model.get("search_aware_step_reward", False)
++        # P3 patch 0008: the v1 trajectory-return GRPO normalization is a
++        # meaningless knob without step-attributed rewards -- fail closed.
++        search_v1_trajectory_return = config.algorithm.get("search_v1_trajectory_return", False)
++        if search_v1_trajectory_return and not search_aware_step_reward:
++            raise RuntimeError(
++                "algorithm.search_v1_trajectory_return=true requires "
++                "reward_model.search_aware_step_reward=true (step-attributed v1 "
++                "rewards); trajectory-return GRPO over the default whole-episode "
++                "rewards would be a silent no-op / mis-normalization"
++            )
+ 
+         reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=0, normalize_by_length=False,
+                                        search_aware_step_reward=search_aware_step_reward)

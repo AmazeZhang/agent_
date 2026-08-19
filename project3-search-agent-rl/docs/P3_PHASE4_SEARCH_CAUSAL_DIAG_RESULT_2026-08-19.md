@@ -238,6 +238,7 @@ CPU 测试（纯函数，无 GPU/无 Ray）：
 - 重复计算检查：95,718/95,718 episode 放置和 == 分量和，0 不一致；分量合计 answer 1,301,300¢ / format 794,780¢ / evidence 8,835¢ / sce 1,020¢ / invalid −65,620¢ / leak −240¢ / redundant 0¢
 - 组内方差均值 0.034；全同组比例 69.7%；search advantage 均值 −0.58 < no-search +0.03（历史策略下搜索轨迹在组内仍处劣势——v1 修正的是**未来训练**的 reward 归因，不回改历史策略）
 - 注意：历史 audit 的 record_score 记录的是旧 reward，与 v1 总分不可比（未做跨代数值断言，属设计内）
+- **2026-08-19 更新（Phase 4B.1）**：该 gates JSON 已被 trainer-exact 重跑覆盖（11 条门禁，见 §9.4.5）；上表为 Phase 4B 旧 matcher 历史记录，分量数字的收紧差异见 §9.4.5 对比行
 
 ### 9.3 六卡工程 smoke 设计（仅设计，不执行；所有 GPU 动作另行批准）
 
@@ -248,6 +249,60 @@ CPU 测试（纯函数，无 GPU/无 Ray）：
 - 预计耗时（估算）：启动与预检 ~10 min；1~2 步六卡 rollout+训练 ~20~40 min；checkpoint+恢复验证 ~10 min；合计 **~40~60 min 单次**（不含排队/重试）
 - 完成后退出验收：exit code、无残留 PID/端口/Ray、GPU 回基线
 
+## 9.4 Phase 4B.1 训练语义修正（2026-08-19，patch 0008）
+
+Phase 4B 主体审阅通过但 GPU smoke 未批准；Phase 4B.1 在**只授权代码、CPU 测试与离线回放**的范围内修正五个训练语义问题（不启动 GPU）。独立 patch `0008-v1-trajectory-return-and-traj-audit.patch`（构建在 0001–0007 之上），保留 0007 审计历史。
+
+### 9.4.1 修正一：GRPO trajectory-return advantage（per-record 归一化 bug）
+
+- **缺陷**：原 `compute_grpo_outcome_advantage(compute_mean_std_cross_steps=True)` 把**每条 step record** 的 `token_level_rewards.sum()` 作为独立 score 加入 uid 组——同一轨迹里 useful search step（即时 +0.15）与终止 answer step（+1.30）被当作两个独立 score，search step 组内归一后可能得到**负 advantage**（单元测试 `test_default_path_is_unchanged_per_record_normalization` 精确复现：t2 的 search record 在默认路径下为负）。
+- **修正**：新增 `compute_grpo_trajectory_return_advantage`（patch 0008，core_algos.py），独立开关 `algorithm.search_v1_trajectory_return=true`（**默认 false**，official-loose 基线仍走原实现）：① 每条 record 先算自身 reward ② 按 traj_uid 汇总同一 Episode 所有 step record：`trajectory_return = Σ record_reward` ③ 按 uid 找到同一道题的 5 个不同 traj_uid ④ 对 5 个 trajectory return 做 GRPO mean/std 归一 ⑤ 得到每个 trajectory 的归一化 advantage ⑥ **广播**给该 trajectory 的所有 model-action record 及其有效 response token；Observation token 保持 loss mask=0。torch.std 为样本标准差（ddof=1）；单轨迹组 mean=0/std=1（镜像旧实现）；同一 traj_uid 出现在多个 uid 下时 **fail-closed 抛 ValueError**。
+- **构造测试**（同 uid 5 轨迹，`tests/test_v1_trajectory_return.py` 10 条）：T1 direct `[1.00]`=1.00；T2 useful+correct `[0.15,1.30]`=1.45；T3 evidence+wrong `[0.15,0.10]`=0.25；T4 irrelevant+correct `[0.00,1.00]`=1.00；T5 invalid+wrong `[−0.20,0.10]`=−0.10。硬断言：T2 两个 record 得到**完全相同**的正 advantage；T2>T1；T1==T4；T5 最低；组内均值≈0；record 顺序打乱不变；不同 uid 绝不混组；Observation token advantage=0；`compute_advantage(..., search_v1_trajectory_return=True)` 集成路径与默认路径结果不同。
+
+### 9.4.2 修正二：episode 审计按 traj_uid（不能按 uid）
+
+- 0007 的 `search_v1_episode` 按 uid 累计会把同一道题 5 条轨迹的 reward 分量合并成**一份** total，无法逐轨迹核对。
+- **修正**：`search_v1_episode` 按**轨迹**记录（每条真实 trajectory 的 8 分量与 total，`episode["uid"]` 供关联），同一 uid 的 5 个 traj_uid 各得独立 total；新增 `search_v1_group` 为按 uid 的**信息性**汇总（分量求和、n_trajectories、sorted traj_uids），不替代 episode 审计；分量和==放置和断言保留（`test_v1_episode_traj_uid.py`：同 uid 5 轨迹得到 5 份独立 total，uid crossing fail-closed，缺 search_v1/traj_uid fail-closed，默认模式回归不变）。
+
+### 9.4.3 修正三：question 真实透传（此前恒 None）
+
+- **缺陷**：`SearchMultiProcessEnv._sync_reset` 的 extras 不含 question → `SearchEnv.question` 恒为 None → answer-leak 规则的 **question 排除逻辑永远针对空 question 判定**（问题本身含答案 alias 会被误判为 leak）。
+- **修正**：extras 增加 `"question"`（与 env 内保存的问题逐字节一致）；`env.search_aware_step_reward` 顶层开关传播到 per-env SearchEnv 配置（此前 wrapper 配了但永远到不了 SearchEnv——Phase 4B 潜在 bug）；padded 槽位（`ground_truth=""`）防御性守卫。
+- **真实路径测试**（`test_v1_env_question_passthrough.py`，经 SearchMultiProcessEnv.reset → SearchEnv.reset，不只直接调 reward helper）：alias 同时出现在 question 与 query 中**不算** new leak；alias 只在 query 中新出现算 leak（−20¢）；env 内部保存的问题与输入逐字节一致；flag 开/关传播生效；padding 槽位 dummy question 幸存。
+
+### 9.4.4 修正四：token 边界 alias matcher（过宽 substring 规则）
+
+- **缺陷**：旧规则 `norm_text(alias) in norm_text(text)`——两字符 alias（"it"、"us"）会命中 "britain"、"museum" 等任意含子串的文本，且跨标点/空白粘连误命中。
+- **修正**（`searchr1_repro/search_v1_reward.py` 重写，训练侧经 patch 0008 同步）：`valid_aliases` 返回 **word-lists**（NFKC + casefold + `\w+` token 序列，规范化总长 ≥2）；多词 alias 只能作为**连续 token 子序列**命中；**两字符 alias 只以完整 token 命中**（"us" 命中独立 token "us" 不命中 "museum"；"it" 不命中 "britain"；"US" 作为独立 token 正例命中）；question 排除与 evidence 检查在同一 token 基础上进行。
+- **测试**（`test_search_v1_reward.py` +6 条 token 边界 + `test_v1_trajectory_return` 配套）：it/britain、us/museum 负例、US 独立 token 正例、两字符 alias 全 token 命中、多词短语折叠空白/标点后命中、question 排除。
+
+### 9.4.5 修正五：trainer-exact 离线回放（11 条硬门禁全过）
+
+回放管线严格模拟训练路径：step components → traj_uid trajectory return → uid 内 GRPO 归一（numpy ddof=1 镜像 torch.std；单轨迹组 0/1）→ trajectory advantage 广播。结果（95,718 episodes / 19,796 groups，`gates/p3_v1_reward_replay_20260819.json`，**11/11 门禁通过**，exit 0）：
+
+| 门禁 | 结果 |
+|---|---|
+| ① useful-search-correct（n=30，均恰 1.45）> direct（n=12,928，1.00） | ✓ |
+| ②③④ irrelevant（n=55）max=1.00 / leak-correct（n=0）/ redundant-correct（n=0）≤ 1.00 | ✓（leak/redundant 空门禁，同 Phase 4B；语义由单元测试与分量算术结构性保证） |
+| ⑤ invalid（n=2,411，−0.20）< format-wrong（n=78,643）< direct（1.00） | ✓ |
+| ⑥ **useful-search search record advantage 方向**：+1.523 > 0 —— 不再因即时 0.15 被判负（Phase 4B.1 核心修正） | ✓ |
+| ⑦ useful trajectory adv（+1.523）> direct（+0.584）—— **T2 整体排序高于 T1** | ✓ |
+| ⑧ irrelevant ≤ direct（**组内匹配比较**：同 uid 组内 irrelevant max adv ≤ direct max adv，0 违规；类均值 +0.631 vs +0.584 属跨组构成效应——direct 类被全 direct 组稀释，不参与门禁） | ✓ |
+| ⑨ leak ≤ direct（组内匹配，0 违规；leak-correct n=0 空门禁） | ✓ |
+| ⑩ 数据完整性：0 个 traj_uid 跨 uid（加载期与计算期均为 0）；**组大小分布：5→17,608 组（89.0%）、4→1,385、3→567、2→201、1→35**——2,188 组 <5 为覆盖率报告项（非门禁）：加载 99,000 轨迹（= 19,796 组 × 5 + 20），打分 95,718（3,282 条因 question 解码失败或不在 train.parquet env_kwargs 而无 gt 被 drop）；短组缺口合计 3,262 ≈ 3,282 dropped → 历史 rollout 本身基本每问题恰 5 条轨迹，组 <5 几乎全部由 gt 覆盖损失解释 | ✓ |
+| ⑪ **shuffled 假阳性率**（diag2 同款 (i+17) mod n 置换，n=4,630 搜索步）：新 token 规则 **0.52%** < 真实命中率 **12.27%**；旧 substring 规则对照 null 率 **1.27%**（收紧 2.4×）；diag2 oracle 命中率 65.2%（confirm256，上下文） | ✓ |
+
+- **分量合计（新 matcher）**：answer 1,301,300¢ / format 794,780¢ / evidence **8,400¢**（560 次 credit）/ sce **900¢**（30 次）/ invalid −65,620¢ / leak **−160¢**（8 次）/ redundant 0¢——对比 Phase 4B 旧 matcher 的 8,835¢ / 1,020¢ / −240¢：evidence 命中 −29、leak −4，为 matcher 收紧后的**诚实下降**（两代数字均记录在案）
+- 重复计算检查：95,718/95,718 episode 放置和==分量和==trajectory return，0 不一致
+- 注意：历史 audit 的 record_score 记录旧 reward，与 v1 总分不可比（设计内）；回放**不**回改历史策略，修正的是未来训练的 reward/advantage 归因
+
+### 9.4.6 交付边界
+
+- **patch 0008**（6 个 vendor 文件）：`skyrl_gym/envs/search/env.py`、`env_package/search/envs.py`、`reward_manager/episode.py`、`verl/trainer/ppo/core_algos.py`、`verl/trainer/ppo/ray_trainer.py`、`verl/trainer/main_ppo.py`（fail-closed：`search_v1_trajectory_return=true` 且无 `search_aware_step_reward` → RuntimeError）；pre-0008 状态（20bd331 + 0001-0007）干净 apply、reverse-check、整树 diff 零差异
+- **配套（项目侧）**：`search_v1_reward.py`（token 边界 matcher）、`training_audit.py`（`trajectory_advantage` / `search_v1_group`）、wrapper `+algorithm.search_v1_trajectory_return=true`、30 条新 CPU 测试
+- **回归**：全套 CPU 测试 **105 全绿**（30 新 + 75 既有；official-loose 默认路径不变，`test_default_path_is_unchanged_per_record_normalization` 显式锁死默认路径语义）；`test_p25_cpu_retriever_service.py` 预存在 faiss 收集错误（--ignore，非本次范围）
+- **本轮未启动 GPU**；六卡工程 smoke 及后续行为 smoke 均等待单独批准
+
 ## 10. 停止声明
 
-诊断与 Phase 4B 工程交付已完成。**不自动启动 SFT、GRPO、GiGPO 或任何六卡训练**，等待单独批准。
+诊断与 Phase 4B / 4B.1 工程交付已完成。**不自动启动 SFT、GRPO、GiGPO 或任何六卡训练**，等待单独批准。

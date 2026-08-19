@@ -220,6 +220,11 @@ overrides=(
   # Both must be true together; the manager fails closed on mismatch.
   "+env.search_aware_step_reward=true"
   "+reward_model.search_aware_step_reward=true"
+  # Phase 4B.1 (patch 0008): GRPO normalizes TRAJECTORY returns (sum of the
+  # trajectory's step records) per uid instead of per record; the trajectory
+  # advantage is broadcast back to all its records. main_ppo fails closed if
+  # this is on without search_aware_step_reward.
+  "+algorithm.search_v1_trajectory_return=true"
   # config-only penalty OFF: the env's own invalid/error penalty already lives
   # on the search step; ray_trainer's post-hoc subtraction would double-count.
   "actor_rollout_ref.actor.use_invalid_action_penalty=false"
