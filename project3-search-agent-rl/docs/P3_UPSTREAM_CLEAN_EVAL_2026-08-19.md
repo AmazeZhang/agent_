@@ -131,17 +131,22 @@ round-2 prompt 检查 80/80 passed（诊断模式不 fail-closed）。
 
 - 2026-08-20 启动（GPU1，greedy 主评测，official-confirm256-v1 heldout.parquet，
   256 题，batch 24）。
-- **run a 事故（20260820a，已中止）**：第一批首轮 3 个搜索请求收到 retriever
-  422（空 body，`string_too_short`/`Field required`），重试后仍失败 → 该批
-  搜索全失效、EM 必为 0，已停掉。**根因调查**（2026-08-20，不复现）：
-  - 用同一官方模型 + greedy + 真实 SearchMultiProcessEnv + 真实 retriever
-    完整复现 heldout-24 × 2 轮：**24/24 首轮查询非空且全部成功、0 个 422**；
-  - curl 实证：retriever 只对空 query（`{"query": ""}`，422 `string_too_short`）
-    和缺字段（`{}`，422 `Field required`）返回 422；合法 payload 恒 200；
-  - 结论：**间歇性基础设施故障**（首轮 3 个请求瞬时失败），非模型/管线代码
-    缺陷；eval 逐 episode 记录 `api_request_error`，search_success_rate < 1.0
-    时会显式暴露，不静默降级。
-- **run b（20260820b）**：同参数重跑，验证 422 是否重现——结果运行后回填。
+- **run a/b 事故（20260820a/b，均已中止）**：搜索请求收到 retriever 422
+  （`string_too_short`，query 为空），重试仍失败 → 该批搜索失效、EM 必为 0。
+  **根因（2026-08-20，已确诊并修复）**：
+  - 官方模型在**后期轮次**（R2-R4）对部分 question 生成 `<search></search>`
+    空查询（查询退化，如 `your query`、`and`、重复查询）；
+  - 上游 `SearchToolGroup.search` 只拦 `None` 不拦空串 → 空查询到达
+    retriever → 其 schema `query: str = Field(min_length=1)` 返回 422 →
+    错误文本污染上下文、搜索链断裂；
+  - 完整复现：24 题 × 4 轮（多批、真实 env+retriever）稳定复现空查询
+    （~6-8 个/72 题）；最小 `SearchEnv.step("<search></search>")` 直接复现
+    422；smoke-16/diag16 轮次短（多数 R2 answer）无空查询所以未触发；
+  - **修复（eval 端，不改 clean tree）**：`sanitize_empty_search_actions`
+    把空查询替换为 `""`（env 返回空 observation、**不发 HTTP**，与
+    projection 的 no-tags 语义一致）并标 `valids=0`；新增 6 项单元测试，
+    共 29 项全绿（commit 待推送）。
+- **run c（20260820c）**：修复后重跑——结果运行后回填。
 
 ## 6. 资源状态
 

@@ -318,6 +318,52 @@ class TestRound2PromptCheck:
         assert eval_mod.step_search_query(step) is None
 
 
+class TestSanitizeEmptySearch:
+    """Empty <search></search> must never reach the retriever (it 422s against
+    the retriever's query min_length=1 schema). Replaced by "" + valids=0."""
+
+    def test_empty_search_is_replaced(self):
+        actions, valids = eval_mod.sanitize_empty_search_actions(["<search></search>"], [1])
+        assert actions == [""]
+        assert valids == [0]
+
+    def test_whitespace_search_is_replaced(self):
+        # projection already strips, but defend at the eval boundary too
+        actions, valids = eval_mod.sanitize_empty_search_actions(["<search>  </search>"], [1])
+        assert actions == [""]
+        assert valids == [0]
+
+    def test_real_search_passes_through(self):
+        actions, valids = eval_mod.sanitize_empty_search_actions(["<search>capital of France</search>"], [1])
+        assert actions == ["<search>capital of France</search>"]
+        assert valids == [1]
+
+    def test_answer_and_notags_untouched(self):
+        actions, valids = eval_mod.sanitize_empty_search_actions(["<answer>Paris</answer>", "", "<search>q</search>"], [1, 0, 1])
+        assert actions == ["<answer>Paris</answer>", "", "<search>q</search>"]
+        assert valids == [1, 0, 1]
+
+    def test_existing_invalid_flags_preserved(self):
+        actions, valids = eval_mod.sanitize_empty_search_actions(["<search>a</search> <answer>b</answer>"], [0])
+        assert actions == ["<search>a</search> <answer>b</answer>"]
+        assert valids == [0]
+
+    def test_manager_sends_sanitized_action_to_env(self):
+        # End-to-end: an empty search never reaches the env as a search call;
+        # the manager's internal projection turns "" into the no-tags path.
+        envs = FakeSearchEnvs(answers=["Paris"])
+        config = make_config()
+        manager = SearchEnvironmentManager(envs, projection.search_projection, config)
+        kwargs = [{"question": "Q?", "ground_truth": {"target": ["x"]}, "data_source": "test"}]
+        manager.reset(kwargs)
+        projected, valids = eval_mod.sanitize_empty_search_actions(["<search></search>"], [1])
+        next_obs, rewards, dones, infos = manager.step(projected)
+        assert envs.stepped_actions[-1] == [""]  # env never saw <search></search>
+        assert next_obs["anchor"][0] == ""  # empty observation, no HTTP call
+        assert bool(dones[0]) is False
+        assert infos[0]["is_action_valid"] == 0
+
+
 class TestAggregateMetrics:
     def test_counts(self):
         episodes = [

@@ -247,6 +247,31 @@ def offline_rescore(episode_steps: list[dict[str, Any]], answers: list[str]) -> 
     return {"final_answer": final_answer, "score": float(score), "has_answer": True}
 
 
+def sanitize_empty_search_actions(
+    projected_actions: list[str], valids: list[int]
+) -> tuple[list[str], list[int]]:
+    """Degenerate empty queries must never reach the retriever.
+
+    The official Search-R1 model occasionally emits ``<search></search>`` in
+    later rounds (query degeneration). Upstream SearchToolGroup.search guards
+    only ``None``, so an empty string reaches the retriever and 422s against
+    its ``query: str = Field(min_length=1)`` schema; the error blob then
+    pollutes the context and kills the episode's search chain. We replace
+    such actions with ``""`` (the env returns an empty observation with NO
+    HTTP request -- the same semantics as search_projection's no-tags case)
+    and mark them invalid so episode records stay truthful."""
+    sanitized: list[str] = []
+    sanitized_valids: list[int] = []
+    for action, valid in zip(projected_actions, valids):
+        if action.startswith("<search>") and not action[8:-9].strip():
+            sanitized.append("")
+            sanitized_valids.append(0)
+        else:
+            sanitized.append(action)
+            sanitized_valids.append(int(valid))
+    return sanitized, sanitized_valids
+
+
 def step_search_query(step: dict[str, Any]) -> str | None:
     """The query of a genuine search attempt: the projected action must be a
     <search> block AND the env must have actually executed the tool. Done
@@ -675,7 +700,15 @@ def main() -> int:
                     ]
                     raw_actions = generate_actions(llm, tokenizer, observations["text"], seeds, args)
                     projected_actions, valids = search_projection(raw_actions)
-                    next_observations, rewards, step_done, infos = manager.step(raw_actions)
+                    # Empty <search></search> is a degenerate action: upstream
+                    # SearchToolGroup.search guards only None (not ""), so the
+                    # empty query reaches the retriever and 422s against its
+                    # min_length=1 schema. The error blob pollutes the context
+                    # and kills the episode's search chain. Treat empty queries
+                    # as invalid actions ("" -> env returns an empty observation
+                    # with NO HTTP request, same semantics as the no-tags case).
+                    projected_actions, valids = sanitize_empty_search_actions(projected_actions, valids)
+                    next_observations, rewards, step_done, infos = manager.step(projected_actions)
                     generation_seconds = time.monotonic() - generation_started
                     for local_index in range(len(batch_records)):
                         if not active_before[local_index]:
