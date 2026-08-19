@@ -84,9 +84,64 @@ run p3-eval-upstream-clean-smoke16-20260819a（模型 = 自训
    聚合）；greedy 仍是主评测口径，采样只作策略支持诊断；
 4. 不启动任何训练、不修改自研 Reward；patch 0009 不进行。
 
-## 5. 待填结果（官方模型跑完后回填）
+## 5. 官方模型评测结果（2026-08-19/20）
 
-- greedy smoke-16 / 行为诊断 / confirm-256 结果与指标。
+### 5.1 greedy smoke-16（run p3-eval-upstream-clean-official-smoke16-20260819a）
+
+temperature=0、num_rollouts=1、seed=0、16 题（smoke test.parquet）。
+
+| 指标 | 值 |
+|---|---|
+| episodes | 16 |
+| 搜索率（searched_episodes） | 16/16 = 100% |
+| 搜索成功（search_successful_steps） | 41/41 = 100% |
+| round-2 prompt 检查（fail-closed 门禁） | checked 16 / passed 16 / **PASS** |
+| EM | 1/16 = 6.25% |
+| **search→answer** | 1.0 |
+| **search→correct** | 0.0625 |
+| no_search_episodes | 0 |
+
+### 5.2 行为诊断（run p3-eval-upstream-clean-official-diag16-sampling-20260819b）
+
+同 16 题，temperature=1、每题 5 rollout（rollout i 用 seed 0+i）、main_mode=False
+（不设 fail-closed 门，仅策略支持诊断）。
+
+| 指标 | episode 级（80） | question 级（16） |
+|---|---|---|
+| 搜索率 | 80/80 = 100% | 16/16 = 100% |
+| 搜索成功 | 207/207 = 100% | — |
+| answer_compliance | 78/80 = 97.5% | 16/16 = 100% |
+| **search→answer** | 0.975 | 1.0 |
+| **search→correct** | 0.0875 | 0.3125 |
+| EM | 7/80 = 8.75% | 5/16 题 ≥1 rollout 正确 |
+
+round-2 prompt 检查 80/80 passed（诊断模式不 fail-closed）。
+
+### 5.3 结论（官方 checkpoint 行为）
+
+- 官方模型在 **greedy 主评测下搜索链路完好**：100% 搜索、100% 搜索成功、
+  search→answer=1.0 —— 与自训 Step300 的"greedy 零搜索坍缩"形成鲜明对比，
+  Step300 的结果（§2）确实不能代表官方模型。
+- 但 search→correct 仅 6.25%（greedy）/ 31.25%（sampling, question 级）：
+  搜索→正确回答的链路存在但不稳定；采样诊断提升 question 级正确率 5 倍，
+  说明该模型具有搜索后答对的能力，greedy 主评测是其下限表现。
+- greedy 仍是主评测口径；采样只作策略支持诊断。
+
+### 5.4 confirm-256（run p3-eval-upstream-clean-official-confirm256-20260820a/b）
+
+- 2026-08-20 启动（GPU1，greedy 主评测，official-confirm256-v1 heldout.parquet，
+  256 题，batch 24）。
+- **run a 事故（20260820a，已中止）**：第一批首轮 3 个搜索请求收到 retriever
+  422（空 body，`string_too_short`/`Field required`），重试后仍失败 → 该批
+  搜索全失效、EM 必为 0，已停掉。**根因调查**（2026-08-20，不复现）：
+  - 用同一官方模型 + greedy + 真实 SearchMultiProcessEnv + 真实 retriever
+    完整复现 heldout-24 × 2 轮：**24/24 首轮查询非空且全部成功、0 个 422**；
+  - curl 实证：retriever 只对空 query（`{"query": ""}`，422 `string_too_short`）
+    和缺字段（`{}`，422 `Field required`）返回 422；合法 payload 恒 200；
+  - 结论：**间歇性基础设施故障**（首轮 3 个请求瞬时失败），非模型/管线代码
+    缺陷；eval 逐 episode 记录 `api_request_error`，search_success_rate < 1.0
+    时会显式暴露，不静默降级。
+- **run b（20260820b）**：同参数重跑，验证 422 是否重现——结果运行后回填。
 
 ## 6. 资源状态
 

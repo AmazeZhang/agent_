@@ -24,10 +24,20 @@ fi
 
 data_root="${PROJECT3_DATA_ROOT:-/media/imc/data}"
 min_free_gib="${PROJECT3_MIN_FREE_GIB:-150}"
+# Pass through every PROJECT3_EVAL_* variable (model/tokenizer/data/temperature/
+# num-rollouts, ...): the tmux server reuses the environment of its FIRST
+# session, so ad-hoc prefix env vars would otherwise be lost.
+eval_extra_env=()
+while IFS='=' read -r -d '' k v; do
+  case "$k" in
+    PROJECT3_EVAL_*) eval_extra_env+=("${k}=${v}") ;;
+  esac
+done < <(env -0)
 printf -v managed_command '%q ' \
   env \
   "PROJECT3_DATA_ROOT=${data_root}" \
   "PROJECT3_MIN_FREE_GIB=${min_free_gib}" \
+  "${eval_extra_env[@]}" \
   bash "${script_dir}/run_managed.sh" "$run_id" "$gpu_ids" -- "$@"
 
 tmux new-session -d -s "$session_name" -c "$PWD" "$managed_command"
