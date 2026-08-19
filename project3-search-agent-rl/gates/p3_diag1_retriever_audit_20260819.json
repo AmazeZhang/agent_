@@ -1,0 +1,99 @@
+{
+  "dev256_sha": "ffebf468e756a673da267f5830cfc67f2e9c4dc44ec41c979a389c1efebfff60",
+  "part_a": {
+    "n": 256,
+    "ok_top3": 256,
+    "ok_top10": 256,
+    "latency_top3": {
+      "p50": 6.154240056988783,
+      "p95": 6.328806779929437,
+      "p99": 6.37328706192784
+    },
+    "latency_top10": {
+      "p50": 6.1508405160857365,
+      "p95": 6.354987474041991,
+      "p99": 6.369379731011577
+    },
+    "recall": {
+      "top1": 101,
+      "top3": 134,
+      "top10": 167
+    },
+    "recall_by_source": {
+      "nq": {
+        "n": 64,
+        "top1": 38,
+        "top3": 47,
+        "top10": 56
+      },
+      "hotpotqa": {
+        "n": 64,
+        "top1": 18,
+        "top3": 27,
+        "top10": 35
+      },
+      "popqa": {
+        "n": 32,
+        "top1": 13,
+        "top3": 21,
+        "top10": 25
+      },
+      "2wikimultihopqa": {
+        "n": 32,
+        "top1": 7,
+        "top3": 10,
+        "top10": 16
+      },
+      "triviaqa": {
+        "n": 32,
+        "top1": 22,
+        "top3": 25,
+        "top10": 27
+      },
+      "musique": {
+        "n": 16,
+        "top1": 2,
+        "top3": 2,
+        "top10": 4
+      },
+      "bamboogle": {
+        "n": 16,
+        "top1": 1,
+        "top3": 2,
+        "top10": 4
+      }
+    },
+    "scores_top10": {
+      "min": 0.7636638879776001,
+      "p50": 0.8284273147583008,
+      "p95": 0.8727421760559082,
+      "max": 0.9260463714599609
+    }
+  },
+  "part_b": {
+    "Base": {
+      "search_steps": 124,
+      "statuses": {
+        "invalid_query": 114,
+        "success": 10
+      },
+      "classes": {
+        "invalid_or_failed": 114,
+        "success_with_evidence": 5,
+        "success_no_evidence": 5
+      },
+      "empty_query": 114
+    },
+    "SearchR1": {
+      "search_steps": 40,
+      "statuses": {
+        "success": 40
+      },
+      "classes": {
+        "success_no_evidence": 16,
+        "success_with_evidence": 24
+      },
+      "empty_query": 0
+    }
+  }
+}

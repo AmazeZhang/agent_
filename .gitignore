@@ -51,3 +51,6 @@ project3-search-agent-rl/outputs/
 project3-search-agent-rl/wandb/
 project3-search-agent-rl/.env
 project3-search-agent-rl/秋招简历与面试知识库.md
+
+# P3 Phase 4A diagnostic checkpoints (regenerable, contain doc payloads)
+project3-search-agent-rl/gates/*_checkpoint*.jsonl
