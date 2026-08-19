@@ -34,14 +34,39 @@ launch_and_wait() {
   local run_id="$1"
   local target="$2"
   shift 2
+  local run_dir="${project_data}/runs/${run_id}"
+  # idempotent resume: a run whose managed command exited 0 is done, skip it
+  if [[ -f "${run_dir}/metadata.env" ]] && grep -q '^exit_code=0$' "${run_dir}/metadata.env"; then
+    echo "[driver] ${run_id} already completed; skipping"
+    return 0
+  fi
+  if [[ -e "${run_dir}" ]]; then
+    echo "[driver] refusing to reuse incomplete run dir: ${run_dir} (remove it manually)" >&2
+    return 1
+  fi
+  # tmux sessions persist after the managed command exits (remain-on-exit on);
+  # clean any stale session with this name before launching.
   if tmux has-session -t "p3-${run_id}" 2>/dev/null; then
-    echo "session p3-${run_id} already exists; skipping launch" >&2
-    exit 3
+    tmux kill-session -t "p3-${run_id}" 2>/dev/null || true
   fi
   echo "[driver] launching ${run_id}"
   PROJECT3_DATA_ROOT="${data_root}" \
     bash "${script_dir}/start_tmux_run.sh" "${run_id}" 1 -- env "$@" bash "${target}" >/dev/null
-  while tmux has-session -t "p3-${run_id}" 2>/dev/null; do sleep 10; done
+  # wait for run_managed to record exit_code in metadata.env (timeout 100 min)
+  local waited=0
+  while (( waited < 600 )); do
+    if [[ -f "${run_dir}/metadata.env" ]] && grep -q '^exit_code=' "${run_dir}/metadata.env"; then
+      break
+    fi
+    sleep 10
+    waited=$((waited + 1))
+  done
+  if ! grep -q '^exit_code=' "${run_dir}/metadata.env" 2>/dev/null; then
+    echo "[driver] TIMEOUT waiting for ${run_id}" >&2
+    return 1
+  fi
+  grep '^exit_code=' "${run_dir}/metadata.env"
+  tmux kill-session -t "p3-${run_id}" 2>/dev/null || true
   echo "[driver] finished ${run_id}"
 }
 
