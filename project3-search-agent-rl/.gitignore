@@ -1,0 +1,4 @@
+# Derived pristine upstream worktree (git worktree add) used by the
+# clean-upstream evaluation line. Content is byte-identical to vendor/verl-agent
+# at commit 20bd331b with NO patches applied; never committed.
+vendor/upstream-20bd331b/
