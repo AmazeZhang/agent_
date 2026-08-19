@@ -1,0 +1,246 @@
+--- a/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
++++ b/agent_system/environments/env_package/search/third_party/skyrl_gym/envs/search/env.py
+@@ -25,13 +25,24 @@
+             log_requests=env_config.log_requests,
+         )
+         self.init_tool_groups([self.tool_group])
+-        
++        # P3 patch 0007: per-step v1 shaping components (search-aware GRPO v1,
++        # docs/P3_PHASE4_SEARCH_CAUSAL_DIAG_RESULT_2026-08-19.md §9). Off by
++        # default: existing configs keep byte-identical behavior. The v1 profile
++        # sets env.search_aware_step_reward=true.
++        self.search_aware_step_reward = bool(getattr(env_config, "search_aware_step_reward", False))
++
+     def reset(self, extras: Dict[str, Any] = {}) -> None:
+         assert "ground_truth" in extras, "ground_truth is required in extras field"
+         self.ground_truth = extras["ground_truth"]
+         self.max_turns = extras["max_turns"] if "max_turns" in extras else 3
+ 
+         self.data_source = extras.get("data_source", "unknown")
++        # P3 patch 0007: original question text (answer-leak rule: an alias
++        # already present in the question must never be judged a leak).
++        self.question = extras.get("question", None)
++        # P3 patch 0007: per-episode state for step-attributed shaping.
++        self.search_count = 0
++        self.had_effective_evidence = False
+ 
+         # Chat history
+         # role (user, assistant), content (tool observation or LLM response)
+@@ -92,8 +103,19 @@
+         reward = self._get_reward(action, done)
+ 
+         if done:
++            metadata = {"data_source": self.data_source, "tool_calling": False}
++            if self.search_aware_step_reward:
++                # P3 patch 0007: R_answer only on the terminal answer step; the
++                # sce bonus is settled here via episode metadata
++                # (had_effective_evidence, linked to real successful retrievals).
++                from searchr1_repro.search_v1_reward import terminal_step_components
++                metadata["search_v1"] = terminal_step_components(
++                    r_answer_total=float(reward),
++                    em=reward >= 1.0,
++                    had_effective_evidence=self.had_effective_evidence,
++                )
+             return BaseTextEnvStepOutput(
+-                observations=[], reward=reward, done=done, metadata={"data_source": self.data_source, "tool_calling": False}, postprocessed_action=action
++                observations=[], reward=reward, done=done, metadata=metadata, postprocessed_action=action
+             )
+ 
+         query = [None]
+@@ -141,6 +163,28 @@
+             ),
+         }
+ 
++        if self.search_aware_step_reward:
++            # P3 patch 0007: per-search-step v1 shaping components. evidence_hit
++            # checks ONLY the real Retriever-returned document bodies (the tool
++            # observation); an invalid/error step is never evidence; an
++            # answer-leak step contributes neither evidence_hit nor sce and pays
++            # the leak penalty. The shaping value stays in info metadata: the
++            # reward manager (episode.py) places it at THIS step's last token.
++            from searchr1_repro.search_v1_reward import search_step_components, valid_aliases
++            step_query = query[0] if query and query[0] else None
++            sv = search_step_components(
++                query=step_query,
++                status=retrieval_metadata.get("status") if retrieval_metadata else None,
++                doc_text=observation if observation else None,
++                gt_aliases=valid_aliases(self.ground_truth["target"]),
++                question=self.question,
++                prior_search_count=self.search_count,
++            )
++            info["search_v1"] = sv
++            self.search_count += 1
++            if sv["evidence_effective"]:
++                self.had_effective_evidence = True
++
+         # Update chat history
+         if new_obs:
+             self.chat_history.append(new_obs)
+--- a/agent_system/multi_turn_rollout/rollout_loop.py
++++ b/agent_system/multi_turn_rollout/rollout_loop.py
+@@ -381,6 +381,11 @@
+             batch.non_tensor_batch['retrieval_failed'] = np.array(
+                 [bool(info.get('retrieval_failed', False)) for info in infos], dtype=bool
+             )
++            # P3 patch 0007: per-step search-aware GRPO v1 shaping components
++            # (computed by the env; absent -> None records when the feature is off).
++            batch.non_tensor_batch['search_v1'] = np.array(
++                [info.get('search_v1') for info in infos], dtype=object
++            )
+ 
+             if 'tool_calling' in infos[0]:
+                 tool_callings[active_masks] += np.array([info['tool_calling'] for info in infos], dtype=np.float32)[active_masks]
+--- a/agent_system/reward_manager/episode.py
++++ b/agent_system/reward_manager/episode.py
+@@ -19,12 +19,29 @@
+ 
+ class EpisodeRewardManager:
+     """The reward manager.
++
++    Default mode (search_aware_step_reward=False): unchanged semantics -- the
++    accumulated episode reward is placed at every step record's last valid
++    response token (upstream behavior).
++
++    v1 mode (search_aware_step_reward=True, P3 patch 0007): step-attributed
++    placement of the frozen search-aware GRPO v1 reward
++    (searchr1_repro/search_v1_reward.py, docs .../P3_PHASE4_SEARCH_CAUSAL_DIAG_RESULT_2026-08-19.md §9):
++      - each search step record gets its own shaping sum at its last valid token
++        (evidence/invalid/redundant/answer-leak; R_answer is NEVER copied onto
++        search steps)
++      - the terminal answer step record gets R_answer (+ format) + the sce bonus
++        at its last valid token
++      - per-episode the 8 reward components are recorded into
++        non_tensor_batch['search_v1_episode'] and their sum is asserted equal to
++        the per-record placed scores for that uid (exact cents arithmetic)
+     """
+ 
+-    def __init__(self, tokenizer, num_examine, normalize_by_length=False) -> None:
++    def __init__(self, tokenizer, num_examine, normalize_by_length=False, search_aware_step_reward=False) -> None:
+         self.tokenizer = tokenizer
+         self.num_examine = num_examine  # the number of batches of decoded responses to print to the console
+         self.normalize_by_length = normalize_by_length
++        self.search_aware_step_reward = search_aware_step_reward
+ 
+     def __call__(self, data: DataProto, return_dict=False):
+         """We will expand this function gradually based on the available datasets"""
+@@ -40,6 +57,16 @@
+ 
+         already_print_data_sources = {}
+ 
++        if self.search_aware_step_reward:
++            self._apply_search_aware_v1(data, reward_tensor)
++            if return_dict:
++                return {
++                    "reward_tensor": reward_tensor,
++                    "reward_extra_info": {},
++                }
++            else:
++                return reward_tensor
++
+         for i in range(len(data)):
+             data_item = data[i]  # DataProtoItem
+ 
+@@ -94,3 +121,81 @@
+             }
+         else:
+             return reward_tensor
++
++    def _apply_search_aware_v1(self, data: DataProto, reward_tensor: torch.Tensor) -> None:
++        """Step-attributed v1 reward placement + per-episode component recording.
++
++        Fail-closed: every record must carry env-computed `search_v1` metadata
++        (the v1 profile enables it on both the env and the reward manager); a
++        missing dict is a config error, not a zero reward.
++        """
++        from searchr1_repro.search_v1_reward import reward_float
++
++        # uid -> {placed_cents, per-step component cents, record count}
++        acc: dict[str, dict] = {}
++        # per-record audit: episode-level component dict (filled per uid below)
++        data.non_tensor_batch['search_v1_episode'] = np.empty(len(data), dtype=object)
++
++        for i in range(len(data)):
++            data_item = data[i]
++            sv = data_item.non_tensor_batch.get('search_v1')
++            if sv is None:
++                raise RuntimeError(
++                    "search_aware_step_reward=true but record has no search_v1 metadata; "
++                    "env.search_aware_step_reward must also be true (fail-closed)"
++                )
++            prompt_ids = data_item.batch['prompts']
++            prompt_length = prompt_ids.shape[-1]
++            valid_response_length = int(data_item.batch['attention_mask'][prompt_length:].sum())
++            if valid_response_length <= 0:
++                raise RuntimeError("v1 step reward on an empty response record")
++            if sv.get("terminal"):
++                placed_c = int(sv.get("answer_reward_c", 0)) + int(sv.get("format_reward_c", 0)) + int(sv.get("sce_c", 0))
++            else:
++                placed_c = int(sv.get("step_shaping_c", 0))
++            reward_tensor[i, valid_response_length - 1] = reward_float(placed_c)
++
++            uid = data_item.non_tensor_batch.get('uid')
++            if uid is None:
++                raise RuntimeError("v1 step reward requires uid grouping metadata")
++            bucket = acc.setdefault(uid, {"placed_cents": 0, "components": {
++                "answer_reward_c": 0, "format_reward_c": 0, "evidence_hit_reward_c": 0,
++                "searched_correct_bonus_c": 0, "invalid_penalty_c": 0,
++                "redundant_penalty_c": 0, "answer_leak_penalty_c": 0,
++            }, "records": []})
++            bucket["placed_cents"] += placed_c
++            bucket["records"].append(i)
++            comps = bucket["components"]
++            if sv.get("terminal"):
++                comps["answer_reward_c"] += int(sv.get("answer_reward_c", 0))
++                comps["format_reward_c"] += int(sv.get("format_reward_c", 0))
++                comps["searched_correct_bonus_c"] += int(sv.get("sce_c", 0))
++            else:
++                if sv.get("evidence_credit"):
++                    comps["evidence_hit_reward_c"] += 15
++                if sv.get("invalid_or_error"):
++                    comps["invalid_penalty_c"] -= 20
++                if sv.get("redundant_search"):
++                    comps["redundant_penalty_c"] -= 45
++                if sv.get("answer_leak"):
++                    comps["answer_leak_penalty_c"] -= 20
++
++        # per-episode component sum == per-record placed score sum (exact cents)
++        for uid, bucket in acc.items():
++            comps = bucket["components"]
++            comp_sum = sum(comps.values())
++            if comp_sum != bucket["placed_cents"]:
++                raise RuntimeError(
++                    f"v1 reward sum-consistency failed for uid {uid}: "
++                    f"components {comps} sum to {comp_sum}, placed {bucket['placed_cents']}"
++                )
++            episode = dict(comps)
++            episode["total_reward_c"] = comp_sum
++            episode["n_records"] = len(bucket["records"])
++            # attach to every record of this uid so the rollout audit records it
++            for ridx in bucket["records"]:
++                data.non_tensor_batch['search_v1_episode'][ridx] = episode
++
++        # sanity: every batch record belongs to exactly one uid accumulation
++        if sum(len(b["records"]) for b in acc.values()) != len(data):
++            raise RuntimeError("v1 step reward uid accounting mismatch")
+--- a/verl/trainer/main_ppo.py
++++ b/verl/trainer/main_ppo.py
+@@ -163,10 +163,17 @@
+         else:
+             raise NotImplementedError
+ 
+-        reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=0, normalize_by_length=False)
++        # P3 patch 0007: search-aware GRPO v1 step-attributed rewards
++        # (reward_model.search_aware_step_reward=true, must match
++        # env.search_aware_step_reward=true -- the reward manager is fail-closed).
++        search_aware_step_reward = config.reward_model.get("search_aware_step_reward", False)
++
++        reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=0, normalize_by_length=False,
++                                       search_aware_step_reward=search_aware_step_reward)
+ 
+         # Note that we always use function-based RM for validation
+-        val_reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=1, normalize_by_length=False)
++        val_reward_fn = reward_manager_cls(tokenizer=tokenizer, num_examine=1, normalize_by_length=False,
++                                           search_aware_step_reward=search_aware_step_reward)
+ 
+         resource_pool_manager = ResourcePoolManager(resource_pool_spec=resource_pool_spec, mapping=mapping)
+ 

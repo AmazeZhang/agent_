@@ -45,6 +45,12 @@ def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, mult
     responses = batch["responses"].detach().cpu()
     input_ids = batch["input_ids"].detach().cpu()
     attention_mask = batch["attention_mask"].detach().cpu()
+    # P3 v1 (patch 0007): per-record training score (GRPO sees
+    # token_level_scores.sum(-1)) so the offline replay can cross-validate the
+    # step-attributed reward against the recorded component sums.
+    token_level_scores = (
+        batch["token_level_scores"].detach().cpu() if "token_level_scores" in batch else None
+    )
     prompt_width = prompts.shape[1]
     response_width = responses.shape[1]
     if input_ids.shape[1] != prompt_width + response_width:
@@ -60,7 +66,12 @@ def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, mult
         response_policy_mask = response_attention_mask
         mask_source = "response_attention_mask"
 
-    selected_metadata = ("uid", "traj_uid", "env_step", "retrieval", "retrieval_failed", "is_action_valid")
+    selected_metadata = (
+        "uid", "traj_uid", "env_step", "retrieval", "retrieval_failed", "is_action_valid",
+        # P3 v1 (patch 0007): per-step shaping components + per-episode component
+        # totals, for offline replay verification and sum-consistency checks.
+        "search_v1", "search_v1_episode",
+    )
     records = []
     for index in range(input_ids.shape[0]):
         full_policy_mask = torch.cat(
@@ -88,6 +99,9 @@ def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, mult
                 "input_ids": input_ids[index].tolist(),
                 "attention_mask": attention_mask[index].tolist(),
                 "policy_loss_mask": full_policy_mask.tolist(),
+                "record_score": (
+                    float(token_level_scores[index].sum()) if token_level_scores is not None else None
+                ),
                 "metadata": metadata,
             }
         )

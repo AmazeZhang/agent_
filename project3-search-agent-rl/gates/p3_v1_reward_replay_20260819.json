@@ -1,0 +1,84 @@
+{
+  "config_fp_note": "historical audits record the OLD reward; record_scores not compared",
+  "gates": {
+    "1_useful_search_correct_gt_direct_correct": {
+      "pass": true,
+      "mean_useful_cents": 145.0,
+      "mean_direct_cents": 100.0,
+      "n_useful": 34,
+      "n_direct": 12928
+    },
+    "2_irrelevant_search_correct_le_direct": {
+      "pass": true,
+      "n_members": 51,
+      "max_cents": 100,
+      "n_excess": 0
+    },
+    "3_leak_search_correct_le_direct": {
+      "pass": true,
+      "n_members": 0,
+      "max_cents": null,
+      "n_excess": 0
+    },
+    "4_redundant_search_correct_le_direct": {
+      "pass": true,
+      "n_members": 0,
+      "max_cents": null,
+      "n_excess": 0
+    },
+    "5_invalid_lt_format_wrong_lt_direct": {
+      "pass": true,
+      "mean_invalid_cents": -20.0,
+      "mean_format_cents": 10.036875500680289,
+      "mean_direct_cents": 100.0,
+      "n_invalid": 2411,
+      "n_format": 78643
+    }
+  },
+  "group_stats": {
+    "n_trajs": 95718,
+    "n_groups": 19796,
+    "reward_mean": 0.21313389331160285,
+    "reward_std": 0.3166540123459563,
+    "intra_group_variance_mean": 0.03408718834893693,
+    "all_same_reward_group_ratio": 0.696958981612447,
+    "search_frac": 0.04837125723479387,
+    "search_adv_mean": -0.5816290725864413,
+    "nosearch_adv_mean": 0.029564186348094393,
+    "n_search_trajs": 4630,
+    "n_nosearch_trajs": 91088
+  },
+  "component_totals_cents": {
+    "answer_reward_c": 1301300,
+    "format_reward_c": 794780,
+    "evidence_hit_reward_c": 8835,
+    "searched_correct_bonus_c": 1020,
+    "invalid_penalty_c": -65620,
+    "redundant_penalty_c": 0,
+    "answer_leak_penalty_c": -240
+  },
+  "component_trigger_counts": {
+    "episodes_with_evidence_credit": 589,
+    "episodes_with_evidence_effective": 589,
+    "episodes_with_leak": 12,
+    "episodes_with_invalid": 3281,
+    "episodes_with_redundant_search": 0,
+    "search_steps_total": 4630,
+    "em_correct": 13013,
+    "format_only": 79472
+  },
+  "duplicate_computation_check": {
+    "n_episodes": 95718,
+    "n_sum_mismatch": 0,
+    "samples": []
+  },
+  "class_sizes": {
+    "direct_correct": 12928,
+    "useful_search_correct": 34,
+    "irrelevant_search_correct": 51,
+    "answer_leak_search_correct": 0,
+    "redundant_search_correct": 0,
+    "invalid_no_answer": 2411,
+    "format_wrong": 78643
+  }
+}

@@ -100,23 +100,27 @@ R_answer 当前语义：EM=1.0 / format=0.1 / 无=0.0；候选 format_score ∈ 
 | 候选 | format | α | β | γ | λ | μ | T2−T1 | 检查 |
 |---|---|---|---|---|---|---|---|---|
 | C0-current-baseline | 0.1 | 0 | 0 | 0 | 0 | 0 | 0（T2==T1） | **不满足 T2>T1（这正是问题所在）** |
-| C1-conservative | 0.1 | 0.02 | 0.05 | 0.10 | 0.10 | 0.20 | +0.17 | PASS |
-| C2-moderate | 0.1 | 0.02 | 0.10 | 0.20 | 0.20 | 0.35 | +0.32 | PASS |
-| C3-format-0.05 | 0.05 | 0.02 | 0.05 | 0.10 | 0.10 | 0.20 | +0.17 | PASS |
-| C4-format-0.0 | 0.0 | 0.02 | 0.05 | 0.10 | 0.10 | 0.20 | +0.17 | PASS |
-| C5-evidence-driven-a0 | 0.1 | 0 | 0.15 | 0.30 | 0.20 | 0.45 | +0.45 | PASS |
-| C6-spam-averse | 0.1 | 0.05 | 0.10 | 0.20 | 0.30 | 0.40 | +0.35 | PASS |
+| C1-conservative | 0.1 | 0.02 | 0.05 | 0.10 | 0.10 | 0.20 | +0.17 | T4=1.02>T1 ✗ |
+| C2-moderate | 0.1 | 0.02 | 0.10 | 0.20 | 0.20 | 0.35 | +0.32 | T4=1.02>T1 ✗ |
+| C3-format-0.05 | 0.05 | 0.02 | 0.05 | 0.10 | 0.10 | 0.20 | +0.17 | T4=1.02>T1 ✗ |
+| C4-format-0.0 | 0.0 | 0.02 | 0.05 | 0.10 | 0.10 | 0.20 | +0.17 | T4=1.02>T1 ✗ |
+| C5-evidence-driven-a0 | 0.1 | 0 | 0.15 | 0.30 | 0.20 | 0.45 | +0.45 | T4=1.0≤1.0 ✓；T7=1.45>T1 ✗ |
+| C6-spam-averse | 0.1 | 0.05 | 0.10 | 0.20 | 0.30 | 0.40 | +0.35 | T4=1.05>T1 ✗ |
 
-8 条防 hack 轨迹断言（T1 直答对 / T2 有效搜索+证据答对 / T3 相关证据答错 / T4 无关文档凭记忆答对 / T5 invalid query / T6 重复搜索刷分 / T7 标准答案写进 query / T8 只格式正确答错）：**C1–C6 全部 PASS**（T2>T1、T1>T3、T3>T5、T6≤T1、α≤0.05、T8<T1、μ≥α+β+γ）。C0 基线失败（T2==T1）为机制性发现：当前奖励不给证据支撑搜索任何额外信用。
+8 条防 hack 轨迹断言（T1 直答对 / T2 有效搜索+证据答对 / T3 相关证据答错 / T4 无关文档凭记忆答对 / T5 invalid query / T6 重复搜索刷分 / T7 标准答案写进 query / T8 只格式正确答错）。**勘误 2026-08-19（审阅反馈）：「C1–C6 全部 PASS」表述不成立**：
 
-T7 注记：答案写进 query 在奖励层面不可检测（T7==T2 by construction），缓解在 query 校验层而非奖励层。
+- **T7 答案泄漏没有通过**：任何候选里 T7==T2 by construction（query 含答案 + 检索命中 → 触发与 T2 相同的有效+证据+答对奖励），奖励层面不可区分，必须新增 **T7 ≤ T1 硬断言**
+- **C1/C2/C3/C4/C6 中 α>0 使无关搜索也可能获得奖励**：T4（无关文档凭记忆答对）= 1.0 + α > T1 = 1.0，违反 **T4 ≤ T1 硬断言**（α>0 时"调用了搜索"本身就有正收益 → 可被刷分）
+- C0 基线失败（T2==T1）为机制性发现：当前奖励不给证据支撑搜索任何额外信用
+
+**冻结的 v1 公式（见 §8）正是为满足这两个硬断言而设计**：α=0（T4==1.0≤T1 通过）+ `new_answer_leak_in_query` 惩罚（T7 被清零证据奖励并额外 −0.20 → 0.80<T1 通过），其余断言 T2>T1（1.45>1.0）、T1>T3（1.0>0.25）、T3>T5（0.25>−0.20）、T8<T1（0.1<1.0）在 v1 下全部满足。**勘误 2026-08-19（工程实现确认）：T6 值应为 1.00 而非 0.55**——diag T6（2 次搜索、证据命中、答对）在 episode 级模型下 = 1.0 + 0.15 + 0.30 − 0.45 = 1.00 == T1（相等，guard 成立）；0.55 是「2 次无价值搜索刷分」情形（1.0 − 0.45）。step 归因实现通过「**冗余（第 2 次起）搜索步不获得 evidence 加分**」保证 T6≤T1 对任意多搜索组合普遍成立（详见 §9.1 语义澄清）。
 
 ### 4.2 历史轨迹评估（seg 0-100，n=29,838，off-policy）
 
 - 历史搜索质量：searched 4,524 / valid 1,297（28.7%）/ evidence-hit 585（12.9%）/ correct_with_evidence_search 41（0.9%）；redundant_sum 0
 - 所有 shaping 候选下 search_adv 均为负（−0.36 ~ −0.48）、nosearch_adv 为正（+0.06 ~ +0.09）→ **shaping 在历史 off-policy 轨迹上不能逆转搜索劣势**（γ 只触发 41/4,524）
 - C0 基线：同组全同奖励组比例 82.5%；C1–C6 降到 ~51–55%（组内方差略升）——shaping 增加组内信号但有限
-- 仅推荐系数范围（C1-conservative ~ C6-spam-averse 之间），不冻结
+- 勘误 2026-08-19（审阅反馈）：原"推荐系数范围、不冻结"被冻结为 **Search-aware GRPO v1 公式**（§8）：在 C5-evidence-driven（α=0）基础上新增 `new_answer_leak_in_query` 惩罚，使 T4≤T1 与 T7≤T1 两个硬断言同时成立（§4.1 勘误）
 
 ## 5. GiGPO 接入审计（只读，file:line 已核实）
 
@@ -131,12 +135,13 @@ T7 注记：答案写进 query 在奖励层面不可检测（T7==T2 by construct
 ### 5.2 search 场景下 GiGPO step 分组语义（env manager anchor 已核实）
 
 - `agent_system/environments/env_manager.py:62-78,148-164`：reset 时 anchor=obs（同组 5 traj 相同）；step 时 anchor=next_obs（依检索结果分化）
-- 结论：**step 0 全组 5 条共享同一 anchor → 1 个 step 组**；step ≥ 1 通常每组 1 条（检索结果分化），仅同 query 同结果或同 error obs 时成组
-- 即 GiGPO 在搜索场景：episode 项 ≈ GRPO（组内归一），step 项在 step 0 无组内区分、step ≥ 1 近似单例归一 → **提升有限，但 step-level 信用分配为多轮 credit 提供了机制入口**
+- 结论（勘误 2026-08-19，审阅反馈）：**step 0 全组 5 条共享同一 anchor → 1 个 step 组**；step ≥ 1 的检索 Observation 通常彼此不同（不同 query/结果分化）→ **step group 为单例**
+- **单例组归一化 advantage 近似 0，不提供有效 step 相对信用** → 当前 fork 内 GiGPO 直接开启的预期收益有限（episode 项 ≈ GRPO，step 项退化为无信号）
+- **GiGPO 推迟到 nested rollout 版本**：能够对同一 post-retrieval state 采样多个后续 action（如 group-in-group 或按 step 内多采样）时，step 组内才有足够样本做相对归一；届时再评估
 
 ### 5.3 Observation token 与损失
 
-- `dp_actor.py:317-372`：multi_turn=False → response_mask = attention_mask[:, -response_length:] → **<information> observation 是 prompt token，构造性排除于 policy loss**（不改则永远学不到"读证据"）
+- `dp_actor.py:317-372`：multi_turn=False → response_mask = attention_mask[:, -response_length:] → **<information> observation 是 prompt token，构造性排除于 policy loss**。这是正确语义：Observation 是环境条件上下文，policy loss 只作用于模型生成的 action/answer token；模型通过 answer token 的梯度学习利用证据。**不将 Observation 纳入 loss（勘误 2026-08-19，审阅反馈）**
 - 当前信用分配：`agent_system/reward_manager/episode.py:20-96` 把完整 episode reward 放在**每条 step record 最后一个有效 response token** 上 → 搜索动作与答案动作同分 → 这是"搜索无用"机制根源之一（诊断 2/3 数据将给出证据强度）
 
 ### 5.4 架构可行性
@@ -147,23 +152,21 @@ GiGPO 是 driver-side 纯 advantage 计算替换（critic-free），**FSDP/offlo
 
 ### 方案 A：Search-aware GRPO（最小改动）
 
-- **Reward**：诊断 4 候选系数（推荐 C1-conservative 起步：α=0.02, β=0.05, γ=0.10, λ=0.10, μ=0.20, format=0.1；或 C5-evidence-driven 若诊断 2 显示证据可用是主瓶颈）
+- **Reward**：**冻结的 Search-aware GRPO v1 公式**（勘误 2026-08-19 冻结，见 §8）：`R = R_answer + 0.15·evidence_hit + 0.30·searched_and_correct_and_evidence_hit − 0.20·invalid_or_error − 0.45·redundant_search_count − 0.20·new_answer_leak_in_query`；format_score=0.1（本轮不改格式奖励）；α=0（无关搜索本身不加分）
 - **实现点**（verl-agent fork）：
-  1. RewardManager 需按 step 产出 shaping 分量（valid/evidence/sce/invalid/redundant），挂到 step record（仿 episode.py 但按 step）
-  2. 现有 `token_level_rewards` 广播语义保留：episode 分量仍在最后 token；shaping 分量可放该 step 最后 token
-  3. loss mask 不变（Observation 仍排除——方案 A 不读证据，靠 shaping 奖励间接驱动）
+  1. RewardManager 需按 step 产出 shaping 分量（evidence/sce/invalid/redundant/answer-leak），挂到对应 step record（仿 episode.py 但按 step；R_answer 只在终止 answer step）
+  2. 现有 `token_level_rewards` 广播语义保留：episode 分量仍在最后 token；shaping 分量放该 step 最后 token
+  3. loss mask 不变（Observation 继续排除于 policy loss——勘误①，正确语义：Observation 是条件上下文，模型通过 answer token 梯度学习利用证据）
 - **优点**：改动最小（reward 层 + 配置）；GRPO 语义完全不动；可直接对比当前基线
-- **缺点**：仍学不会"读完证据再作答"；T7（答案写进 query）需 query 校验层
+- **缺点**：仍不显式训练"读完证据再作答"（靠 answer-token 梯度间接学）；`new_answer_leak_in_query` 依赖 alias 归一化检测规则（§8 规则 3），规则外泄漏需审计字段事后检查
 
-### 方案 B：Search-aware GiGPO（信用分配+step 奖励）
+### 方案 B：Search-aware GiGPO（**推迟，本轮不实施**）
 
-- 在方案 A 的 shaping reward 之上：
-  1. `adv_estimator: gigpo` + `step_advantage_w: 0.3~0.5`（起步建议 0.3，避免 step 项噪声主导）
+- 勘误 2026-08-19（审阅反馈）：当前 fork 内 GiGPO 在 search 场景 step≥1 的检索 Observation 通常不同 → step group 为单例 → 单例组归一化 advantage≈0，无有效 step 相对信用 → 直接开启预期收益有限
+- **前置条件：nested rollout 版本**——能对同一 post-retrieval state 采样多个后续 action（step 组内多样本）时再启用；届时在 shaping reward 之上：
+  1. `adv_estimator: gigpo` + `step_advantage_w: 0.3~0.5`（起步 0.3，避免 step 项噪声主导）
   2. 修改 `core_gigpo.py` 增加 `episode_advantage_w` 配置（当前硬编码 1.0）
-  3. **可选（需补丁）**：把 Observation token 纳入 response_mask——训练"读证据"；风险：context 长度 +2048、训练吞吐下降
-  4. step 分组语义已核实：step 0 全组 1 组（≈GRPO），step≥1 多为单例（信用天然细粒度）
-- **优点**：搜索动作与答案动作获得不同 credit；多轮 search/answer 可分别归因
-- **缺点**：改动面大（advantage 层 + reward 层 + 可选 loss mask 补丁）；fork 内 GiGPO 未在 search 场景验证过
+- **本轮不实施**：adv_estimator 保持 GRPO；Observation 始终排除于 policy loss（勘误①）
 
 ## 7. 决策规则应用（prereg §7）
 
@@ -190,19 +193,61 @@ GiGPO 是 driver-side 纯 advantage 计算替换（critic-free），**FSDP/offlo
 |---|---|
 | 起始模型 | **Qwen2.5-3B Base**（干净对照；Step300 已压死搜索，作为基线参照而非起点）。备选：Step300 继续训练（保留记忆 18.8% + oracle 利用 58%，但需先解除搜索惩罚） |
 | 数据集 | `datasets/searchr1-upstream/train.parquet`（169,615 行）取确定性子集 ~20k 题（SHA 固定抽样），含多跳源配额 |
-| Reward 公式 | `R = R_answer + α·valid + β·evidence_hit + γ·searched_and_correct_and_evidence_hit − λ·invalid_or_error − μ·redundant_count`；**起始系数 C1-conservative**（format=0.1, α=0.02, β=0.05, γ=0.10, λ=0.10, μ=0.20），探索范围 C1~C6（α∈[0,0.05], β∈[0.05,0.15], γ∈[0.1,0.3], λ∈[0.1,0.3], μ∈[0.2,0.45]），不冻结 |
-| 算法 | **先 Search-aware GRPO**（方案 A：仅 reward 层改动，验证 reward 假设；诊断 4 显示 shaping 能拉开 T2>T1 且防 hack 全过）→ 若搜索优势仍不出现，上 **Search-aware GiGPO**（方案 B：step 信用，step_advantage_w∈[0.3,0.5]） |
-| 步数/batch | smoke 2 步门禁 → 正式 50~100 步；`ppo_epochs=1, gamma=1.0, env.rollout.n=5, seed=0`（与历史分段一致） |
-| GPU 预算 | 单卡 GPU1（3B FSDP 小 batch）可作 smoke；正式分段需单独批准六卡（边界：本轮不跑任何训练） |
-| smoke 门禁 | ① 诊断 4 的 8 轨迹防 hack 断言在训练环境过；② 训练侧 audit 显示 valid search > 0 且 invalid 率 < 50%；③ dev256 采样评测搜索率 > 0 |
+| Reward 公式 | **冻结 v1（2026-08-19）**：`R = R_answer + 0.15·evidence_hit + 0.30·searched_and_correct_and_evidence_hit − 0.20·invalid_or_error − 0.45·redundant_search_count − 0.20·new_answer_leak_in_query`；format_score=0.1、α=0（valid_retrieval 不单独奖励）、evidence_hit 只检查 Retriever 返回的真实 document 正文 |
+| 算法 | **Search-aware GRPO only**（adv_estimator=grpo，不改 advantage 层）；**GiGPO 推迟**（勘误②：step≥1 检索 Observation 分化 → 单例组 → 无有效 step 信用；等 nested rollout 版本再评估） |
+| 步数/batch | 工程 smoke 1~2 步（只验显存/在线 reward/梯度/checkpoint）→ 行为 smoke 5~10 步（另行预注册）→ 正式 50~100 步；`ppo_epochs=1, gamma=1.0, env.rollout.n=5, seed=0`（与历史分段一致） |
+| GPU 预算 | 六卡 1,2,3,4,6,7 工程 smoke（设计见 §9；与已验证全参数 FSDP/offload/gpu_mem=0.60 架构一致）；**本轮只设计不执行，所有 GPU 动作另行批准** |
+| smoke 门禁 | ① 12 条 CPU 测试 + 历史 rollout 离线回放 5 条硬门禁（T4≤T1、T7≤T1 在内，见 §9）；② 训练侧 audit 显示 valid search > 0 且 invalid 率 < 50%；③ dev256 采样评测搜索率 > 0 |
 | 停止条件 | 连续 N 步搜索率不恢复（无有效搜索）或 dev256 EM ≤ 记忆基线 → 停止并回到诊断；搜索恢复但 EM 无提升 → 转向 P1 检索侧（query 改写） |
 | 并行对照 | Step300（记忆路径）与官方 SearchR1（搜索但欠利用路径）作为两个失败模式的对照锚点 |
 
 **预期实验判别**：
-- 若 shaping 后搜索恢复且 EM 超 Step300 → reward/credit 假设成立，继续 GiGPO 精化
+- 若 shaping 后搜索恢复且 EM 超 Step300 → reward/credit 假设成立；GiGPO 精化等 nested rollout 版本（勘误②）后再评估
 - 若搜索恢复但 EM 不升（证据带回但答错）→ 转为 P1：检索 query 改写（多跳题多查询/子问题分解），reward 不动
 - 若搜索不恢复 → 回到诊断（shaping 信号在组内仍被淹没 → 需要更大 γ 或 GiGPO step 项）
 
-## 9. 停止声明
+## 9. Phase 4B 交付门禁与 GPU 工程 smoke 设计（2026-08-19，本轮交付）
 
-诊断已完成。**不自动启动 SFT、GRPO、GiGPO 或任何六卡训练**，等待单独批准。
+### 9.1 冻结的 Search-aware GRPO v1（单一实现源）
+
+```
+R = R_answer + 0.15·evidence_hit + 0.30·searched_and_correct_and_evidence_hit
+    − 0.20·invalid_or_error − 0.45·redundant_search_count − 0.20·new_answer_leak_in_query
+```
+
+- 固定项：`format_score=0.1`（本轮不改格式奖励）；`valid_retrieval` 系数 **α=0**（无关搜索本身不加分）；`evidence_hit` 只检查 **Retriever 返回的真实 document 正文**，不得检查 query、error 文本或模型输出；`searched_and_correct_and_evidence_hit` 要求至少一次真实成功检索 + 返回证据命中 + 最终答案 EM 正确
+- **answer-leak 防作弊**：`new_answer_leak_in_query`——normalized ground-truth alias 出现在 search query 中、且该 alias 原本不在 question 中；排除过短/空 alias（规则与阈值写入测试）；命中时**清零该次搜索的 evidence_hit 与 sce 奖励**并额外扣 0.20；问题本身包含答案 alias 不得误判；每条命中记录 `{question, query, alias}` 审计字段
+- **step 归因**：R_answer 只放终止 answer step；evidence_hit / invalid_or_error / new_answer_leak / redundant_search 放对应 search step；sce 在终止 answer step 结算但经 episode metadata 关联真实成功检索；禁止把完整 shaping reward 复制给 episode 内每个 step；Observation token 继续排除于 policy loss
+- **语义澄清 2026-08-19（工程实现）**：**冗余（第 2 次起）搜索步不获得 evidence 加分**（`evidence_credit=false`，该步仅计 −0.45）；否则「两次有效搜索 + 答对」= 1.15 > 1.0，违反硬门禁 ⑥（重复搜索 ≤ 直接答对）。`evidence_effective` 保持 true（sce 经 episode metadata 结算只要求 episode 内存在一次真实成功检索证据命中）。由此 diag T6（2 次有效搜索）恰为 1.00 == T1，与 §4.1 防 hack 表一致；任何多搜索组合总奖励 ≤ 1.00（第 2 步起边际恒为 −0.45）
+- **分量记录**：每条 rollout 记录 `answer_reward / format_reward / evidence_hit_reward / searched_correct_bonus / invalid_penalty / redundant_penalty / answer_leak_penalty / total_reward`，并断言分量之和与训练 score 一致
+- **实现隔离**：独立 patch `0007-search-aware-step-reward.patch`；独立配置 profile `search-aware-grpo-v1`；official-loose 基线配置/checkpoint/评测脚本与结果**不修改**；adv_estimator 仍为 GRPO；起始模型 Qwen2.5-3B Base（不从 gs300 继续）；FSDP/offload/vLLM 训练拓扑不变
+
+### 9.2 CPU 门禁（12 条测试 + 历史回放 5 条硬门禁）
+
+CPU 测试（纯函数，无 GPU/无 Ray）：
+① 不搜索直接答对 = 1.0；② 有效证据搜索后答对 = 1.45；③ 无关搜索后靠记忆答对 ≤ 1.0（T4≤T1 硬断言）；④ 有证据但答错 = 0.25；⑤ invalid query = −0.20；⑥ 重复搜索 ≤ 直接答对；⑦ 答案泄漏 query ≤ 直接答对（T7≤T1 硬断言）；⑧ question 原本含 alias 不误判；⑨ error observation 不算 evidence；⑩ 无搜索 episode 不得获得任何搜索奖励；⑪ 多步 reward 只落在对应 step；⑫ Observation token 的 policy loss mask 保持 0。
+
+历史 rollout 离线回放（seg 0-300 全部 *audit.jsonl，按 (traj_uid, env_step) 去重）硬门禁：
+`useful-search-correct > direct-correct`；`irrelevant-search-correct ≤ direct-correct`；`answer-leak-search-correct ≤ direct-correct`；`redundant-search-correct ≤ direct-correct`；`invalid < format-wrong < direct-correct`。
+报告项：组内 reward 方差、全同 reward 组比例、search action 的 advantage 方向、各 reward 分量触发次数、数值重复计算检查。
+
+**执行结果 2026-08-19（95,718 episodes / 19,796 groups，`gates/p3_v1_reward_replay_20260819.json`）——5 条硬门禁全部通过**：
+- ① useful（n=34，均恰为 1.45 的单次有效搜索答对）> direct（n=12,928，1.00）✓
+- ② irrelevant（n=51）max=1.00 ≤ 1.00 ✓；③ leak-correct（n=0）与 ④ redundant-correct（n=0）在历史数据上**空门禁**（与 diag `redundant_sum=0` 一致：历史无 ≥2 次搜索 episode）；语义由单元测试 ⑥⑦ 与分量算术结构性保证（多搜索总奖励 ≤ 1.00）
+- ⑤ invalid（n=2,411，均值 −0.20）< format-wrong（n=78,643，0.100）< direct（1.00）✓
+- 重复计算检查：95,718/95,718 episode 放置和 == 分量和，0 不一致；分量合计 answer 1,301,300¢ / format 794,780¢ / evidence 8,835¢ / sce 1,020¢ / invalid −65,620¢ / leak −240¢ / redundant 0¢
+- 组内方差均值 0.034；全同组比例 69.7%；search advantage 均值 −0.58 < no-search +0.03（历史策略下搜索轨迹在组内仍处劣势——v1 修正的是**未来训练**的 reward 归因，不回改历史策略）
+- 注意：历史 audit 的 record_score 记录的是旧 reward，与 v1 总分不可比（未做跨代数值断言，属设计内）
+
+### 9.3 六卡工程 smoke 设计（仅设计，不执行；所有 GPU 动作另行批准）
+
+**不用**"GPU1 单卡全参数 smoke"方案（未经显存验证）。采用与已验证的全参数 FSDP/offload/gpu_mem=0.60 训练拓扑一致的方式，六卡 1,2,3,4,6,7 一至两步工程 smoke：
+- 目的仅验证：显存（FSDP 全参数 + offload + vLLM rollout 共存）、reward 在线计算（v1 分量落位与 sum 校验）、非零梯度（audit 或 loss 变化）、checkpoint 与恢复
+- **不用 2 步 EM 判断算法效果**（样本量不足，属行为问题）
+- 工程 smoke 通过后，另行预注册 5~10 步行为 smoke（搜索率/分量触发/advantage 方向）
+- 预计耗时（估算）：启动与预检 ~10 min；1~2 步六卡 rollout+训练 ~20~40 min；checkpoint+恢复验证 ~10 min；合计 **~40~60 min 单次**（不含排队/重试）
+- 完成后退出验收：exit code、无残留 PID/端口/Ray、GPU 回基线
+
+## 10. 停止声明
+
+诊断与 Phase 4B 工程交付已完成。**不自动启动 SFT、GRPO、GiGPO 或任何六卡训练**，等待单独批准。
