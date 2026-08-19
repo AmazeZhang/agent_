@@ -146,7 +146,32 @@ round-2 prompt 检查 80/80 passed（诊断模式不 fail-closed）。
     把空查询替换为 `""`（env 返回空 observation、**不发 HTTP**，与
     projection 的 no-tags 语义一致）并标 `valids=0`；新增 6 项单元测试，
     共 29 项全绿（commit 待推送）。
-- **run c（20260820c）**：修复后重跑——结果运行后回填。
+- **run c（20260820c，最终结果）**：修复后重跑，256 题 greedy 全部完成，
+  **全程 0 个 422**（对比 run b 同期 8 个）：
+
+  | 指标 | 值 |
+  |---|---|
+  | EM（env 口径，训练同构） | 7/256 = **2.73%** |
+  | 搜索率 | 256/256 = 100% |
+  | 搜索成功 | 685/685 = 100% |
+  | **search→answer** | 0.996（255/256） |
+  | **search→correct** | 0.0273 |
+  | round-2 prompt gate | checked 254 / passed 254 / **PASS** |
+  | offline audit（正确） | 34/256 = 13.3%（含 27 个格式违规） |
+
+  - **offline audit 差异（27 个 env=0 / offline=1，全为 one-sided）**：模型在
+    `search+answer` 同轮输出（both tags）时，投影只取 `<search>` 块并丢弃
+    `<answer>`（valids=0，env 只执行 search）→ 该答案按上游协议作废
+    （env 的 chat_history 存投影后 action，训练同构）。offline 用完整
+    raw_action 重新评分发现这 27 题**模型其实写对了答案**——属格式违规，
+    不是不知道答案。**EM 口径以 env（训练同构）为准**；offline 仅审计。
+  - **分源 EM**：triviaqa 12.5%、2wiki 6.25%、nq 1.56%、hotpotqa/popqa/
+    musique/bamboogle 0%。
+  - **结论**：官方 Search-R1 3B 在 heldout-256 greedy 下**搜索链路完好**
+    （100% 搜索、100% 搜索成功、search→answer 0.996）但 **EM 仅 2.7%**；
+    与采样诊断对比（question 级 search→correct 31.25% vs greedy 2.7%），
+    **采样是提取正确答案的关键路径，greedy 是下限表现**；另有 ~10.5%
+    的正确答案因 both-tags 格式违规被上游协议丢弃。
 
 ## 6. 资源状态
 
