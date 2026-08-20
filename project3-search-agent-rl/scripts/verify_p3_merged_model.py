@@ -45,6 +45,11 @@ REQUIRED_TOKENIZER_FILES = (
     "tokenizer_config.json",
     "vocab.json",
     "merges.txt",
+)
+# Optional: Qwen2.5-3B-Instruct (official HF layout) ships neither; its added
+# tokens live in tokenizer_config.json's added_tokens_decoder, so transformers
+# loads it byte-identically without them. Reported as present/absent only.
+OPTIONAL_TOKENIZER_FILES = (
     "special_tokens_map.json",
     "added_tokens.json",
 )
@@ -75,6 +80,9 @@ def main() -> None:
     missing = [name for name in required if not (merged / name).is_file()]
     assert not missing, f"missing required files: {missing}"
     report["files_present"] = sorted(required)
+    report["optional_tokenizer_files_present"] = [
+        name for name in OPTIONAL_TOKENIZER_FILES if (merged / name).is_file()
+    ]
     report["weight_shards"] = [p.name for p in shards]
 
     # 2. sizes + SHA256 per file
