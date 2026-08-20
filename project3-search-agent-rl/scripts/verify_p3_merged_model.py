@@ -150,6 +150,20 @@ def main() -> None:
     model_keys = set(model.state_dict().keys())
     missing = sorted(model_keys - file_keys)
     unexpected = sorted(file_keys - model_keys)
+    if not has_lm_head:
+        # Tied embeddings: transformers materializes lm_head.weight sharing
+        # embed_tokens. The raw HF layout (e.g. Qwen2.5-3B-Instruct) ships no
+        # independent lm_head file, so its absence is expected -- verify the
+        # materialized copy ties exactly to embed_tokens instead.
+        missing_wo_lm_head = [k for k in missing if k != "lm_head.weight"]
+        if not missing_wo_lm_head and "lm_head.weight" in missing:
+            embed = model.get_input_embeddings().weight.detach()
+            lm_head = model.lm_head.weight.detach()
+            report["tie_lm_head_matches_embed_tokens"] = bool(torch.equal(embed, lm_head))
+            report["tied_lm_head_materialized"] = True
+            missing = missing_wo_lm_head
+        else:
+            report["tied_lm_head_materialized"] = False
     report["load_missing_keys"] = missing
     report["load_unexpected_keys"] = unexpected
     assert not missing, f"keys present in model but missing from safetensors: {missing}"
