@@ -24,13 +24,16 @@ fi
 
 data_root="${PROJECT3_DATA_ROOT:-/media/imc/data}"
 min_free_gib="${PROJECT3_MIN_FREE_GIB:-150}"
-# Pass through every PROJECT3_EVAL_* variable (model/tokenizer/data/temperature/
-# num-rollouts, ...): the tmux server reuses the environment of its FIRST
-# session, so ad-hoc prefix env vars would otherwise be lost.
+# Pass through every PROJECT3_* variable (eval model/tokenizer/data/temperature/
+# num-rollouts, training adv_estimator/total-steps/profile, ...): the tmux
+# server reuses the environment of its FIRST session, so ad-hoc prefix env
+# vars would otherwise be lost. PROJECT3_DATA_ROOT / PROJECT3_MIN_FREE_GIB are
+# re-exported explicitly below and excluded from the passthrough.
 eval_extra_env=()
 while IFS='=' read -r -d '' k v; do
   case "$k" in
-    PROJECT3_EVAL_*) eval_extra_env+=("${k}=${v}") ;;
+    PROJECT3_DATA_ROOT|PROJECT3_MIN_FREE_GIB) ;;
+    PROJECT3_*) eval_extra_env+=("${k}=${v}") ;;
   esac
 done < <(env -0)
 printf -v managed_command '%q ' \
