@@ -36,7 +36,7 @@
 | P1 环境冻结 | 已完成 | P0 通过 | freeze、CPU import、受管 GPU1 FlashAttention 正反向 smoke |
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 进行中 | 固定模型/数据、本地工具安全补丁通过 | 基座离线单图 smoke 通过；agent 工具闭环未开始 |
-| P4 Agentic SFT | 进行中 | 推理闭环通过 | 合成数据 1-step LoRA checkpoint 通过；断点续训待验证 |
+| P4 Agentic SFT | 进行中 | 推理闭环通过 | 合成数据 1→2 step LoRA 断点续训通过；5-step/adapter 推理待验证 |
 | P5 SFT→RL rollout-only | 未开始 | SFT checkpoint 通过固定对照 | 待补 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
@@ -231,4 +231,11 @@
   `global_step=1`，checkpoint 含 87,368,144 B `adapter_model.safetensors` 和 optimizer state。
   单步记录 loss 2.64398、grad norm 2.96580，只作为计算链路有限值检查，不作为效果结论。
 - 资源：监控采样看到 GPU1 最高 18,765 MiB 已用显存；这是离散采样值，不声明为精确峰值。
-- 边界：启动器最多执行工程 smoke，不授权真实 36K 数据或大规模训练；断点续训仍待验证。
+- 断点续训：Run `sft-lora-resume-step2-20260821` 从 checkpoint-1 明确恢复 model、optimizer、
+  RNG 和 scheduler state，日志确认从 global step 1 继续并跳过首批；checkpoint-2 的
+  `global_step=2`，历史同时保留 step 1/2。
+- 续训有限值：step 2 loss 2.51669、grad norm 3.15616；只说明第二次参数更新为有限值。
+  checkpoint-1/2 adapter SHA256 分别为 `10f43014...`、`2d881fb4...`，证明保存权重发生变化。
+- 续训安全：Run `exit_code=0`，cleanup 后 GPU1 `compute_processes=none`，GPU0 未参与。
+- 边界：启动器最多执行工程 smoke，不授权真实 36K 数据或大规模训练；5-step 与 adapter
+  离线推理仍待验证。
