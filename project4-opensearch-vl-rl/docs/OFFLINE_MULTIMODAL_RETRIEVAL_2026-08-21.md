@@ -193,3 +193,12 @@ split 仍需在数据 pilot 中固定。
 
 因此硬门禁返回 `do-not-mix-computed-queries-with-published-candidates`。后续固定 torchvision V1
 权重，同时重算 19,629 个候选和所有查询图片；只有候选/查询共用同一 encoder 才开放工具调用。
+
+统一候选重编码已完成：物理 GPU1 的受管 tmux Run 编码 19,629/19,629，进程内仅逻辑
+`cuda:0`，实际物理卡记录为 GPU1；70.238 秒，峰值 allocated 约 0.746 GiB，正常退出并确认无遗留
+进程。GPU0/5 未参与。真实原图与中心 80% crop 均检索到同一 `Scolopendra gigantea` entity，
+相似度分别 1.0 与 0.980778。
+
+`LocalImageSearchBackend` 在加载时强制检查 visual index revision 以同一完整 encoder weights SHA256
+结尾；不匹配会在查询前拒绝。工具只接受允许根目录下的本地绝对/相对图片，拒绝路径逃逸和符号
+链接，不在 image search 内访问 URL。

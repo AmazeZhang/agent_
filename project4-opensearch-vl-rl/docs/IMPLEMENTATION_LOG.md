@@ -359,7 +359,7 @@
 
 ### Step P6c：WIT 发布 encoder 校准与统一重编码门禁
 
-- 状态：校准完成且明确失败；受管 GPU 重编码器实现完成，尚未启动真实 GPU Run。
+- 状态：完成；发布空间校准明确失败，统一 encoder 的真实受管 GPU 重编码完成。
 - 权重：torchvision ResNet-50 V1，102,530,333 B，完整 SHA256 `0676ba61b6795bbe...e722fb8a`，
   官方下载器按文件名 hash 前缀校验；缓存位于项目四数据盘。
 - 校准：显式 `CUDA_VISIBLE_DEVICES=''`，CPU 上 16 样本；配对余弦均值 0.4416，identity top-1
@@ -369,3 +369,19 @@
   覆盖、向量要求有限。启动仍必须经过 tmux/受管脚本和空闲卡检查，GPU0/5 不使用。
 - 测试：alignment 接受同空间缩放、拒绝置换空间；WIT image bytes 解码和 managed identity guard
   通过；unittest、Ruff 和 `git diff --check` 通过。
+- 真实 Run：`wit-reembed-resnet50-v1-20260822`，物理 GPU1；19,629 张编码完成，耗时 70.238 秒，
+  峰值 allocated 800,757,248 B；`exit_code=0`，cleanup 后 GPU1 `compute_processes=none`，GPU0/5
+  未参与。Pillow 对一个带 bytes transparency 的 palette image 给出转 RGBA 警告，脚本最终统一
+  `convert("RGB")`，没有失败或跳过记录。
+
+### Step P6d：可执行本地 image_search backend
+
+- 状态：实现和真实端到端 smoke 完成；RL-8K 分层覆盖率尚未评估。
+- backend：查询图使用与候选完全相同的 torchvision ResNet-50 V1/preprocess；初始化时校验索引
+  revision 包含完整 weights SHA256，阻止混合向量空间。
+- 路径安全：只读取显式 allowed root 下的本地文件，支持相对引用，拒绝根目录逃逸、非文件和路径
+  中任意符号链接；不访问图片 URL。
+- smoke：WIT 首图原图 top-1 self similarity 1.0；中心 80% crop top-1 仍为 self，similarity
+  0.980778；其余高位候选也是蜈蚣相关实体。该 smoke 不声明对 RL-8K 的覆盖率。
+- 验证：encoder revision 一致/不一致与本地路径正常/相对/逃逸/符号链接测试通过；unittest、Ruff
+  和 `git diff --check` 通过。

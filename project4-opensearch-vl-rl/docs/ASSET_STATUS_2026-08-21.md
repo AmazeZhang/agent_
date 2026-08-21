@@ -107,4 +107,9 @@ float64 embedding、多语言 Wikipedia URL/标题/上下文。已构建 19,629 
 ResNet-50 V1 与发布空间不兼容：16 样本配对余弦均值 0.4416、identity top-1 1/16，因此工具
 禁止混用。已下载 torchvision 官方 V1 权重 102,530,333 B，SHA256
 `0676ba61b6795bbe1773cffd859882e5e297624d384b6993f7c9e683e722fb8a`；下一步对候选和查询统一
-重编码。
+重编码。19,629 个候选已在受管物理 GPU1 Run 完成统一重编码，耗时 70.238 秒，峰值 allocated
+显存 800,757,248 B；Run `exit_code=0`，cleanup 后 GPU1 无 compute process，GPU0/5 未参与。
+
+统一空间端到端 smoke：WIT 首图原图查询 top-1 为自身实体，相似度 1.0；中心 80% 裁剪仍以
+0.980778 返回同一实体。该结果只证明工具/encoder/index 一致性，不代表随机单 shard 对 RL-8K 的
+语义覆盖率。
