@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 MODEL_ROOT = PROJECT_DATA / "models/Qwen3-VL-8B-Instruct"
 DATASET_ROOT = PROJECT_DATA / "datasets/processed/sft-smoke-v1"
@@ -134,8 +136,10 @@ def main() -> int:
     if checkpoint is not None:
         config["resume_from_checkpoint"] = str(checkpoint)
 
-    config_path = run_dir / "sft-smoke-config.json"
-    config_path.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n")
+    # This pinned LLaMA Factory revision incorrectly calls json.load(Path(...))
+    # for JSON configs. Its YAML path is valid, so keep the generated config YAML.
+    config_path = run_dir / "sft-smoke-config.yaml"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=True))
     provenance = {
         "synthetic": True,
         "purpose": "pipeline-smoke-only",
