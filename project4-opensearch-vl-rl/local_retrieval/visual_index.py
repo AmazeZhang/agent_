@@ -149,6 +149,48 @@ class ExactVisualIndex:
             )
         return results
 
+    def search_batch(
+        self,
+        query_vectors: Sequence[Sequence[float]] | np.ndarray,
+        *,
+        top_k: int = 5,
+        minimum_similarity: float = -1.0,
+    ) -> list[list[dict[str, object]]]:
+        if not 1 <= top_k <= 50:
+            raise ValueError("top_k must be between 1 and 50")
+        if not -1.0 <= minimum_similarity <= 1.0:
+            raise ValueError("minimum_similarity must be between -1 and 1")
+        queries = np.asarray(query_vectors, dtype=np.float32)
+        if queries.ndim != 2 or queries.shape[1] != self.vectors.shape[1]:
+            raise ValueError(
+                "batch query dimension mismatch: "
+                f"{queries.shape}/(*, {self.vectors.shape[1]})"
+            )
+        if not len(queries) or not np.isfinite(queries).all():
+            raise ValueError("batch queries must be non-empty and finite")
+        norms = np.linalg.norm(queries, axis=1)
+        if np.any(norms == 0):
+            raise ValueError("batch queries contain a zero-norm row")
+        scores = (queries / norms[:, None]) @ self.vectors.T
+        batches = []
+        for query_scores in scores:
+            order = np.argsort(-query_scores, kind="stable")[:top_k]
+            results = []
+            for index in order:
+                similarity = float(query_scores[index])
+                if similarity < minimum_similarity:
+                    continue
+                results.append(
+                    {
+                        **self.metadata[int(index)],
+                        "similarity": round(similarity, 8),
+                        "corpus": self.manifest["corpus"],
+                        "corpus_revision": self.manifest["corpus_revision"],
+                    }
+                )
+            batches.append(results)
+        return batches
+
 
 def tool_observation(results: Sequence[Mapping[str, object]]) -> str:
     """Return the stable payload expected after an ``image_search`` call."""

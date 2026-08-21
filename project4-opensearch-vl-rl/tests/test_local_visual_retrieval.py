@@ -44,6 +44,11 @@ class LocalVisualRetrievalTest(unittest.TestCase):
             self.assertEqual(payload["backend"], "local_visual_index")
             self.assertEqual(payload["match_count"], 2)
             self.assertIn("corpus_revision", payload["results"][0])
+            batch_results = index.search_batch(
+                [[1, 0], [-1, 0]], top_k=1, minimum_similarity=-1.0
+            )
+            self.assertEqual(batch_results[0][0]["entity_id"], "a")
+            self.assertEqual(batch_results[1][0]["entity_id"], "c")
 
             with self.assertRaises(FileExistsError):
                 build_exact_index(
