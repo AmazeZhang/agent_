@@ -19,7 +19,7 @@ from local_retrieval.resnet50_encoder import sha256_file  # noqa: E402
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 MODEL_ROOT = PROJECT_DATA / "models/Qwen3-VL-8B-Instruct"
-DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v1"
+DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v2"
 RUN_ROOT = PROJECT_DATA / "runs"
 
 
@@ -52,6 +52,7 @@ def validate_dataset(root: Path) -> dict[str, object]:
         "status": "retrieval-verified",
         "purpose": "local-agentic-sft-rl-pilot",
         "image_observation_contains_text_summary": False,
+        "image_runtime_handle": "img_1",
         "split_unit": "entity_id",
     }
     for field, expected in required.items():

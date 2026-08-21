@@ -20,6 +20,7 @@ class RunWitAgenticSftTest(unittest.TestCase):
                 "status": "retrieval-verified",
                 "purpose": "local-agentic-sft-rl-pilot",
                 "image_observation_contains_text_summary": False,
+                "image_runtime_handle": "img_1",
                 "split_unit": "entity_id",
                 "split_counts": {"dev": 20, "test": 20, "train": 80},
                 "verification": {"failures": 0},

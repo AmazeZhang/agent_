@@ -55,6 +55,7 @@ class VerifyWitAgenticPilotTest(unittest.TestCase):
             sft["conversations"][2]["value"].split("\n", 1)[1]
         )
         self.assertNotIn("summary", image_observation["results"][0])
+        self.assertIn("literal handle img_1", sft["system"])
         self.assertEqual(
             published["oracle_steps"], ["image_search", "text_lookup", "final"]
         )

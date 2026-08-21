@@ -62,7 +62,10 @@ def tool_schema() -> str:
             "type": "function",
             "function": {
                 "name": "image_search",
-                "description": "Find local Wikipedia entity candidates for an image.",
+                "description": (
+                    "Find local Wikipedia entity candidates. The provided query image is "
+                    "registered under the literal runtime handle img_1."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -109,7 +112,8 @@ def make_record(
             {
                 "from": "human",
                 "value": (
-                    "<image> Identify the Wikipedia subject most closely matching this image. "
+                    "<image> The provided image has runtime handle img_1. Identify the "
+                    "Wikipedia subject most closely matching this image. "
                     "Then use text_lookup on the selected entity and report its exact title "
                     "and the first evidence sentence."
                 ),
@@ -134,8 +138,10 @@ def make_record(
         ],
         "images": [task["query_image"]],
         "system": (
-            "Use one tool call per turn. Image search returns entity candidates only; "
-            "text_lookup supplies answer evidence. Do not invent missing evidence."
+            "Use one tool call per turn. Pass the literal handle img_1 to image_search; "
+            "do not replace it with a filename or image description. Image search returns "
+            "entity candidates only; text_lookup supplies answer evidence. Do not invent "
+            "missing evidence."
         ),
         "tools": tool_schema(),
     }
@@ -318,6 +324,7 @@ def verify_and_publish(
             "split_counts": dict(sorted(split_counts.items())),
             "records": len(published_tasks),
             "image_observation_contains_text_summary": False,
+            "image_runtime_handle": "img_1",
             "oracle_steps": ["image_search", "text_lookup", "final"],
         }
         with (staging / "manifest.json").open("x", encoding="utf-8") as handle:

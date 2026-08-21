@@ -31,7 +31,10 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "image_search",
-            "description": "Find local Wikipedia entity candidates for an image.",
+            "description": (
+                "Find local Wikipedia entity candidates. The provided query image is "
+                "registered under the literal runtime handle img_1."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -123,6 +126,7 @@ def load_tasks(split: str, max_tasks: int) -> tuple[dict[str, Any], list[dict[st
     if (
         manifest.get("status") != "retrieval-verified"
         or manifest.get("image_observation_contains_text_summary") is not False
+        or manifest.get("image_runtime_handle") != "img_1"
     ):
         raise ValueError("evaluation dataset is not a verified no-leak pilot")
     with (DATASET_ROOT / "tasks.jsonl").open(encoding="utf-8") as handle:
@@ -216,9 +220,10 @@ def evaluate_task(
                 {
                     "type": "text",
                     "text": (
-                        "Use one tool call per turn. Image search returns entity candidates "
-                        "only; text_lookup supplies answer evidence. Do not invent missing "
-                        "evidence."
+                        "Use one tool call per turn. Pass the literal handle img_1 to "
+                        "image_search; do not replace it with a filename or image description. "
+                        "Image search returns entity candidates only; text_lookup supplies "
+                        "answer evidence. Do not invent missing evidence."
                     ),
                 }
             ],
@@ -230,7 +235,8 @@ def evaluate_task(
                 {
                     "type": "text",
                     "text": (
-                        "Identify the Wikipedia subject most closely matching this image. "
+                        "The provided image has runtime handle img_1. Identify the Wikipedia "
+                        "subject most closely matching this image. "
                         "Then use text_lookup on the selected entity and report its exact "
                         "title and the first evidence sentence."
                     ),
