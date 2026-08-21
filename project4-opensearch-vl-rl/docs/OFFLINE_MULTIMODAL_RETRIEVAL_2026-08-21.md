@@ -1,7 +1,7 @@
 # OpenSearch-VL 本地多模态检索研究与接入决策
 
 > 日期：2026-08-21  
-> 状态：完成第一轮数据级审计；RL 图片包下载中；OVEN 当前账号无权限，转向公开 WIT；尚未启动 RL。
+> 状态：RL-8K JSONL/图片已完成校验和逐图审计；OVEN 当前账号无权限，转向公开 WIT；尚未启动 RL。
 > 目标：判断 OVEN/WIT 是否适合作为低成本 RL 工具后端，以及是否需要改写 RL 数据。
 
 ## 1. 已固定的数据源
@@ -14,9 +14,11 @@
 - 已下载并校验：
   - `rl_data.jsonl`：8,933,719 B
   - SHA256：`3af5b3c188e604817b6c4731c369b7ca1f829414fc514d109a7f468cfd8b0144`
-- 下载中：`images.zip`，2,693,241,993 B，官方 LFS SHA256
-  `589a67c263c8dcd9697bc762df3d3d6cc5b369017b1f196186a69d23142f4236`；使用 8 路有界
-  Range 和可恢复 part 文件，校验通过前不会发布为最终 ZIP。
+- 已完成：`images.zip`，2,693,241,993 B，整体 SHA256
+  `589a67c263c8dcd9697bc762df3d3d6cc5b369017b1f196186a69d23142f4236` 与官方 LFS 一致；
+  使用 8 路有界 Range、可恢复 part 和每路自动重试，校验通过后才发布最终 ZIP。
+- ZIP CRC/安全审计、非覆盖解压和 7,992 张逐图 decode 全部通过；图片为 4,026 JPEG、
+  3,149 PNG、817 WEBP，7,992 个 JSONL 引用均唯一且存在。
 
 下载只使用固定 revision 的 `hf-mirror.com` 直连，显式清空大小写代理变量，未使用 Clash
 7890/7891，且禁用了隐式 HF token 和 Xet。
@@ -130,13 +132,12 @@ text_search
 
 ## 5. 下一步门禁
 
-1. 完成并校验 RL `images.zip`；只通过 `scripts/safe_extract_zip.py` 审计后解压；
-2. 下载并校验 WIT 单个约 0.93 GB 分片，验证 Parquet schema、图片和预计算特征；
-3. 实现离线索引适配器和稳定 observation schema；
-4. 固定随机种子抽取 200 条，按八个 dataset 子集分层报告；
-5. 根据覆盖率与索引成本决定是否分批扩展 WIT，不能把单片 pilot 冒充完整语料；
-6. OVEN 只有在用户正规接受条款、凭据授权后才恢复下载；初期仍不下载八个 query shard；
-7. 任何 20 步以上 RL、WIT 全量 308 GB 下载或在线 fallback 均需重新获得用户确认。
+1. 下载并校验 WIT 单个约 0.93 GB 分片，验证 Parquet schema、图片和预计算特征；
+2. 把真实 WIT 字段接入已实现的离线索引适配器和稳定 observation schema；
+3. 使用已固定的 200 条清单，按八个 dataset 子集分层报告检索覆盖率；
+4. 根据覆盖率与索引成本决定是否分批扩展 WIT，不能把单片 pilot 冒充完整语料；
+5. OVEN 只有在用户正规接受条款、凭据授权后才恢复下载；初期仍不下载八个 query shard；
+6. 任何 20 步以上 RL、WIT 全量 308 GB 下载或在线 fallback 均需重新获得用户确认。
 
 ## 6. 已实现的本地检索契约
 

@@ -305,7 +305,7 @@
 
 ### Step P5c：200 条分层清单与 RL 图片引用门禁
 
-- 状态：实现、CPU 单测和实际 200 条清单均完成；等待图片包完成后执行真实图片审计并随报告提交。
+- 状态：完成；实现、CPU 单测、实际 200 条清单和全部图片审计均通过。
 - 抽样：`select_stratified_rl_audit.py` 使用 dataset 比例、最大余数配额和 SHA256 稳定优先级；输出
   只含 sample ID、row index 和 dataset，显式记录 `uses_answer_for_selection=false`。修改 answer 内容
   不改变测试中的抽样结果。
@@ -318,6 +318,11 @@
 - 清单：数据盘 `datasets/manifests/search-vl-rl-8k-offline-audit-200-8ef5672.json`，21,977 B，
   SHA256 `cd16abbe9d91b4a09e0bbeddf012d23c87a0da58928375dab3271a9eee10fa7b`。首次审批失败的
   问题在权限恢复后通过原命令解决，没有改用旁路或改变抽样算法。
+- 图片资产：2,693,241,993 B ZIP 整体 SHA256 与官方一致；安全审计确认 7,992 文件、
+  2,704,382,981 B 解压大小、最大压缩比 29.44。逐图审计为 JPEG 4,026、PNG 3,149、
+  WEBP 817，全部 7,992 个唯一引用存在并可解码，没有路径逃逸或符号链接。
+- 报告：ZIP 审计和逐图审计分别为 298 B/792 B，SHA256 `74cb2e9a...`/`8755a6c2...`；原始
+  8 路 part 保留作续传/取证证据，未删除。
 
 ### Step P5d：本地 Wikipedia 文本检索契约
 
