@@ -36,7 +36,7 @@
 | P1 环境冻结 | 已完成 | P0 通过 | freeze、CPU import、受管 GPU1 FlashAttention 正反向 smoke |
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 本地工具闭环已通 | 固定模型/数据、本地工具安全补丁通过 | 基座单图 smoke；WIT image/text 双工具真实轨迹可执行 |
-| P4 Agentic SFT | 真实派生数据 1→5 step 工程闭环完成 | 检索验证数据与 loss mask 通过 | WIT 派生 80 条 train 已完成断点续训；旧协议 checkpoint 仅作负面证据 |
+| P4 Agentic SFT | challenge-v5 1-step 完成 | 检索验证数据与 loss mask 通过 | 新协议 checkpoint 已生成，待固定 dev20 复评 |
 | P5 SFT→RL rollout-only | challenge Base dev20 完成 | challenge SFT 通过固定对照 | Base full success 0.55；待 challenge SFT 1-step/复评 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
@@ -536,3 +536,11 @@
   `compute_processes=none`，GPU0/5 未参与。
 - 进入判断：challenge 已产生非零、非满分且按任务类型可解释的基线，允许进入最多 1-step challenge SFT
   和同 dev20 复评；仍不授权大规模 SFT、多卡或 RL。
+- challenge SFT Run：`wit-agent-challenge-v5-sft-1step-20260822`，固定 commit `00cc479`；80 条 train、
+  rank-8 LoRA、冻结 vision/projector、BF16/FA2、batch 1。单步 loss `0.0790444`、grad norm
+  `1.454829` 均有限；低 loss 只反映首个抽样轨迹与 Instruct 基座已较匹配，不作为效果结论。
+- checkpoint：`global_step=1`，21,823,488 trainable params；adapter 87,368,144 B，SHA256
+  `637169695b4b96022e003b2ad59bea780288da0c31aab94a1c64f962856399f5`。物理 GPU1，
+  `exit_code=0`，cleanup `compute_processes=none`，GPU0/5 未参与。
+- provenance：明确 `fully_synthetic=false`、`contains_synthetic_safety_probes=true`，不隐藏 24 条 no-match
+  合成安全探针。下一步只加载该 adapter 跑完全相同的 dev20；未看到 held-out 改善前不续训。
