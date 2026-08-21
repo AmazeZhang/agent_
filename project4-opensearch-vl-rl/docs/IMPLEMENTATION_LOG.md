@@ -37,7 +37,7 @@
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 本地工具闭环已通 | 固定模型/数据、本地工具安全补丁通过 | 基座单图 smoke；WIT image/text 双工具真实轨迹可执行 |
 | P4 Agentic SFT | 真实派生数据 1→5 step 工程闭环完成 | 检索验证数据与 loss mask 通过 | WIT 派生 80 条 train 已完成断点续训；旧协议 checkpoint 仅作负面证据 |
-| P5 SFT→RL rollout-only | Base 固定评测协议已校准 | 真实 SFT checkpoint 通过固定对照 | v4 修复 gold 定义并完成检索验证；待跑最终 Base/SFT 对照 |
+| P5 SFT→RL rollout-only | clean Base 评测完成；难例扩充中 | 真实 SFT checkpoint 通过固定对照 | v4 clean dev5 Base 已满分，不能用于证明训练增益 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -470,3 +470,9 @@
   `17ea6412a8a83476959242d637eb6d8ca262e2b24032118bf0b7fce3f972d474`。
 - 判断：当前实体识别→文本复制任务可能对 8B Instruct 基座过易。完成 v4 Base 复评后，若已接近满分，
   不会用它伪造 SFT/RL 增益；需加入候选冲突、no-match 与工具失败恢复等更难分层任务。
+- v4 Base 复评：Run `wit-agent-v4-base-dev5-20260822`，固定 commit `8ce92b1`；5/5 均严格成功，
+  `expected_tool_path/format/title/evidence/full_success=1.0`，`fatal_rate=0`。report SHA256
+  `d2a5787dac703fa8498e3d3e730c0c99a5ddfc1513871ce4dd1c21ac01f69d45`；物理 GPU1，
+  `exit_code=0`，cleanup `compute_processes=none`，GPU0/5 未参与。
+- 结论：v4 clean 只作为执行链路正控，不再对它做能被解释成效果增益的 SFT 对比。下一数据版本固定增加
+  `candidate-conflict`、`no-match`、`transient-tool-failure` 三类，并按任务类型分别报告，之后才启动新协议 SFT。
