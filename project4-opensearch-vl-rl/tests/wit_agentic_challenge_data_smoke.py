@@ -14,7 +14,7 @@ MODEL_ROOT = (
 )
 DATASET_ROOT = Path(
     "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/datasets/processed/"
-    "wit-agentic-challenge-v4"
+    "wit-agentic-challenge-v5"
 )
 
 

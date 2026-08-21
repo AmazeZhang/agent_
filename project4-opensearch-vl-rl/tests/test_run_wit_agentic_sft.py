@@ -24,7 +24,7 @@ class RunWitAgenticSftTest(unittest.TestCase):
                 "final_response_format": "Title: <exact title>\\nEvidence: <first sentence-or-no-match>",
                 "evidence_extraction": "first_terminal_punctuation_or_360_characters",
                 "split_unit": "entity_id-or-synthetic-probe-id",
-                "maximum_agent_turns": 4,
+                "maximum_agent_turns": 5,
                 "text_lookup_summary_max_characters": 360,
                 "image_search_top_k_maximum": 3,
                 "split_counts": {"dev": 20, "test": 20, "train": 80},

@@ -37,7 +37,7 @@
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 本地工具闭环已通 | 固定模型/数据、本地工具安全补丁通过 | 基座单图 smoke；WIT image/text 双工具真实轨迹可执行 |
 | P4 Agentic SFT | 真实派生数据 1→5 step 工程闭环完成 | 检索验证数据与 loss mask 通过 | WIT 派生 80 条 train 已完成断点续训；旧协议 checkpoint 仅作负面证据 |
-| P5 SFT→RL rollout-only | clean Base 完成；难例数据已就绪 | 真实 SFT checkpoint 通过固定对照 | challenge-v4 已通过真实模板解析，待 Base dev20 重跑 |
+| P5 SFT→RL rollout-only | clean Base 完成；难例数据已就绪 | 真实 SFT checkpoint 通过固定对照 | challenge-v5 已通过真实模板解析，待 Base dev20 重跑 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -510,3 +510,13 @@
   `ec1dcc3f424b375fc5f8a78c42f4aa5637acb3db8d406432cdb96bb8f5084479`、
   `14435f66801d623ff55045693a31c55cf139f82a6985d2aa24a0c73a1ba6e70b`、
   `d79ec7dfa0363244e010a0e85ccc823ab294eff63433b6f4710970c70b1d30d7`；v1–v3 均保留但不再作为训练入口。
+- v4 Base 重跑首条走出 `image_search + 3×text_lookup`，但 4-turn 环境在 final 前截断；对 top-3
+  候选逐个查证是合法策略，因此该限制会错误惩罚谨慎模型。Run
+  `wit-agent-challenge-v4-base-dev20-20260822` 按 exact token/进程组停止，`exit_code=143`，cleanup
+  `compute_processes=none`，不计入模型结果。
+- v5 将环境最大 turn 固定为 5，覆盖最坏合法路径 `image_search + 3×text_lookup + final`；SFT oracle
+  仍只查到命中候选后立即 final（4 turn），不监督冗余调用。v5 再次通过完整 80 条真实模板解析。
+- v5 manifest/tasks/train SFT SHA256 分别为
+  `341194a665682699853fe6704d45bfe49f5e520179011b29b092cb666a7cbbf1`、
+  `14435f66801d623ff55045693a31c55cf139f82a6985d2aa24a0c73a1ba6e70b`、
+  `d79ec7dfa0363244e010a0e85ccc823ab294eff63433b6f4710970c70b1d30d7`；v1–v4 保留但不作为训练入口。

@@ -22,7 +22,7 @@ from local_retrieval.resnet50_encoder import sha256_file  # noqa: E402
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 MODEL_ROOT = PROJECT_DATA / "models/Qwen3-VL-8B-Instruct"
-DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v4"
+DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v5"
 RUN_ROOT = PROJECT_DATA / "runs"
 TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
 
@@ -131,7 +131,7 @@ def load_tasks(split: str, max_tasks: int) -> tuple[dict[str, Any], list[dict[st
         != "Title: <exact title>\\nEvidence: <first sentence-or-no-match>"
         or manifest.get("evidence_extraction")
         != "first_terminal_punctuation_or_360_characters"
-        or manifest.get("maximum_agent_turns") != 4
+        or manifest.get("maximum_agent_turns") != 5
         or manifest.get("text_lookup_summary_max_characters") != 360
         or manifest.get("image_search_top_k_maximum") != 3
     ):
@@ -265,7 +265,7 @@ def evaluate_task(
     fatal = None
     final_text = ""
     image_search_call_count = 0
-    for _ in range(4):
+    for _ in range(5):
         output, input_tokens, output_tokens = generate_turn(
             model, processor, messages, max_new_tokens=max_new_tokens
         )

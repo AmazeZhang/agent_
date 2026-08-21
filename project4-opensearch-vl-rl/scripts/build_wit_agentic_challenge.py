@@ -30,7 +30,7 @@ from verify_wit_agentic_pilot import first_sentence, tool_schema
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 SOURCE_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v4"
-OUTPUT_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v4"
+OUTPUT_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v5"
 SYSTEM = (
     "Use one tool call per turn. Pass the literal handle img_1 to image_search. "
     "Image search returns entity candidates only; text_lookup supplies answer evidence. "
@@ -427,7 +427,7 @@ def build(source_root: Path, output: Path) -> Path:
             "image_observation_contains_text_summary": False,
             "final_response_format": "Title: <exact title>\\nEvidence: <first sentence-or-no-match>",
             "evidence_extraction": "first_terminal_punctuation_or_360_characters",
-            "maximum_agent_turns": 4,
+            "maximum_agent_turns": 5,
             "network_required": False,
         }
         with (staging / "manifest.json").open("x", encoding="utf-8") as handle:
