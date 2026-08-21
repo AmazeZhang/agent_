@@ -96,7 +96,7 @@ no-match 幻觉率、fatal 比例，以及按任务类型分层的 reward。不�
 2. 完成 200 条分层清单；
 3. 下载一个 WIT shard 并固定真实 schema；
 4. 完成本地 `image_search`/`text_lookup` 与多跳数据 pilot；**已完成**；
-5. 运行 Base 固定评测；**待完成**；
-6. 运行真实数据小规模 SFT 并复评；**1-step 工程门禁已完成，待 Base/SFT 对照后续训**；
+5. 运行 Base 固定评测；**评测协议 v4 已校准，待最终 Base 复评**；
+6. 运行真实数据小规模 SFT 并复评；**旧协议 1→5 step 工程门禁已完成，不作为效果证据**；
 7. 运行 vanilla/fatal-aware GRPO smoke 与消融；
 8. 只有观察到可信增益且审计无数据泄漏后，才准备扩大训练。

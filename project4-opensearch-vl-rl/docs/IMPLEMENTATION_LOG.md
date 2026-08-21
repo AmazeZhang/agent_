@@ -36,8 +36,8 @@
 | P1 环境冻结 | 已完成 | P0 通过 | freeze、CPU import、受管 GPU1 FlashAttention 正反向 smoke |
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 本地工具闭环已通 | 固定模型/数据、本地工具安全补丁通过 | 基座单图 smoke；WIT image/text 双工具真实轨迹可执行 |
-| P4 Agentic SFT | 真实派生数据 1-step 完成 | 检索验证数据与 loss mask 通过 | 合成 1→2→5 step 闭环；WIT 派生 80 条 train 完成 1-step |
-| P5 SFT→RL rollout-only | 待固定 Base/SFT held-out 评测 | 真实 SFT checkpoint 通过固定对照 | RL-8K 覆盖边界已实测；本地 WIT/Wikipedia 派生数据已就绪 |
+| P4 Agentic SFT | 真实派生数据 1→5 step 工程闭环完成 | 检索验证数据与 loss mask 通过 | WIT 派生 80 条 train 已完成断点续训；旧协议 checkpoint 仅作负面证据 |
+| P5 SFT→RL rollout-only | Base 固定评测协议已校准 | 真实 SFT checkpoint 通过固定对照 | v4 修复 gold 定义并完成检索验证；待跑最终 Base/SFT 对照 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -154,6 +154,19 @@
   `datasets/manifests/search-vl-rl-8k-audit-8ef5672.json`；详细研究见
   `docs/OFFLINE_MULTIMODAL_RETRIEVAL_2026-08-21.md`。
 - 状态：元数据审计完成；尚未下载 OVEN gated 资产或运行 RL。
+
+### 2026-08-22：固定评测暴露协议歧义与 gold 提取错误
+
+- v1 现象：Base、SFT step1、SFT step5 都把图像描述或文件名传给 `image_search`，而环境只接受未在
+  prompt 中声明的 `img_1`；三组均 fatal。该结果证明协议缺字段，不能解释成模型能力或 SFT 无效。
+- v2 修复：在 system、user 和工具 schema 中显式声明 runtime handle。Base dev5 的工具路径 5/5 正确、
+  fatal 为 0，最终语义也正确，但旧 rubric 没有明确要求 `Title/Evidence` 两行格式。
+- v3 修复：显式最终格式后，Base dev5 工具路径、标题和格式均为 5/5，严格证据为 4/5。
+- v3 根因：`first_sentence()` 仅在标点位置不小于 39 时截断。`Cinder` 第一短句被错误并入第二句，模型
+  实际输出与 prompt 所要求的第一句一致。旧 report 原样保留，不回写分数。
+- v4 决策：第一处终止标点即结束，无标点才截断到 360 字符；manifest 显式固定提取算法，训练和评测
+  fail-closed 校验该字段，并新增短句回归测试。
+- 状态：v4 数据已在受管 GPU1 上 120/120 检索验证通过，待固定 Base 复评。
 
 ## 变更记录
 
@@ -433,3 +446,27 @@
   GPU1 清理后 18 MiB/无 compute process，GPU0/5 未参与。
 - 边界：尚未用固定 dev/test 跑 Base 对照，不会因 1-step loss 而声称 SFT 有效；下一步是实现同一
   本地工具环境的 Base/SFT rollout 评测，然后才决定是否续训 5/20 step。
+
+### Step P6g：固定本地 Agent rollout 与评测协议校准
+
+- evaluator：最多 3 turn，实际执行只读本地 SQLite `text_lookup`，图像检索使用已由同 encoder 验证的
+  固定 top-k cache；每条保存工具调用、observation、token 数、fatal 和分项分数。Base 与 adapter 共用
+  同一执行器，最多 20 条，禁止 GPU0/5。
+- 首次失败：`wit-agent-base-dev5-20260822` 因 Transformers 要求所有多轮 message 使用结构化 content，
+  在首条生成前退出；修复后保留失败 Run，cleanup 无进程。
+- v1 协议负面结果：Base/SFT1/SFT5 dev5 都因隐含图像 handle fatal，不能作为三者效果对比。
+- 真实 SFT step5：`wit-agentic-sft-resume-step5-20260822` 从 checkpoint-1 恢复；step 2–5 loss
+  `0.451/0.366/0.2007/0.08135`，grad norm 均有限；checkpoint-5 adapter SHA256
+  `ab85c84275d0946768ce6fcebbf42eab8dc90639b2fa6a68b4472dda98e8a7da`。这是旧 v1 协议的工程
+  checkpoint，不用于宣称效果。
+- v2 Base：dev5 工具路径 1.0、fatal 0，说明显式 handle 已修复工具协议；两行格式未固定，旧指标只作
+  rubric 校准证据。
+- v3 Base：Run `wit-agent-v3-base-dev5-20260822`，工具路径/标题/格式 `1.0/1.0/1.0`，fatal 0，
+  evidence/full success `0.8/0.8`；report SHA256
+  `069b086dba4f049a0d3324afde4663209328563dae4c5d5d17895489646f6f7e`。唯一失败来自上述 gold bug。
+- v4 数据：Run `wit-agentic-pilot-v4-verify-20260822`，commit `7698bcb`，120/120 通过，物理 GPU1；
+  `exit_code=0`，cleanup `compute_processes=none`，GPU0/5 未参与。manifest/tasks SHA256 分别为
+  `4fbdc0a9db3268445b68e3a09853113a7744b4514956b3d4d0bc621db5d53d27` 和
+  `17ea6412a8a83476959242d637eb6d8ca262e2b24032118bf0b7fce3f972d474`。
+- 判断：当前实体识别→文本复制任务可能对 8B Instruct 基座过易。完成 v4 Base 复评后，若已接近满分，
+  不会用它伪造 SFT/RL 增益；需加入候选冲突、no-match 与工具失败恢复等更难分层任务。
