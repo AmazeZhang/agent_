@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
 def first_sentence(text: str, *, maximum: int = 360) -> str:
     compact = " ".join(text.split()).strip(' "')
     for index, character in enumerate(compact):
-        if character in ".!?" and index >= 39:
+        if character in ".!?":
             return compact[: index + 1]
     return compact[:maximum].rstrip()
 
@@ -328,6 +328,7 @@ def verify_and_publish(
             "image_observation_contains_text_summary": False,
             "image_runtime_handle": "img_1",
             "final_response_format": "Title: <exact title>\\nEvidence: <first sentence>",
+            "evidence_extraction": "first_terminal_punctuation_or_360_characters",
             "oracle_steps": ["image_search", "text_lookup", "final"],
         }
         with (staging / "manifest.json").open("x", encoding="utf-8") as handle:

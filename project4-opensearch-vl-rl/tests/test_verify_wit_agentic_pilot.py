@@ -18,6 +18,11 @@ class VerifyWitAgenticPilotTest(unittest.TestCase):
             ),
             "This sentence is deliberately longer than forty characters.",
         )
+        self.assertEqual(
+            MODULE.first_sentence("A cinder is a pyroclastic material. Another sentence."),
+            "A cinder is a pyroclastic material.",
+        )
+        self.assertEqual(MODULE.first_sentence("No punctuation", maximum=5), "No pu")
 
     def test_record_requires_two_distinct_tool_steps(self) -> None:
         task = {

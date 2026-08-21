@@ -22,7 +22,7 @@ from local_retrieval.resnet50_encoder import sha256_file  # noqa: E402
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 MODEL_ROOT = PROJECT_DATA / "models/Qwen3-VL-8B-Instruct"
-DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v3"
+DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v4"
 RUN_ROOT = PROJECT_DATA / "runs"
 TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
 
@@ -129,6 +129,8 @@ def load_tasks(split: str, max_tasks: int) -> tuple[dict[str, Any], list[dict[st
         or manifest.get("image_runtime_handle") != "img_1"
         or manifest.get("final_response_format")
         != "Title: <exact title>\\nEvidence: <first sentence>"
+        or manifest.get("evidence_extraction")
+        != "first_terminal_punctuation_or_360_characters"
     ):
         raise ValueError("evaluation dataset is not a verified no-leak pilot")
     with (DATASET_ROOT / "tasks.jsonl").open(encoding="utf-8") as handle:
