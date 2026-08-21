@@ -154,3 +154,15 @@ text_search
 样本的最终检索引擎；全量阶段需要引入分块或近似索引，并重新记录索引构建参数与召回验证。
 当前也没有擅自定义查询图像的 ResNet-50 预处理，必须在读取真实 WIT shard 的 schema/数据卡字段后
 与发布特征严格对齐。
+
+本地文本侧已实现 `local_retrieval/text_index.py`：
+
+- 使用 SQLite FTS5 `unicode61` 构建固定 corpus/revision 的实体证据索引；
+- 建库校验 `entity_id/title/source/text`，拒绝重复实体、空语料和覆盖已有索引；
+- 支持参数化的实体 ID 精确 lookup 和经过安全 token 化的全文检索，不接受原始 FTS 表达式；
+- 运行时以 `mode=ro&immutable=1` 打开，返回与视觉侧一致的 title/source/summary/entity-id、
+  corpus 与 revision 字段；
+- no-match 返回空列表或 `None`，不调用网络、不伪造页面内容。
+
+当前只通过合成 Wikipedia 文档验证接口；真实 Wikipedia 语料 revision、许可、字段映射和按实体
+split 仍需在数据 pilot 中固定。

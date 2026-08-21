@@ -318,3 +318,14 @@
 - 清单：数据盘 `datasets/manifests/search-vl-rl-8k-offline-audit-200-8ef5672.json`，21,977 B，
   SHA256 `cd16abbe9d91b4a09e0bbeddf012d23c87a0da58928375dab3271a9eee10fa7b`。首次审批失败的
   问题在权限恢复后通过原命令解决，没有改用旁路或改变抽样算法。
+
+### Step P5d：本地 Wikipedia 文本检索契约
+
+- 状态：实现与合成 CPU 测试完成；真实 Wikipedia corpus 尚未接入。
+- 实现：新增 SQLite FTS5 只读索引，固定 `corpus/corpus_revision`；支持实体 ID 精确 lookup 和
+  `unicode61` 全文检索，输出与本地图像检索一致的证据字段及 `Tool execution result:` JSON。
+- 安全：构建拒绝覆盖、空字段、重复实体和空语料；查询长度、token 数与 top-k 有界，用户输入先
+  token 化再参数绑定，不允许直接注入 FTS 语法；运行时以 immutable read-only URI 打开。
+- 验证：合成 bridge/painting 文档通过相关性排序、精确 lookup、no-match、revision 传播、JSON
+  observation、覆盖拒绝和非法输入测试；unittest、Ruff 与 `git diff --check` 通过。
+- 边界：这是替代在线 `text_search/visit` 的工具契约，不是 Wikipedia 语料就绪或检索效果证据。

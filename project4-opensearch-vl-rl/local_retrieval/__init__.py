@@ -1,5 +1,13 @@
 """Offline retrieval components for the OpenSearch-VL reproduction."""
 
+from .text_index import LocalTextIndex, build_text_index, text_tool_observation
 from .visual_index import ExactVisualIndex, build_exact_index, tool_observation
 
-__all__ = ["ExactVisualIndex", "build_exact_index", "tool_observation"]
+__all__ = [
+    "ExactVisualIndex",
+    "LocalTextIndex",
+    "build_exact_index",
+    "build_text_index",
+    "text_tool_observation",
+    "tool_observation",
+]
