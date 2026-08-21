@@ -19,7 +19,7 @@ from local_retrieval.resnet50_encoder import sha256_file  # noqa: E402
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 MODEL_ROOT = PROJECT_DATA / "models/Qwen3-VL-8B-Instruct"
-DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v4"
+DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v1"
 RUN_ROOT = PROJECT_DATA / "runs"
 
 
@@ -49,21 +49,27 @@ def validate_dataset(root: Path) -> dict[str, object]:
     with (root / "manifest.json").open(encoding="utf-8") as handle:
         manifest = json.load(handle)
     required = {
-        "status": "retrieval-verified",
-        "purpose": "local-agentic-sft-rl-pilot",
+        "status": "challenge-ready",
+        "purpose": "local-agentic-sft-rl-challenge",
         "image_observation_contains_text_summary": False,
         "image_runtime_handle": "img_1",
-        "final_response_format": "Title: <exact title>\\nEvidence: <first sentence>",
+        "final_response_format": "Title: <exact title>\\nEvidence: <first sentence-or-no-match>",
         "evidence_extraction": "first_terminal_punctuation_or_360_characters",
-        "split_unit": "entity_id",
+        "split_unit": "entity_id-or-synthetic-probe-id",
+        "maximum_agent_turns": 4,
     }
     for field, expected in required.items():
         if manifest.get(field) != expected:
             raise ValueError(f"dataset manifest {field} is not {expected!r}")
     if manifest.get("split_counts") != {"dev": 20, "test": 20, "train": 80}:
         raise ValueError("dataset split counts are not the fixed 80/20/20 pilot")
-    if manifest.get("verification", {}).get("failures") != 0:
-        raise ValueError("dataset contains retrieval verification failures")
+    if manifest.get("task_type_counts") != {
+        "candidate-conflict": 48,
+        "clean": 12,
+        "no-match": 24,
+        "transient-tool-failure": 36,
+    }:
+        raise ValueError("dataset task type counts are not fixed")
     return manifest
 
 

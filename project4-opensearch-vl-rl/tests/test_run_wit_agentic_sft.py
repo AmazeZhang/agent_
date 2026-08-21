@@ -17,15 +17,21 @@ class RunWitAgenticSftTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manifest = {
-                "status": "retrieval-verified",
-                "purpose": "local-agentic-sft-rl-pilot",
+                "status": "challenge-ready",
+                "purpose": "local-agentic-sft-rl-challenge",
                 "image_observation_contains_text_summary": False,
                 "image_runtime_handle": "img_1",
-                "final_response_format": "Title: <exact title>\\nEvidence: <first sentence>",
+                "final_response_format": "Title: <exact title>\\nEvidence: <first sentence-or-no-match>",
                 "evidence_extraction": "first_terminal_punctuation_or_360_characters",
-                "split_unit": "entity_id",
+                "split_unit": "entity_id-or-synthetic-probe-id",
+                "maximum_agent_turns": 4,
                 "split_counts": {"dev": 20, "test": 20, "train": 80},
-                "verification": {"failures": 0},
+                "task_type_counts": {
+                    "candidate-conflict": 48,
+                    "clean": 12,
+                    "no-match": 24,
+                    "transient-tool-failure": 36,
+                },
             }
             (root / "manifest.json").write_text(json.dumps(manifest))
             self.assertEqual(MODULE.validate_dataset(root), manifest)

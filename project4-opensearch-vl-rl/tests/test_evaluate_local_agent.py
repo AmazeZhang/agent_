@@ -35,6 +35,30 @@ class EvaluateLocalAgentTest(unittest.TestCase):
         self.assertNotIn('"content": output}', source)
         self.assertIn('"type": "text", "text": output', source)
 
+    def test_transient_image_failure_is_deterministic(self) -> None:
+        call = {"name": "image_search", "arguments": {"image": "img_1"}}
+        task = {
+            "image_search_failures_before_success": 1,
+            "retrieval_results": [
+                {
+                    "entity_id": "entity-1",
+                    "title": "Entity One",
+                    "source": "https://example.test/entity-1",
+                    "similarity": 0.9,
+                    "corpus": "test",
+                    "corpus_revision": "one",
+                }
+            ],
+        }
+        first, _ = MODULE.execute_call(
+            call, task, None, image_search_call_count=1
+        )
+        second, _ = MODULE.execute_call(
+            call, task, None, image_search_call_count=2
+        )
+        self.assertIn("TRANSIENT_FAILURE", first)
+        self.assertIn("entity-1", second)
+
 
 if __name__ == "__main__":
     unittest.main()

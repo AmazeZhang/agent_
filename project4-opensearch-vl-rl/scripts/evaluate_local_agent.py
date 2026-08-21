@@ -22,7 +22,7 @@ from local_retrieval.resnet50_encoder import sha256_file  # noqa: E402
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 MODEL_ROOT = PROJECT_DATA / "models/Qwen3-VL-8B-Instruct"
-DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v4"
+DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v1"
 RUN_ROOT = PROJECT_DATA / "runs"
 TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
 
@@ -124,13 +124,14 @@ def load_tasks(split: str, max_tasks: int) -> tuple[dict[str, Any], list[dict[st
     with (DATASET_ROOT / "manifest.json").open(encoding="utf-8") as handle:
         manifest = json.load(handle)
     if (
-        manifest.get("status") != "retrieval-verified"
+        manifest.get("status") != "challenge-ready"
         or manifest.get("image_observation_contains_text_summary") is not False
         or manifest.get("image_runtime_handle") != "img_1"
         or manifest.get("final_response_format")
-        != "Title: <exact title>\\nEvidence: <first sentence>"
+        != "Title: <exact title>\\nEvidence: <first sentence-or-no-match>"
         or manifest.get("evidence_extraction")
         != "first_terminal_punctuation_or_360_characters"
+        or manifest.get("maximum_agent_turns") != 4
     ):
         raise ValueError("evaluation dataset is not a verified no-leak pilot")
     with (DATASET_ROOT / "tasks.jsonl").open(encoding="utf-8") as handle:
@@ -186,6 +187,8 @@ def execute_call(
     call: dict[str, Any],
     task: dict[str, Any],
     text_index: LocalTextIndex,
+    *,
+    image_search_call_count: int,
 ) -> tuple[str, bool]:
     name = call["name"]
     arguments = call["arguments"]
@@ -195,6 +198,16 @@ def execute_call(
         top_k = int(arguments.get("top_k", 3))
         if not 1 <= top_k <= 3:
             raise ValueError("cached image_search top_k must be between 1 and 3")
+        failures = int(task.get("image_search_failures_before_success", 0))
+        if image_search_call_count <= failures:
+            return (
+                "Tool execution result:\n"
+                + json.dumps(
+                    {"error": {"code": "TRANSIENT_FAILURE", "retryable": True}},
+                    sort_keys=True,
+                ),
+                True,
+            )
         results = task["retrieval_results"][:top_k]
         return entity_tool_observation(results), True
     if name == "text_lookup":
@@ -227,8 +240,9 @@ def evaluate_task(
                         "Use one tool call per turn. Pass the literal handle img_1 to "
                         "image_search; do not replace it with a filename or image description. "
                         "Image search returns entity candidates only; text_lookup supplies "
-                        "answer evidence. Do not invent missing evidence. The final response "
-                        "must contain exactly two lines named Title and Evidence."
+                        "answer evidence. Retry a tool only when its error says retryable=true. "
+                        "Do not invent missing evidence. The final response must contain exactly "
+                        "two lines named Title and Evidence."
                     ),
                 }
             ],
@@ -239,13 +253,7 @@ def evaluate_task(
                 {"type": "image", "image": query_image},
                 {
                     "type": "text",
-                    "text": (
-                        "The provided image has runtime handle img_1. Identify the Wikipedia "
-                        "subject most closely matching this image. "
-                        "Then use text_lookup on the selected entity and report its exact "
-                        "title and the first evidence sentence. The final response must contain "
-                        "exactly two lines: `Title: ...` followed by `Evidence: ...`."
-                    ),
+                    "text": str(task["user_prompt"]),
                 },
             ],
         },
@@ -254,7 +262,8 @@ def evaluate_task(
     tool_names = []
     fatal = None
     final_text = ""
-    for _ in range(3):
+    image_search_call_count = 0
+    for _ in range(4):
         output, input_tokens, output_tokens = generate_turn(
             model, processor, messages, max_new_tokens=max_new_tokens
         )
@@ -273,7 +282,14 @@ def evaluate_task(
             final_text = output
             break
         try:
-            observation, used_image_cache = execute_call(call, task, text_index)
+            if call["name"] == "image_search":
+                image_search_call_count += 1
+            observation, used_image_cache = execute_call(
+                call,
+                task,
+                text_index,
+                image_search_call_count=image_search_call_count,
+            )
         except (ValueError, TypeError) as error:
             fatal = f"tool-error:{error}"
             break
@@ -298,9 +314,10 @@ def evaluate_task(
     else:
         fatal = "maximum-turns-exceeded"
     final_score = score_final(final_text, task)
-    expected_tools = tool_names == ["image_search", "text_lookup"]
+    expected_tools = tool_names == task["oracle_steps"][:-1]
     return {
         "task_id": task["task_id"],
+        "task_type": task["task_type"],
         "split": task["split"],
         "fatal": fatal,
         "tool_names": tool_names,
