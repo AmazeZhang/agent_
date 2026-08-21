@@ -35,9 +35,9 @@
 | P0 安全门禁 | 已完成 | 安全规范已审阅 | 受管脚本、CPU 假 GPU/进程组测试通过 |
 | P1 环境冻结 | 已完成 | P0 通过 | freeze、CPU import、受管 GPU1 FlashAttention 正反向 smoke |
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
-| P3 安全推理 | 进行中 | 固定模型/数据、本地工具安全补丁通过 | 基座离线单图 smoke 通过；agent 工具闭环未开始 |
-| P4 Agentic SFT | 工程 smoke 完成 | 推理闭环通过 | 合成数据 1→2→5 step、断点续训、adapter 离线推理通过 |
-| P5 SFT→RL rollout-only | 本地检索准备中 | SFT checkpoint 通过固定对照 | RL-8K 元数据已审计；OVEN/WIT 适用范围已收窄，未启动 RL |
+| P3 安全推理 | 本地工具闭环已通 | 固定模型/数据、本地工具安全补丁通过 | 基座单图 smoke；WIT image/text 双工具真实轨迹可执行 |
+| P4 Agentic SFT | 真实派生数据 1-step 完成 | 检索验证数据与 loss mask 通过 | 合成 1→2→5 step 闭环；WIT 派生 80 条 train 完成 1-step |
+| P5 SFT→RL rollout-only | 待固定 Base/SFT held-out 评测 | 真实 SFT checkpoint 通过固定对照 | RL-8K 覆盖边界已实测；本地 WIT/Wikipedia 派生数据已就绪 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -403,3 +403,33 @@
   数值和 encoder/index revision，不包含 gold answer。
 - 启动纠错：首次把 `PROJECT4_DATA_ROOT` 多写了项目子目录；安全守卫在接触 GPU 前拒绝，
   没有进程或结果文件。清理已退出的精确 tmux 会话后，用规定根路径重启并完成。
+
+### Step P6f：WIT/Wikipedia 派生多跳数据与真实 1-step SFT
+
+- 数据状态：完成 120 条 retrieval-verified pilot，按 `entity_id` 分为 train/dev/test
+  80/20/20；120 个实体全部唯一，没有原图或同实体跨 split。
+- 查询图：由 WIT 候选图做中心 90% crop 并重编码为 JPEG Q92，不用原图恒等 self-query。
+  候选选择固定 seed，不使用模型或 gold answer。
+- 检索门禁：120/120 变换图 top-1 仍为对应实体，cosine min/mean/median/max 为
+  0.938418/0.968947/0.971144/0.991388；若任一样本实体不匹配、低于 0.90 或文本证据不一致，
+  发布器会整批失败而不静默丢样。
+- 多跳约束：轨迹固定为 `image_search -> text_lookup -> final`。image observation 只显示
+  entity candidates，显式删除 page summary；最终证据只能从第二步 text lookup 获得。
+- 数据证据：数据盘 `wit-agentic-pilot-v1`；manifest SHA256
+  `3c7dd4806fc52a85116df6ee2016149b727f36a2d3edb05bf81c3e1e43ff15e1`，tasks SHA256
+  `789adb00a30e17cf141bb72a1d02ce3207eceeef6688e41f28d3daca0048fc7a`。
+- GPU 验证 Run：`wit-agentic-pilot-verify-20260822`，固定 commit `95c6d47`，物理 GPU1，
+  `exit_code=0`；前后 18 MiB，cleanup 无进程，GPU0/5 未参与。
+- SFT 解析：LLaMA Factory 实际解析 8 条抽样，每条 1 张图，1382–1525 tokens，91–128
+  supervised tokens；observation 位置全为 `-100`，两个工具调用和 final 被监督。基座是
+  Instruct 版，因此正式使用 `qwen3_vl_nothink`，不训练伪造的 hidden reasoning。
+- 解析问题：首次 CPU 解析因 HF datasets 默认在只读 home cache 建 lock 失败；显式把
+  `HF_HOME/HF_DATASETS_CACHE/TRANSFORMERS_CACHE` 改到 `/tmp` 后通过。该失败不是数据格式错误，也未使用 GPU。
+- 真实 SFT Run：`wit-agentic-sft-1step-20260822`，固定 commit `6989ec6`，物理 GPU1。
+  80 条 train 数据、rank-8 LoRA、冻结 vision/projector、BF16/FA2；单步 loss 0.4348、grad norm
+  2.025，只证明数值和更新链路正常，不是效果结论。
+- checkpoint：`global_step=1`，adapter 87,368,144 B，SHA256
+  `7f1b7499a090ccebae1ec7201cf175c8fbdcf4f5758e7fedb9770dc24a83813b`。Run `exit_code=0`，
+  GPU1 清理后 18 MiB/无 compute process，GPU0/5 未参与。
+- 边界：尚未用固定 dev/test 跑 Base 对照，不会因 1-step loss 而声称 SFT 有效；下一步是实现同一
+  本地工具环境的 Base/SFT rollout 评测，然后才决定是否续训 5/20 step。
