@@ -571,3 +571,16 @@
 - 决策：停止 step20 和 SFT 扩大。当前只支持“5-step 改善冲突子类但造成恢复类灾难性遗忘”的结论，
   不支持“SFT 总体有效”。下一步回到 CPU 侧审计采样/损失平衡，并先实现可审计 reward/rollout-only，
   不直接启动 RL 参数更新。
+- 离线 reward 合约：保留上游 `0.8*r_accuracy + 0.2*r_query` 和 `r_format` 乘法门；外部 query judge
+  替换为规则化的“gold evidence 是否实际取得 × oracle 工具数/实际工具数”，每条均可追溯到保存的 tool call。
+- fatal 合约：记录 learnable prefix；fatal 在首 turn 时 hard mask，否则保留前缀。GRPO 组内先均值中心化，
+  再仅对 fatal 轨迹做 `advantage=max(0, A)` 单侧 clamp；单测验证 `[1,0]` 组的 fatal 负 advantage
+  从 `-0.5` 变为 `0`，正常正 advantage 保留。
+- CPU 重放：Base/SFT1/SFT5 的 `r_accuracy/r_query/r_format/total` 分别为
+  `0.55/0.90/1.0/0.62`、`0.55/0.90/1.0/0.62`、`0.50/0.85/1.0/0.57`，与分层评测的 SFT5
+  回归一致，没有 reward normalization 抬分或隐藏失败。
+- 报告：数据盘 `offline-reward-replay-base-sft1-sft5-20260822.json`，SHA256
+  `a16a6940f33d2a819e11d52edbe61a4941631d0c49349f0a3e633ce113f584d6`；模式明确标记
+  `deterministic-rules-only-no-api`。构建、测试和重放均为 CPU，无网络/API/GPU。
+- RL 门禁：贪心单轨迹没有组内 reward 方差，不能直接形成 GRPO 更新。下一步必须先做 1–2 个 train task、
+  每题少量随机 rollout 的 group variance/reward hacking 审计；通过前不启动 optimizer step。

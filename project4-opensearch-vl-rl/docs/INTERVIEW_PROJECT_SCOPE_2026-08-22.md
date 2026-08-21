@@ -99,6 +99,6 @@ no-match 幻觉率、fatal 比例，以及按任务类型分层的 reward。不�
 5. 运行 Base 固定评测；**v4 clean dev5 已完成且满分，只作执行正控**；
 6. 扩充候选冲突、no-match、工具失败恢复并重跑 Base；**challenge-v5 Base dev20 已完成，full success 0.55**；
 7. 运行新协议真实数据小规模 SFT 并复评；**step5 总体回归，停止扩大并审计任务平衡**；
-8. 实现离线 reward/rollout-only 审计；**待进行，不启动参数更新**；
+8. 实现离线 reward/rollout-only 审计；**确定性 reward 重放已完成，待随机 rollout group 方差审计**；
 9. 运行 vanilla/fatal-aware GRPO smoke 与消融；
 10. 只有观察到可信增益且审计无数据泄漏后，才准备扩大训练。
