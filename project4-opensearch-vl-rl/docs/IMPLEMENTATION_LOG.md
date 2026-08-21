@@ -559,3 +559,15 @@
   `3e308b8f991e0ab6d2113c9a21879e05874b1243c4da22fa604613c85141bd89`；trainer state 保留 step1–5
   历史。物理 GPU1，`exit_code=0`，cleanup 无进程，GPU0/5 未参与。
 - 下一步只做同一 dev20 的 SFT5 固定评测；在该结果前不允许 step20 或扩大数据。
+- SFT5 dev20 Run：`wit-agent-challenge-v5-sft5-dev20-20260822`；总体 full success 从 Base/SFT1
+  `0.55` 降到 `0.50`，evidence exact `0.50`，title exact `0.95`，format `1.0`，fatal `0`，
+  oracle path exact 从 Base `0.65` 降到 `0.60`。
+- 分层 trade-off：candidate-conflict full success 从 Base `0.50` 升到 `0.625`，但
+  transient-tool-failure 从 `0.50` 降到 `0.1667`；clean/no-match 仍为 `0/1.0`。例如 transient
+  `wit-00012098` 在 Base 正确，SFT5 却在拿到正确工具结果后输出错误实体 `Claude Choules`，是真实回归而非
+  评分格式问题。
+- 报告 SHA256 `2ccb7502c2a810f5f958f72ca12af2ebc5e315e609c955004eaca53601b8e20c`；adapter/dataset/tasks
+  hash 均与固定记录一致。物理 GPU1，`exit_code=0`，cleanup 无进程。
+- 决策：停止 step20 和 SFT 扩大。当前只支持“5-step 改善冲突子类但造成恢复类灾难性遗忘”的结论，
+  不支持“SFT 总体有效”。下一步回到 CPU 侧审计采样/损失平衡，并先实现可审计 reward/rollout-only，
+  不直接启动 RL 参数更新。
