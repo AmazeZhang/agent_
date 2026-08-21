@@ -334,3 +334,14 @@
 - 验证：合成 bridge/painting 文档通过相关性排序、精确 lookup、no-match、revision 传播、JSON
   observation、覆盖拒绝和非法输入测试；unittest、Ruff 与 `git diff --check` 通过。
 - 边界：这是替代在线 `text_search/visit` 的工具契约，不是 Wikipedia 语料就绪或检索效果证据。
+
+### Step P6a：WIT Parquet 安全 schema 审计器
+
+- 状态：工具与合成测试完成；真实 shard 正在非 Clash 直连下载，尚未声称数据就绪。
+- 实现：`audit_wit_shard.py` 固定输出文件 SHA256、Parquet 行数/row group/字段类型、压缩 codec、
+  压缩与未压缩列大小，并读取最多 1–10 个样本做有界类型摘要。
+- 日志边界：图片 bytes 只记录长度与 SHA256，字符串最多预览 160 字符，向量只记录长度、有限值
+  数量、范围和 L2 norm；不把完整图片、embedding 或大字段写入报告/终端。
+- 安全：报告拒绝覆盖；`sample_rows` 有界；仅 CPU/pyarrow，不使用 GPU、搜索 API 或模型。
+- 验证：合成 Parquet 覆盖 image struct、binary bytes、float embedding 与字符串字段；确认报告不含
+  原始图片内容，unittest、Ruff 和 `git diff --check` 通过。
