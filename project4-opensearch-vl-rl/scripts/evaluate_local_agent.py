@@ -103,6 +103,15 @@ def score_final(text: str, task: dict[str, Any]) -> dict[str, bool]:
     }
 
 
+def is_full_success(fatal: str | None, final_score: dict[str, bool]) -> bool:
+    return (
+        fatal is None
+        and final_score["format_valid"]
+        and final_score["title_exact"]
+        and final_score["evidence_exact"]
+    )
+
+
 def require_managed_run(environment: dict[str, str]) -> tuple[Path, str]:
     run_id = environment.get("PROJECT4_RUN_ID", "")
     run_token = environment.get("PROJECT4_RUN_TOKEN", "")
@@ -316,23 +325,18 @@ def evaluate_task(
     else:
         fatal = "maximum-turns-exceeded"
     final_score = score_final(final_text, task)
-    expected_tools = tool_names == task["oracle_steps"][:-1]
+    oracle_path_exact = tool_names == task["oracle_steps"][:-1]
     return {
         "task_id": task["task_id"],
         "task_type": task["task_type"],
         "split": task["split"],
         "fatal": fatal,
         "tool_names": tool_names,
-        "expected_tool_path": expected_tools,
+        "oracle_path_exact": oracle_path_exact,
         "final": final_text,
         "score": {
             **final_score,
-            "full_success": (
-                fatal is None
-                and expected_tools
-                and final_score["title_exact"]
-                and final_score["evidence_exact"]
-            ),
+            "full_success": is_full_success(fatal, final_score),
         },
         "turns": turns,
     }
@@ -348,7 +352,7 @@ def aggregate_metrics(results: list[dict[str, Any]]) -> dict[str, float]:
     }
     metrics.update(
         {
-            "expected_tool_path": sum(result["expected_tool_path"] for result in results)
+            "oracle_path_exact": sum(result["oracle_path_exact"] for result in results)
             / len(results),
             "fatal_rate": sum(result["fatal"] is not None for result in results)
             / len(results),

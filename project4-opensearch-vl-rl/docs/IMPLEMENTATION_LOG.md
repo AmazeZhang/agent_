@@ -520,3 +520,8 @@
   `341194a665682699853fe6704d45bfe49f5e520179011b29b092cb666a7cbbf1`、
   `14435f66801d623ff55045693a31c55cf139f82a6985d2aa24a0c73a1ba6e70b`、
   `d79ec7dfa0363244e010a0e85ccc823ab294eff63433b6f4710970c70b1d30d7`；v1–v4 保留但不作为训练入口。
+- v5 首次 Base Run 的首条最终标题/证据正确且无 fatal，但旧 `full_success` 又要求工具序列与最短 oracle
+  完全相等；模型多查一个合法候选因此被错误判失败。Run
+  `wit-agent-challenge-v5-base-dev20-20260822` 精确停止并保留，不能计入模型结果。
+- 评分修复：`full_success` 只由无 fatal + 格式/标题/证据正确决定；最短工具序列另报
+  `oracle_path_exact`，作为效率指标而非正确性门。这样仍能比较冗余调用，又不否定有充分证据的正确答案。

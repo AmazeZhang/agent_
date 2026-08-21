@@ -29,6 +29,8 @@ class EvaluateLocalAgentTest(unittest.TestCase):
             {"format_valid": True, "title_exact": True, "evidence_exact": True},
         )
         self.assertFalse(MODULE.score_final("An Entity", task)["format_valid"])
+        self.assertTrue(MODULE.is_full_success(None, score))
+        self.assertFalse(MODULE.is_full_success("fatal", score))
 
     def test_every_runtime_message_uses_structured_content(self) -> None:
         source = Path(MODULE.__file__).read_text()
@@ -68,7 +70,7 @@ class EvaluateLocalAgentTest(unittest.TestCase):
                     "evidence_exact": True,
                     "full_success": True,
                 },
-                "expected_tool_path": True,
+                "oracle_path_exact": True,
                 "fatal": None,
             },
             {
@@ -78,7 +80,7 @@ class EvaluateLocalAgentTest(unittest.TestCase):
                     "evidence_exact": False,
                     "full_success": False,
                 },
-                "expected_tool_path": False,
+                "oracle_path_exact": False,
                 "fatal": "failure",
             },
         ]
