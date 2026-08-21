@@ -8,6 +8,10 @@ __all__ = [
     "LocalTextIndex",
     "build_exact_index",
     "build_text_index",
+    "encode_pil_images",
+    "load_resnet50_v1",
     "text_tool_observation",
     "tool_observation",
 ]
+
+from .resnet50_encoder import encode_pil_images, load_resnet50_v1

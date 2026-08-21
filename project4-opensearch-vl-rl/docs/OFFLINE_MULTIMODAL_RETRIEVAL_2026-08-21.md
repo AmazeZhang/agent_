@@ -44,7 +44,7 @@
 - 数据卡给出 6,477,255 个样本；每行带 300px 图像、Wikimedia 元数据、多语言描述/上下文，
   以及 2,048 维 ResNet-50 特征，适合先验证本地图像近邻和实体候选链路。
 - 第一片 `data/train-00000-of-00330.parquet` 为 932,699,916 B，LFS SHA256
-  `8a9a449a0db937920b7c0dd13cd0bc9b1cadb19071567169dbac41a956273ec2`。
+  `8a9a449a0db937920b7c0dd13cd0bc9b1cadb19071567169dbac41a956273ec2`；已完成下载和校验。
 - OVEN 权限恢复前，WIT 从“第二阶段补召回”提升为首个公开视觉候选库；先做单片 pilot，
   索引与 observation 验收后才考虑 308 GB 全量下载，避免先下载再发现 schema/性能不适配。
 
@@ -167,3 +167,29 @@ text_search
 
 当前只通过合成 Wikipedia 文档验证接口；真实 Wikipedia 语料 revision、许可、字段映射和按实体
 split 仍需在数据 pilot 中固定。
+
+## 7. WIT 单 shard 实测与 encoder 决策
+
+固定 shard 00000 的真实 schema 审计结果：
+
+- 19,629 行、2 个 row groups、22 个物理 Parquet 列、Snappy 压缩；
+- `image` 为内嵌 bytes/path struct，发布图片宽度为 300px；
+- `embedding` 为固定 2,048 维 float64；首样本全部有限；
+- `wit_features` 将同一图片的多语言 page URL/title/context/caption 按对齐列表组织；
+- shard 审计报告保存在数据盘，SHA256 `63a0ec13...`。
+
+已构建发布向量 pilot：视觉 `.npy` 160,800,896 B、metadata JSONL 9,340,786 B、文本 FTS
+15,798,272 B。首样本用发布 embedding 自查询时 top-1 为英文 Wikipedia 实体
+`Scolopendra gigantea`，文本检索返回同一 entity ID，证明字段映射和双索引契约可执行。
+
+但该发布向量暂时**不能作为实际 image_search 的候选空间**。[官方数据卡](https://huggingface.co/datasets/wikimedia/wit_base/blob/ff6d4fb32fd566d3a1fa20e946cba3234179465e/README.md)
+只说明它来自 ImageNet ResNet-50 倒数第二层，没有给出精确 checkpoint；
+[HF discussion #5](https://huggingface.co/datasets/wikimedia/wit_base/discussions/5) 也提出了同一问题而未给出官方模型。
+用固定 torchvision `ResNet50_Weights.IMAGENET1K_V1` 在 16 个样本上校准得到：
+
+- 配对余弦 mean/min/max：0.4416/0.2733/0.5884；
+- identity top-1：1/16；
+- mean relative L2：0.9626。
+
+因此硬门禁返回 `do-not-mix-computed-queries-with-published-candidates`。后续固定 torchvision V1
+权重，同时重算 19,629 个候选和所有查询图片；只有候选/查询共用同一 encoder 才开放工具调用。

@@ -345,3 +345,27 @@
 - 安全：报告拒绝覆盖；`sample_rows` 有界；仅 CPU/pyarrow，不使用 GPU、搜索 API 或模型。
 - 验证：合成 Parquet 覆盖 image struct、binary bytes、float embedding 与字符串字段；确认报告不含
   原始图片内容，unittest、Ruff 和 `git diff --check` 通过。
+
+### Step P6b：WIT 单 shard 数据与发布向量双索引
+
+- 状态：完成；发布向量索引只用于 schema/字段验证，encoder 校准失败后不用于真实查询。
+- 数据：固定 revision `ff6d4fb3...` shard 00000，932,699,916 B，官方 LFS SHA256 校验通过；
+  实测 19,629 行、2 个 row groups、2,048 维 float64 embedding 和多语言 Wikipedia 证据。
+- 构建：英语优先、中文次优、其他语言回退；稳定 entity ID 由 revision+row index 生成。视觉和文本
+  索引各 19,629 条，首样本的 self-search 与 FTS lookup 返回同一英文实体。
+- provenance：输出 manifest 固定 source hash、语料 revision、字段选择、embedding 未知 checkpoint
+  边界和 CC-BY-SA-4.0；输出目录 staging 原子发布并拒绝覆盖。
+- 验证：端到端合成 WIT Parquet 测试及真实首样本 paired lookup 均通过；不构成外部查询效果证据。
+
+### Step P6c：WIT 发布 encoder 校准与统一重编码门禁
+
+- 状态：校准完成且明确失败；受管 GPU 重编码器实现完成，尚未启动真实 GPU Run。
+- 权重：torchvision ResNet-50 V1，102,530,333 B，完整 SHA256 `0676ba61b6795bbe...e722fb8a`，
+  官方下载器按文件名 hash 前缀校验；缓存位于项目四数据盘。
+- 校准：显式 `CUDA_VISIBLE_DEVICES=''`，CPU 上 16 样本；配对余弦均值 0.4416，identity top-1
+  0.0625，relative L2 均值 0.9626，未达到 0.99/0.95 双门槛，禁止混用空间。
+- 决策：固定 torchvision V1，同时重算候选和查询；不再猜测 WIT 未公开的精确 checkpoint。
+- GPU 安全：重编码器必须存在 Project 4 Run ID/dir/token，且进程内恰好一张可见 CUDA 卡；输出拒绝
+  覆盖、向量要求有限。启动仍必须经过 tmux/受管脚本和空闲卡检查，GPU0/5 不使用。
+- 测试：alignment 接受同空间缩放、拒绝置换空间；WIT image bytes 解码和 managed identity guard
+  通过；unittest、Ruff 和 `git diff --check` 通过。

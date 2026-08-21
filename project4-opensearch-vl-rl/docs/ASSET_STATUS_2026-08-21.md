@@ -86,7 +86,9 @@ SFT 仍以获取并校验官方数据为进入条件。
   staging 保留取证。
 - OVEN 为 gated 数据集，本机当前官方端点返回 401，未绕过访问控制。
 - 公开替代路线 `wikimedia/wit_base` 已固定到 revision `ff6d4fb3...`：330 个 Parquet、
-  308,150,150,366 B。先验证单片，不在本阶段启动全量下载。
+  308,150,150,366 B。仅下载 shard 00000：932,699,916 B，SHA256
+  `8a9a449a0db937920b7c0dd13cd0bc9b1cadb19071567169dbac41a956273ec2` 与官方 LFS 一致；
+  未启动全量下载。
 
 ZIP 与逐图验收：
 
@@ -96,3 +98,13 @@ ZIP 与逐图验收：
 - 尺寸范围：宽 80–5,469 px，高 16–4,884 px；没有缺失、路径逃逸或符号链接；
 - ZIP 审计报告 SHA256 `74cb2e9a...`，逐图报告 SHA256 `8755a6c2...`，均保存在数据盘
   `datasets/manifests/`。
+
+WIT shard 00000 实测包含 19,629 行、2 个 row groups；每行有 300px image bytes、2,048 维
+float64 embedding、多语言 Wikipedia URL/标题/上下文。已构建 19,629 条发布向量视觉 pilot 与
+19,629 条 SQLite FTS 文本证据，合计约 186 MB。
+
+发布 embedding 的精确 encoder checkpoint 未在数据卡中标识。CPU 校准表明 torchvision
+ResNet-50 V1 与发布空间不兼容：16 样本配对余弦均值 0.4416、identity top-1 1/16，因此工具
+禁止混用。已下载 torchvision 官方 V1 权重 102,530,333 B，SHA256
+`0676ba61b6795bbe1773cffd859882e5e297624d384b6993f7c9e683e722fb8a`；下一步对候选和查询统一
+重编码。
