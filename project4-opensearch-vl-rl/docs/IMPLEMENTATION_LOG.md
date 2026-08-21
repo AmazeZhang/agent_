@@ -13,7 +13,7 @@
 | 安全规范 | 已建立并由 P0 受管脚本落实 |
 | P0 受管运行 | 已完成并推送；真实 GPU1 preflight 和受管 smoke 通过 |
 | 推理环境 | 8B 基座已校验；离线单图生成通过 |
-| SFT 环境/训练 | 独立环境已冻结；合成 agentic 数据解析/标注 smoke 通过，尚未执行参数更新 |
+| SFT 环境/训练 | 独立环境已冻结；合成 agentic 数据 1-step LoRA 参数更新通过 |
 | RL 环境/训练 | 未开始 |
 | 消融 | 未开始 |
 | 本地效果结论 | 无；不得引用上游论文数字作为本地结果 |
@@ -36,7 +36,7 @@
 | P1 环境冻结 | 已完成 | P0 通过 | freeze、CPU import、受管 GPU1 FlashAttention 正反向 smoke |
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 进行中 | 固定模型/数据、本地工具安全补丁通过 | 基座离线单图 smoke 通过；agent 工具闭环未开始 |
-| P4 Agentic SFT | 进行中 | 推理闭环通过 | 合成数据生成、工具调用解析和监督标签 smoke 通过 |
+| P4 Agentic SFT | 进行中 | 推理闭环通过 | 合成数据 1-step LoRA checkpoint 通过；断点续训待验证 |
 | P5 SFT→RL rollout-only | 未开始 | SFT checkpoint 通过固定对照 | 待补 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
@@ -217,10 +217,18 @@
 
 ### Step P4b：有界单卡 LoRA SFT 启动器
 
-- 状态：启动器实现和静态检查完成；GPU 参数更新 smoke 待执行。
+- 状态：完成；启动器已推送为 `bb9e6b6`，YAML 兼容修复已推送为 `4a50130`。
 - 约束：只接受 1–5 optimizer steps、单张非 GPU0 物理卡、项目四受管 Run 环境和全新输出目录；
   checkpoint 只能来自项目四 Run 目录，并校验 LoRA 权重与 trainer state。
 - 配置：固定本地 8B 基座和合成数据，HF 全离线，缓存写项目四数据盘；BF16 + FlashAttention 2、
   rank-8 LoRA，视觉塔和多模态 projector 冻结，单卡 batch 1，gradient checkpointing。
 - 验证：Ruff、Python 编译和 `git diff --check` 通过；脱离受管 Run 调用会在模型加载前拒绝。
-- 边界：启动器最多执行工程 smoke，不授权真实 36K 数据或大规模训练。
+- 首次 Run：`sft-lora-1step-20260821` 在上游 JSON 参数解析阶段安全失败；无模型加载、无 GPU
+  遗留，详见问题记录。失败 Run 不覆盖、不删除。
+- 成功 Run：`sft-lora-1step-yaml-20260821`，物理 GPU1；`exit_code=0`，cleanup 后 GPU1
+  `compute_processes=none`，GPU0 未参与。
+- 参数更新证据：21,823,488 个 LoRA 可训练参数（总参数的 0.2483%）；trainer state
+  `global_step=1`，checkpoint 含 87,368,144 B `adapter_model.safetensors` 和 optimizer state。
+  单步记录 loss 2.64398、grad norm 2.96580，只作为计算链路有限值检查，不作为效果结论。
+- 资源：监控采样看到 GPU1 最高 18,765 MiB 已用显存；这是离散采样值，不声明为精确峰值。
+- 边界：启动器最多执行工程 smoke，不授权真实 36K 数据或大规模训练；断点续训仍待验证。
