@@ -13,7 +13,7 @@
 | 安全规范 | 已建立并由 P0 受管脚本落实 |
 | P0 受管运行 | 已完成并推送；真实 GPU1 preflight 和受管 smoke 通过 |
 | 推理环境 | 8B 基座已校验；离线单图生成通过 |
-| SFT 环境/训练 | 独立环境已冻结；尚未执行 SFT step |
+| SFT 环境/训练 | 独立环境已冻结；合成 agentic 数据解析/标注 smoke 通过，尚未执行参数更新 |
 | RL 环境/训练 | 未开始 |
 | 消融 | 未开始 |
 | 本地效果结论 | 无；不得引用上游论文数字作为本地结果 |
@@ -36,7 +36,7 @@
 | P1 环境冻结 | 已完成 | P0 通过 | freeze、CPU import、受管 GPU1 FlashAttention 正反向 smoke |
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 进行中 | 固定模型/数据、本地工具安全补丁通过 | 基座离线单图 smoke 通过；agent 工具闭环未开始 |
-| P4 Agentic SFT | 未开始 | 推理闭环通过 | 待补 |
+| P4 Agentic SFT | 进行中 | 推理闭环通过 | 合成数据生成、工具调用解析和监督标签 smoke 通过 |
 | P5 SFT→RL rollout-only | 未开始 | SFT checkpoint 通过固定对照 | 待补 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
@@ -102,6 +102,24 @@
 - 决策：停止的下载均只终止精确独立进程组并保留缓存；ModelScope 客户端设置每个 shard
   8 路 Range 下载。完成后逐文件 SHA256 对照固定 HF revision 的 LFS OID，不能仅凭文件名验收。
 - 状态：8B 基座下载中；未使用 Clash 7890/7891。
+
+### 2026-08-21：CPU 数据检查会误判多卡训练
+
+- 现象：仅做数据解析/分词时，LLaMA Factory 看到主机 8 张物理 GPU，要求使用分布式启动器，
+  首次检查在加载模型前即安全退出。
+- 影响：CPU-only 检查若不隐藏 GPU，会被误判为训练任务；没有占用或修改任何 GPU。
+- 决策：CPU 数据检查显式设置 `CUDA_VISIBLE_DEVICES=`，并开启 HF/Transformers/Datasets 离线模式；
+  同时将 `HF_HOME`、`HF_DATASETS_CACHE`、`TRANSFORMERS_CACHE` 固定到项目四数据盘；真正训练仍必须
+  经项目四 tmux 受管启动器选择物理卡。未设置缓存路径的复验被只读根盘正确拒绝，设置后通过。
+- 状态：已解决；4 条合成记录解析成功，首样本 438 tokens、68 个监督 tokens、2 张图像。
+
+### 2026-08-21：Qwen3-VL 模板 reasoning 警告
+
+- 现象：LLaMA Factory 提示 `qwen3_vl` 是 reasoning 模板，并建议非推理任务考虑
+  `qwen3_vl_nothink`。
+- 决策：上游项目 SFT 配置明确使用 `qwen3_vl`，当前工程 smoke 保持上游对齐；此警告保留，
+  不能据此宣称最终训练模板已完成效果验证。
+- 状态：非阻塞，后续真实数据对照时复核。
 
 ## 变更记录
 
@@ -176,3 +194,13 @@
 - 警告：Transformers 报告模型 generation config 中 `temperature/top_p/top_k` 在贪心生成下被忽略；
   不影响本次 `do_sample=False` 结果，后续训练配置不继承这些生成参数。
 - 边界：只证明基座离线图文加载/生成；尚未启用搜索、访问网页或其他 agent 工具，也不是效果评测。
+
+### Step P4a：合成 agentic SFT 数据与监督链路 smoke
+
+- 状态：完成；等待本步骤提交推送。
+- 数据：在数据盘生成 4 条明确标记为 `synthetic=true`、`pipeline-smoke-only` 的样本，
+  每条含原图、`crop` function call、工具 observation 图和最终答案；生成器拒绝覆盖已有目录。
+- 校验：通过固定本地模型 tokenizer 和 LLaMA Factory `qwen3_vl` 模板实际解析；4 条记录均进入
+  train split，首样本 438 tokens、68 个监督 tokens、2 张图像。
+- 隔离：检查在 `CUDA_VISIBLE_DEVICES=` 和完整离线模式下完成，未使用 GPU、搜索 API 或网络。
+- 边界：合成数据只用于验证工程通路，绝不替代官方 Search-VL-SFT-36K，也不能形成训练效果结论。
