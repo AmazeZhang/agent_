@@ -11,7 +11,12 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from local_retrieval import ExactVisualIndex, build_exact_index, tool_observation  # noqa: E402
+from local_retrieval import (  # noqa: E402
+    ExactVisualIndex,
+    build_exact_index,
+    entity_tool_observation,
+    tool_observation,
+)
 
 
 class LocalVisualRetrievalTest(unittest.TestCase):
@@ -44,6 +49,11 @@ class LocalVisualRetrievalTest(unittest.TestCase):
             self.assertEqual(payload["backend"], "local_visual_index")
             self.assertEqual(payload["match_count"], 2)
             self.assertIn("corpus_revision", payload["results"][0])
+            entity_payload = json.loads(
+                entity_tool_observation(results).split("\n", 1)[1]
+            )
+            self.assertEqual(entity_payload["evidence_scope"], "entity-candidates-only")
+            self.assertNotIn("summary", entity_payload["results"][0])
             batch_results = index.search_batch(
                 [[1, 0], [-1, 0]], top_k=1, minimum_similarity=-1.0
             )

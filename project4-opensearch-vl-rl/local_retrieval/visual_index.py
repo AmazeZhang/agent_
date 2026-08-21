@@ -203,3 +203,21 @@ def tool_observation(results: Sequence[Mapping[str, object]]) -> str:
     return "Tool execution result:\n" + json.dumps(
         payload, ensure_ascii=False, indent=2, sort_keys=True
     )
+
+
+def entity_tool_observation(results: Sequence[Mapping[str, object]]) -> str:
+    """Return visual entity candidates without leaking page-text evidence."""
+
+    projected = [
+        {key: value for key, value in result.items() if key != "summary"}
+        for result in results
+    ]
+    payload = {
+        "backend": "local_visual_index",
+        "evidence_scope": "entity-candidates-only",
+        "match_count": len(projected),
+        "results": projected,
+    }
+    return "Tool execution result:\n" + json.dumps(
+        payload, ensure_ascii=False, indent=2, sort_keys=True
+    )
