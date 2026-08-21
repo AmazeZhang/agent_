@@ -37,7 +37,7 @@
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 本地工具闭环已通 | 固定模型/数据、本地工具安全补丁通过 | 基座单图 smoke；WIT image/text 双工具真实轨迹可执行 |
 | P4 Agentic SFT | 真实派生数据 1→5 step 工程闭环完成 | 检索验证数据与 loss mask 通过 | WIT 派生 80 条 train 已完成断点续训；旧协议 checkpoint 仅作负面证据 |
-| P5 SFT→RL rollout-only | clean Base 完成；难例数据已就绪 | 真实 SFT checkpoint 通过固定对照 | challenge-v3 已通过真实模板解析，待 Base dev20 |
+| P5 SFT→RL rollout-only | clean Base 完成；难例数据已就绪 | 真实 SFT checkpoint 通过固定对照 | challenge-v4 已通过真实模板解析，待 Base dev20 重跑 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -500,3 +500,13 @@
   `81d048997c13d1f637fbdeb72f70b7dd7ba91e0a7d0eb1a60c117724357e9f02`。
 - 安全：构建与模板解析均不使用 GPU、网络或 API；下一步只在物理 GPU1 跑 Base dev20 固定评测，之后才
   判断是否进入 challenge SFT。
+- 首次 Base dev20 Run `wit-agent-challenge-v3-base-dev20-20260822` 暴露 schema 契约不一致：工具 schema
+  允许 `top_k=5`，固定 cache/执行器只允许 3；模型合法生成 5 后被执行器拒绝。该 Run 在第 9 条期间由
+  `stop_managed.sh` 按 exact Run token/进程组 TERM，`exit_code=143`，cleanup
+  `physical_gpu=1 compute_processes=none`；日志保留，不能算模型结果。
+- v4 修复：训练 tools schema、评测 schema、cache 执行器和 manifest 全部固定 `top_k<=3`，新增回归
+  断言；v4 再次真实解析 80/80，通过相同 `506–1989` tokens 与 `44–193` supervised token 门禁。
+- v4 证据：manifest/tasks/train SFT SHA256 分别为
+  `ec1dcc3f424b375fc5f8a78c42f4aa5637acb3db8d406432cdb96bb8f5084479`、
+  `14435f66801d623ff55045693a31c55cf139f82a6985d2aa24a0c73a1ba6e70b`、
+  `d79ec7dfa0363244e010a0e85ccc823ab294eff63433b6f4710970c70b1d30d7`；v1–v3 均保留但不再作为训练入口。

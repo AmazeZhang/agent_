@@ -70,7 +70,7 @@ def tool_schema() -> str:
                     "type": "object",
                     "properties": {
                         "image": {"type": "string"},
-                        "top_k": {"type": "integer", "minimum": 1, "maximum": 5},
+                        "top_k": {"type": "integer", "minimum": 1, "maximum": 3},
                     },
                     "required": ["image"],
                 },

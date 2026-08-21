@@ -19,7 +19,7 @@ from local_retrieval.resnet50_encoder import sha256_file  # noqa: E402
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 MODEL_ROOT = PROJECT_DATA / "models/Qwen3-VL-8B-Instruct"
-DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v3"
+DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v4"
 RUN_ROOT = PROJECT_DATA / "runs"
 
 
@@ -58,6 +58,7 @@ def validate_dataset(root: Path) -> dict[str, object]:
         "split_unit": "entity_id-or-synthetic-probe-id",
         "maximum_agent_turns": 4,
         "text_lookup_summary_max_characters": 360,
+        "image_search_top_k_maximum": 3,
     }
     for field, expected in required.items():
         if manifest.get(field) != expected:

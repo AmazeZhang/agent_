@@ -19,7 +19,9 @@ class VerifyWitAgenticPilotTest(unittest.TestCase):
             "This sentence is deliberately longer than forty characters.",
         )
         self.assertEqual(
-            MODULE.first_sentence("A cinder is a pyroclastic material. Another sentence."),
+            MODULE.first_sentence(
+                "A cinder is a pyroclastic material. Another sentence."
+            ),
             "A cinder is a pyroclastic material.",
         )
         self.assertEqual(MODULE.first_sentence("No punctuation", maximum=5), "No pu")
@@ -61,6 +63,12 @@ class VerifyWitAgenticPilotTest(unittest.TestCase):
         )
         self.assertNotIn("summary", image_observation["results"][0])
         self.assertIn("literal handle img_1", sft["system"])
+        self.assertEqual(
+            json.loads(sft["tools"])[0]["function"]["parameters"]["properties"][
+                "top_k"
+            ]["maximum"],
+            3,
+        )
         self.assertEqual(
             published["oracle_steps"], ["image_search", "text_lookup", "final"]
         )

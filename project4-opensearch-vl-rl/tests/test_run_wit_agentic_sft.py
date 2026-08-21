@@ -26,6 +26,7 @@ class RunWitAgenticSftTest(unittest.TestCase):
                 "split_unit": "entity_id-or-synthetic-probe-id",
                 "maximum_agent_turns": 4,
                 "text_lookup_summary_max_characters": 360,
+                "image_search_top_k_maximum": 3,
                 "split_counts": {"dev": 20, "test": 20, "train": 80},
                 "task_type_counts": {
                     "candidate-conflict": 48,
