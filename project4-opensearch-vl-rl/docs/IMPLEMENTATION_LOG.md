@@ -37,7 +37,7 @@
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 本地工具闭环已通 | 固定模型/数据、本地工具安全补丁通过 | 基座单图 smoke；WIT image/text 双工具真实轨迹可执行 |
 | P4 Agentic SFT | 真实派生数据 1→5 step 工程闭环完成 | 检索验证数据与 loss mask 通过 | WIT 派生 80 条 train 已完成断点续训；旧协议 checkpoint 仅作负面证据 |
-| P5 SFT→RL rollout-only | clean Base 完成；难例数据已就绪 | 真实 SFT checkpoint 通过固定对照 | challenge-v5 已通过真实模板解析，待 Base dev20 重跑 |
+| P5 SFT→RL rollout-only | challenge Base dev20 完成 | challenge SFT 通过固定对照 | Base full success 0.55；待 challenge SFT 1-step/复评 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -525,3 +525,14 @@
   `wit-agent-challenge-v5-base-dev20-20260822` 精确停止并保留，不能计入模型结果。
 - 评分修复：`full_success` 只由无 fatal + 格式/标题/证据正确决定；最短工具序列另报
   `oracle_path_exact`，作为效率指标而非正确性门。这样仍能比较冗余调用，又不否定有充分证据的正确答案。
+- 最终 Base Run：`wit-agent-challenge-v5-base-dev20-v2-20260822`，固定 commit `99e8aa5`，20/20
+  完整执行；总体 `full_success=0.55`、`title_exact=0.95`、`evidence_exact=0.55`、
+  `format_valid=1.0`、`fatal_rate=0`、`oracle_path_exact=0.65`。
+- 分层 full success：candidate-conflict `0.50`（8 条）、clean `0.00`（2 条）、
+  transient-tool-failure `0.50`（6 条）、no-match `1.00`（4 条）。候选冲突最短路径只有 `0.125`，
+  说明基座常查完更多候选；这作为独立效率信号，不覆盖正确性。
+- 报告：SHA256 `d01d6719bff45f40ffb4ccfa93a4d59c92e2a28606bad0d555193f26d6228a60`；
+  dataset manifest/tasks hash 与 v5 固定值一致。物理 GPU1，`exit_code=0`，cleanup
+  `compute_processes=none`，GPU0/5 未参与。
+- 进入判断：challenge 已产生非零、非满分且按任务类型可解释的基线，允许进入最多 1-step challenge SFT
+  和同 dev20 复评；仍不授权大规模 SFT、多卡或 RL。
