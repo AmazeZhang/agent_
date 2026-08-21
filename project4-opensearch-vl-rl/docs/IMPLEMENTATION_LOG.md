@@ -204,3 +204,13 @@
   train split，首样本 438 tokens、68 个监督 tokens、2 张图像。
 - 隔离：检查在 `CUDA_VISIBLE_DEVICES=` 和完整离线模式下完成，未使用 GPU、搜索 API 或网络。
 - 边界：合成数据只用于验证工程通路，绝不替代官方 Search-VL-SFT-36K，也不能形成训练效果结论。
+
+### Step P4b：有界单卡 LoRA SFT 启动器
+
+- 状态：启动器实现和静态检查完成；GPU 参数更新 smoke 待执行。
+- 约束：只接受 1–5 optimizer steps、单张非 GPU0 物理卡、项目四受管 Run 环境和全新输出目录；
+  checkpoint 只能来自项目四 Run 目录，并校验 LoRA 权重与 trainer state。
+- 配置：固定本地 8B 基座和合成数据，HF 全离线，缓存写项目四数据盘；BF16 + FlashAttention 2、
+  rank-8 LoRA，视觉塔和多模态 projector 冻结，单卡 batch 1，gradient checkpointing。
+- 验证：Ruff、Python 编译和 `git diff --check` 通过；脱离受管 Run 调用会在模型加载前拒绝。
+- 边界：启动器最多执行工程 smoke，不授权真实 36K 数据或大规模训练。
