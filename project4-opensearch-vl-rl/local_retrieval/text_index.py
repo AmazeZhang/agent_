@@ -162,7 +162,7 @@ class LocalTextIndex:
         if not entity_id.strip() or len(entity_id) > 256:
             raise ValueError("entity_id must contain 1 to 256 non-space characters")
         row = self.connection.execute(
-            "SELECT entity_id, title, source, substr(body, 1, 500) AS summary "
+            "SELECT entity_id, title, source, substr(body, 1, 360) AS summary "
             "FROM docs WHERE entity_id = ? LIMIT 1",
             (entity_id,),
         ).fetchone()

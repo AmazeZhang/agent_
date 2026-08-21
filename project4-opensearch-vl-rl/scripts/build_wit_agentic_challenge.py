@@ -20,13 +20,17 @@ SCRIPT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(SCRIPT_ROOT))
 
-from local_retrieval import entity_tool_observation, text_tool_observation
+from local_retrieval import (
+    LocalTextIndex,
+    entity_tool_observation,
+    text_tool_observation,
+)
 from local_retrieval.resnet50_encoder import sha256_file
 from verify_wit_agentic_pilot import first_sentence, tool_schema
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 SOURCE_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v4"
-OUTPUT_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v1"
+OUTPUT_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v3"
 SYSTEM = (
     "Use one tool call per turn. Pass the literal handle img_1 to image_search. "
     "Image search returns entity candidates only; text_lookup supplies answer evidence. "
@@ -92,7 +96,9 @@ def conflict_keyword(task: dict[str, Any]) -> str | None:
         return None
     target = results[1]
     blocked = set(WORD_RE.findall(str(target["title"]).casefold()))
-    other_text = " ".join(str(item.get("summary", "")) for item in results if item is not target).casefold()
+    other_text = " ".join(
+        str(item.get("summary", "")) for item in results if item is not target
+    ).casefold()
     candidates = {
         word.casefold()
         for word in WORD_RE.findall(str(target.get("summary", "")))
@@ -106,21 +112,33 @@ def conflict_keyword(task: dict[str, Any]) -> str | None:
 def function_message(name: str, arguments: dict[str, object]) -> dict[str, str]:
     return {
         "from": "function",
-        "value": json.dumps({"name": name, "arguments": arguments}, separators=(",", ":")),
+        "value": json.dumps(
+            {"name": name, "arguments": arguments}, separators=(",", ":")
+        ),
     }
 
 
-def base_record(prompt: str, image_name: str, conversations: list[dict[str, str]]) -> dict[str, Any]:
+def base_record(
+    prompt: str, image_name: str, conversations: list[dict[str, str]]
+) -> dict[str, Any]:
     return {
-        "conversations": [{"from": "human", "value": f"<image> {prompt}"}, *conversations],
+        "conversations": [
+            {"from": "human", "value": f"<image> {prompt}"},
+            *conversations,
+        ],
         "images": [image_name],
         "system": SYSTEM,
         "tools": tool_schema(),
     }
 
 
-def clean_example(source: dict[str, Any], image_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
-    result = source["retrieval_results"][0]
+def clean_example(
+    source: dict[str, Any],
+    image_name: str,
+    text_results: dict[str, dict[str, object]] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    visual_result = source["retrieval_results"][0]
+    result = (text_results or {}).get(str(visual_result["entity_id"]), visual_result)
     prompt = (
         "The image has runtime handle img_1. Identify its closest Wikipedia subject, "
         "look up that entity, and report the exact title and first evidence sentence. "
@@ -129,7 +147,10 @@ def clean_example(source: dict[str, Any], image_name: str) -> tuple[dict[str, An
     )
     calls = [
         function_message("image_search", {"image": "img_1", "top_k": 3}),
-        {"from": "observation", "value": entity_tool_observation(source["retrieval_results"])},
+        {
+            "from": "observation",
+            "value": entity_tool_observation(source["retrieval_results"]),
+        },
         function_message("text_lookup", {"entity_id": result["entity_id"]}),
         {"from": "observation", "value": text_tool_observation([result])},
         {"from": "gpt", "value": source["gold_final"]},
@@ -145,8 +166,12 @@ def clean_example(source: dict[str, Any], image_name: str) -> tuple[dict[str, An
     return base_record(prompt, image_name, calls), task
 
 
-def transient_example(source: dict[str, Any], image_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
-    record, task = clean_example(source, image_name)
+def transient_example(
+    source: dict[str, Any],
+    image_name: str,
+    text_results: dict[str, dict[str, object]] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    record, task = clean_example(source, image_name, text_results)
     first_call = function_message("image_search", {"image": "img_1", "top_k": 3})
     record["conversations"][1:1] = [
         first_call,
@@ -163,12 +188,18 @@ def transient_example(source: dict[str, Any], image_name: str) -> tuple[dict[str
 
 
 def conflict_example(
-    source: dict[str, Any], image_name: str, keyword: str
+    source: dict[str, Any],
+    image_name: str,
+    keyword: str,
+    text_results: dict[str, dict[str, object]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     results = source["retrieval_results"]
     first, target = results[0], results[1]
-    evidence = first_sentence(str(target["summary"]))
-    final = f"Title: {target['title']}\nEvidence: {evidence}"
+    evidence_by_id = text_results or {}
+    first_text = evidence_by_id.get(str(first["entity_id"]), first)
+    target_text = evidence_by_id.get(str(target["entity_id"]), target)
+    evidence = first_sentence(str(target_text["summary"]))
+    final = f"Title: {target_text['title']}\nEvidence: {evidence}"
     prompt = (
         f"The image has runtime handle img_1. Search for its candidate entities. The closest "
         f"visual candidate may be a distractor: select the candidate whose text evidence contains "
@@ -178,9 +209,9 @@ def conflict_example(
         function_message("image_search", {"image": "img_1", "top_k": 3}),
         {"from": "observation", "value": entity_tool_observation(results)},
         function_message("text_lookup", {"entity_id": first["entity_id"]}),
-        {"from": "observation", "value": text_tool_observation([first])},
+        {"from": "observation", "value": text_tool_observation([first_text])},
         function_message("text_lookup", {"entity_id": target["entity_id"]}),
-        {"from": "observation", "value": text_tool_observation([target])},
+        {"from": "observation", "value": text_tool_observation([target_text])},
         {"from": "gpt", "value": final},
     ]
     task = {
@@ -189,7 +220,7 @@ def conflict_example(
         "user_prompt": prompt,
         "task_type": "candidate-conflict",
         "conflict_keyword": keyword,
-        "gold_title": target["title"],
+        "gold_title": target_text["title"],
         "gold_evidence_sentence": evidence,
         "gold_final": final,
         "image_search_failures_before_success": 0,
@@ -273,56 +304,104 @@ def build(source_root: Path, output: Path) -> Path:
             )
             for split in COUNTS
         }
-        for split, quotas in COUNTS.items():
-            available = by_split[split]
-            eligible = [(task, conflict_keyword(task)) for task in available]
-            conflicts = [
-                (task, keyword)
-                for task, keyword in eligible
-                if keyword is not None
-            ][: quotas["candidate-conflict"]]
-            if len(conflicts) != quotas["candidate-conflict"]:
-                raise ValueError(f"not enough conflict candidates for {split}")
-            used = {task["task_id"] for task, _ in conflicts}
-            remaining = [task for task in available if task["task_id"] not in used]
-            clean = remaining[: quotas["clean"]]
-            transient = remaining[quotas["clean"] : quotas["clean"] + quotas["transient-tool-failure"]]
-            if len(clean) != quotas["clean"] or len(transient) != quotas["transient-tool-failure"]:
-                raise ValueError(f"not enough source entities for {split}")
-            examples: list[
-                tuple[dict[str, Any], dict[str, Any], dict[str, Any] | None]
-            ] = []
-            for task, keyword in conflicts:
-                examples.append((*conflict_example(task, f"images/{task['task_id']}-conflict.jpg", keyword), task))
-            for task in clean:
-                examples.append((*clean_example(task, f"images/{task['task_id']}-clean.jpg"), task))
-            for task in transient:
-                examples.append((*transient_example(task, f"images/{task['task_id']}-transient.jpg"), task))
-            for record, task, source in examples:
-                source_image = source_root / str(source["query_image"])
-                shutil.copyfile(source_image, staging / task["query_image"])
-                records[split].append(record)
-                published.append(task)
-            for index in range(quotas["no-match"]):
-                image_name = f"images/no-match-{split}-{index:03d}.png"
-                image = Image.new("RGB", (224, 224), (127, 127, 127))
-                draw = ImageDraw.Draw(image)
-                for offset in range(0, 224, 32):
-                    shade = (offset * 17 + index * 29) % 255
-                    draw.rectangle((offset, 0, min(offset + 15, 223), 223), fill=(shade, 255 - shade, 127))
-                image.save(staging / image_name, format="PNG")
-                record, task = no_match_example(split, index, image_name)
-                records[split].append(record)
-                published.append(task)
+        with LocalTextIndex(Path(source_manifest["text_index"])) as text_index:
+            for split, quotas in COUNTS.items():
+                available = by_split[split]
+                eligible = [(task, conflict_keyword(task)) for task in available]
+                conflicts = [
+                    (task, keyword) for task, keyword in eligible if keyword is not None
+                ][: quotas["candidate-conflict"]]
+                if len(conflicts) != quotas["candidate-conflict"]:
+                    raise ValueError(f"not enough conflict candidates for {split}")
+                used = {task["task_id"] for task, _ in conflicts}
+                remaining = [task for task in available if task["task_id"] not in used]
+                clean = remaining[: quotas["clean"]]
+                transient = remaining[
+                    quotas["clean"] : quotas["clean"] + quotas["transient-tool-failure"]
+                ]
+                if (
+                    len(clean) != quotas["clean"]
+                    or len(transient) != quotas["transient-tool-failure"]
+                ):
+                    raise ValueError(f"not enough source entities for {split}")
+                examples: list[
+                    tuple[dict[str, Any], dict[str, Any], dict[str, Any] | None]
+                ] = []
+                selected = [task for task, _ in conflicts] + clean + transient
+                text_results = {}
+                for task in selected:
+                    for result in task["retrieval_results"][:2]:
+                        entity_id = str(result["entity_id"])
+                        looked_up = text_index.lookup(entity_id)
+                        if looked_up is None:
+                            raise ValueError(f"missing text evidence for {entity_id}")
+                        text_results[entity_id] = looked_up
+                for task, keyword in conflicts:
+                    examples.append(
+                        (
+                            *conflict_example(
+                                task,
+                                f"images/{task['task_id']}-conflict.jpg",
+                                keyword,
+                                text_results,
+                            ),
+                            task,
+                        )
+                    )
+                for task in clean:
+                    examples.append(
+                        (
+                            *clean_example(
+                                task,
+                                f"images/{task['task_id']}-clean.jpg",
+                                text_results,
+                            ),
+                            task,
+                        )
+                    )
+                for task in transient:
+                    examples.append(
+                        (
+                            *transient_example(
+                                task,
+                                f"images/{task['task_id']}-transient.jpg",
+                                text_results,
+                            ),
+                            task,
+                        )
+                    )
+                for record, task, source in examples:
+                    source_image = source_root / str(source["query_image"])
+                    shutil.copyfile(source_image, staging / task["query_image"])
+                    records[split].append(record)
+                    published.append(task)
+                for index in range(quotas["no-match"]):
+                    image_name = f"images/no-match-{split}-{index:03d}.png"
+                    image = Image.new("RGB", (224, 224), (127, 127, 127))
+                    draw = ImageDraw.Draw(image)
+                    for offset in range(0, 224, 32):
+                        shade = (offset * 17 + index * 29) % 255
+                        draw.rectangle(
+                            (offset, 0, min(offset + 15, 223), 223),
+                            fill=(shade, 255 - shade, 127),
+                        )
+                    image.save(staging / image_name, format="PNG")
+                    record, task = no_match_example(split, index, image_name)
+                    records[split].append(record)
+                    published.append(task)
         for split, items in records.items():
             with (staging / f"sft_{split}.json").open("x", encoding="utf-8") as handle:
                 json.dump(items, handle, ensure_ascii=False, indent=2)
                 handle.write("\n")
         with (staging / "tasks.jsonl").open("x", encoding="utf-8") as handle:
             for task in published:
-                handle.write(json.dumps(task, ensure_ascii=False, sort_keys=True) + "\n")
+                handle.write(
+                    json.dumps(task, ensure_ascii=False, sort_keys=True) + "\n"
+                )
         with (staging / "dataset_info.json").open("x", encoding="utf-8") as handle:
-            json.dump(dataset_info(), handle, ensure_ascii=False, indent=2, sort_keys=True)
+            json.dump(
+                dataset_info(), handle, ensure_ascii=False, indent=2, sort_keys=True
+            )
             handle.write("\n")
         split_counts = Counter(task["split"] for task in published)
         type_counts = Counter(task["task_type"] for task in published)
@@ -332,7 +411,13 @@ def build(source_root: Path, output: Path) -> Path:
             "purpose": "local-agentic-sft-rl-challenge",
             "source_manifest_sha256": sha256_file(source_root / "manifest.json"),
             "source_tasks_sha256": sha256_file(source_root / "tasks.jsonl"),
+            "sft_sha256": {
+                split: sha256_file(staging / f"sft_{split}.json")
+                for split in ("train", "dev", "test")
+            },
+            "dataset_info_sha256": sha256_file(staging / "dataset_info.json"),
             "text_index": source_manifest["text_index"],
+            "text_lookup_summary_max_characters": 360,
             "records": len(published),
             "split_unit": "entity_id-or-synthetic-probe-id",
             "split_counts": dict(sorted(split_counts.items())),
@@ -356,7 +441,9 @@ def build(source_root: Path, output: Path) -> Path:
 def main() -> int:
     args = parse_args()
     output = build(args.source.resolve(), args.output)
-    print(json.dumps({"output": str(output), "status": "challenge-ready"}, sort_keys=True))
+    print(
+        json.dumps({"output": str(output), "status": "challenge-ready"}, sort_keys=True)
+    )
     return 0
 
 

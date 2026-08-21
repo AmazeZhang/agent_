@@ -37,7 +37,7 @@
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 本地工具闭环已通 | 固定模型/数据、本地工具安全补丁通过 | 基座单图 smoke；WIT image/text 双工具真实轨迹可执行 |
 | P4 Agentic SFT | 真实派生数据 1→5 step 工程闭环完成 | 检索验证数据与 loss mask 通过 | WIT 派生 80 条 train 已完成断点续训；旧协议 checkpoint 仅作负面证据 |
-| P5 SFT→RL rollout-only | clean Base 评测完成；难例扩充中 | 真实 SFT checkpoint 通过固定对照 | v4 clean dev5 Base 已满分，不能用于证明训练增益 |
+| P5 SFT→RL rollout-only | clean Base 完成；难例数据已就绪 | 真实 SFT checkpoint 通过固定对照 | challenge-v3 已通过真实模板解析，待 Base dev20 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -476,3 +476,27 @@
   `exit_code=0`，cleanup `compute_processes=none`，GPU0/5 未参与。
 - 结论：v4 clean 只作为执行链路正控，不再对它做能被解释成效果增益的 SFT 对比。下一数据版本固定增加
   `candidate-conflict`、`no-match`、`transient-tool-failure` 三类，并按任务类型分别报告，之后才启动新协议 SFT。
+
+### Step P6h：有区分度的离线 Agent challenge
+
+- 任务组成：固定 120 条、train/dev/test `80/20/20`；`candidate-conflict=48`、`clean=12`、
+  `transient-tool-failure=36`、`no-match=24`。实体任务仍沿用 entity-disjoint split；no-match 使用明确标记的
+  synthetic safety probe，不伪装成真实 WIT 命中。
+- candidate-conflict：图像检索返回真实 top-3，但问题要求选择文本证据含唯一关键词的候选；oracle 为
+  `image_search -> text_lookup(rank1) -> text_lookup(rank2) -> final`，防止只复制视觉 top-1。
+- transient：环境第一次 `image_search` 确定性返回 `retryable=true/TRANSIENT_FAILURE`，第二次才返回固定真实
+  cache；oracle 显式监督重试。no-match 返回空候选并要求固定拒答，不能猜测实体。
+- v1 失败门禁：真实 `qwen3_vl_nothink` 解析发现部分四步轨迹达到 `cutoff_len=2048`，原因是两次文本
+  observation 过长；训练未启动，v1 保留为失败证据。
+- observation 修复：`LocalTextIndex.lookup` 固定最多返回 360 字符；challenge SFT 构建时从实际 SQLite
+  lookup 取 observation，与评测运行时完全一致，不再误用带视觉 encoder revision 的内部候选记录。
+- v2 虽通过解析，但 manifest 未包含 SFT 文件哈希和证据窗口，无法充分区分 observation 变更；保留但不作为
+  训练入口。v3 manifest 增加 train/dev/test、dataset_info 哈希及 360 字符契约。
+- v3 真实解析：CPU、`CUDA_VISIBLE_DEVICES=`、全离线，80/80 train 记录；每条恰好 1 图，tokens
+  min/max `506/1989`，supervised tokens min/max `44/193`，均未触达 2048 截断。
+- v3 证据：数据盘 `wit-agentic-challenge-v3`；manifest/tasks/train SFT SHA256 分别为
+  `9097b28f0efc6ebb29ef034ec25d7007c61769b3fec056a7540e3a818b491fce`、
+  `14435f66801d623ff55045693a31c55cf139f82a6985d2aa24a0c73a1ba6e70b`、
+  `81d048997c13d1f637fbdeb72f70b7dd7ba91e0a7d0eb1a60c117724357e9f02`。
+- 安全：构建与模板解析均不使用 GPU、网络或 API；下一步只在物理 GPU1 跑 Base dev20 固定评测，之后才
+  判断是否进入 challenge SFT。
