@@ -11,7 +11,7 @@
 | 上游源码 | 已固定到 submodule commit `c5c02a49780e26ae9cb6f1fb56731d1e594d59f0` |
 | 源码审计 | 已完成第一轮 |
 | 安全规范 | 已建立，尚待 P0 脚本落地 |
-| P0 受管运行 | 进行中 |
+| P0 受管运行 | 已完成 CPU 安全门禁；真实 GPU preflight 留待 P1 smoke 前执行 |
 | 推理环境 | 未创建 |
 | SFT 环境/训练 | 未开始 |
 | RL 环境/训练 | 未开始 |
@@ -32,7 +32,7 @@
 
 | 阶段 | 状态 | 进入条件 | 完成证据 |
 |---|---|---|---|
-| P0 安全门禁 | 进行中 | 安全规范已审阅 | 待补：脚本、CPU 测试、精确停止测试 |
+| P0 安全门禁 | 已完成 | 安全规范已审阅 | 受管脚本、CPU 假 GPU/进程组测试通过 |
 | P1 环境冻结 | 未开始 | P0 通过 | 待补 |
 | P2 资产准备 | 未开始 | 环境方案确认、下载清单和空间预算完成 | 待补 |
 | P3 安全推理 | 未开始 | 固定模型/数据、本地工具安全补丁通过 | 待补 |
@@ -82,7 +82,7 @@
 
 ### Step D0：审计、安全规范与实施规划
 
-- 状态：完成，等待提交与推送。
+- 状态：完成并推送，commit `db2097a`。
 - 产物：
   - `docs/SOURCE_AUDIT_2026-08-17.md`
   - `docs/EXPERIMENT_SAFETY.md`
@@ -90,3 +90,25 @@
   - `docs/IMPLEMENTATION_LOG.md`
 - 验证：`git diff --check` 通过；未启动训练、未下载模型和数据。
 
+### Step P0：项目四受管运行与精确停止
+
+- 状态：完成，等待提交与推送。
+- 新增：
+  - `scripts/gpu_guard.sh`
+  - `scripts/preflight.sh`
+  - `scripts/run_managed.sh`
+  - `scripts/start_tmux_run.sh`
+  - `scripts/stop_managed.sh`
+  - `tests/test_p0_safety.sh`
+- 验证：
+  - 物理 GPU0 无条件拒绝；
+  - GPU5 默认拒绝，只有 `ALLOW_UNSTABLE_GPU5=1` 才通过列表门禁；
+  - 目标卡出现未知 Compute Process 时拒绝；
+  - 默认清空继承的 Clash 代理；
+  - 新 Run 目录拒绝覆盖；
+  - `stop_managed.sh` 校验 Run token，只终止对应进程组，无关进程保持存活；
+  - 正常/停止路径均记录退出信息和 GPU cleanup；
+  - `bash -n` 与 `git diff --check` 通过；当前主机未安装 shellcheck，已记录但不为进入 P1 的阻塞。
+- 命令：`bash project4-opensearch-vl-rl/tests/test_p0_safety.sh`
+- 结果：`P0 safety tests: PASS`。
+- 资源：测试仅使用 `/tmp` 和伪造的 `nvidia-smi`，未调用真实 GPU、未下载依赖。

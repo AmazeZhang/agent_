@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+args="$*"
+if [[ "$args" == *"--query-gpu=index --format=csv,noheader,nounits"* ]]; then
+  printf '0\n1\n2\n3\n4\n5\n6\n7\n'
+  exit 0
+fi
+if [[ "$args" == *"--query-compute-apps="* ]]; then
+  gpu_id=""
+  for arg in "$@"; do
+    case "$arg" in
+      --id=*) gpu_id="${arg#--id=}" ;;
+    esac
+  done
+  if [[ -n "${FAKE_BUSY_GPU:-}" && "$gpu_id" == "$FAKE_BUSY_GPU" ]]; then
+    echo "4242,other-user-process,1024"
+  fi
+  exit 0
+fi
+
+gpu_id="1"
+for arg in "$@"; do
+  case "$arg" in
+    --id=*) gpu_id="${arg#--id=}" ;;
+  esac
+done
+echo "${gpu_id},GPU-FAKE-${gpu_id},00000000:00:00.0,Fake GPU,24564,18,24066,0,40,595.45.04"
