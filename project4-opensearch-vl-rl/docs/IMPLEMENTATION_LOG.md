@@ -273,3 +273,19 @@
   未参与，未使用网络或 API。
 - P4 结论：SFT 工程闭环已完成，但真实 SFT-36K 数据尚未就绪，因此不能声称完成论文级 SFT
   复现或具备效果证据。下一步只进入 RL rollout/API 依赖审计，不启动大规模训练。
+
+### Step P5a：RL 数据组成审计与离线视觉语料决策
+
+- 状态：完成；RL 图片包下载属于后续 P5b，尚未宣称资产就绪。
+- 官方 RL 数据：固定 `Search-VL-RL-8K` revision `8ef5672...`；JSONL 共 7,992 行且字段完整，
+  八个来源中 `new_livevqa` 占 46.87%，证明 Wikipedia 图像库不能无条件替代开放网页检索。
+- 数据原则：不改写官方 RL 样本，不把预测实体、检索 top-k 或答案相关覆盖标签写回原数据；
+  pilot 只保存样本 ID，检索轨迹进入独立日志。
+- OVEN：官方端点访问 gated 脚本返回 HTTP 401；未绕过访问门禁，也未通过 Clash 下载。
+- WIT：选择公开 `wikimedia/wit_base` revision `ff6d4fb3...`；固定 330 个 Parquet、
+  308,150,150,366 B。先做单片约 0.93 GB pilot，通过 schema/索引验收后再决定扩展。
+- ZIP 安全：新增独立审计/解压器，拒绝路径穿越、反斜杠路径、符号链接、加密、重复成员、
+  超限膨胀和覆盖；CPU 单测覆盖正常解压、覆盖拒绝、三类路径逃逸和符号链接拒绝。
+- 验证：`python3 -m unittest tests/test_safe_extract_zip.py tests/test_audit_rl_dataset.py`、Ruff、
+  `compileall` 和 `git diff --check` 均通过。
+- 边界：没有启动 RL、没有调用搜索 API、没有使用 GPU；WIT 全量下载和 20 步以上 RL 仍受门禁。

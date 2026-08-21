@@ -1,7 +1,7 @@
 # OpenSearch-VL 本地多模态检索研究与接入决策
 
 > 日期：2026-08-21  
-> 状态：完成第一轮数据级审计；尚未下载 OVEN gated 图像资产，尚未启动 RL。  
+> 状态：完成第一轮数据级审计；RL 图片包下载中；OVEN 当前账号无权限，转向公开 WIT；尚未启动 RL。
 > 目标：判断 OVEN/WIT 是否适合作为低成本 RL 工具后端，以及是否需要改写 RL 数据。
 
 ## 1. 已固定的数据源
@@ -14,8 +14,9 @@
 - 已下载并校验：
   - `rl_data.jsonl`：8,933,719 B
   - SHA256：`3af5b3c188e604817b6c4731c369b7ca1f829414fc514d109a7f468cfd8b0144`
-- 尚未下载：`images.zip`，2,693,241,993 B，官方 LFS SHA256
-  `589a67c263c8dcd9697bc762df3d3d6cc5b369017b1f196186a69d23142f4236`。
+- 下载中：`images.zip`，2,693,241,993 B，官方 LFS SHA256
+  `589a67c263c8dcd9697bc762df3d3d6cc5b369017b1f196186a69d23142f4236`；使用 8 路有界
+  Range 和可恢复 part 文件，校验通过前不会发布为最终 ZIP。
 
 下载只使用固定 revision 的 `hf-mirror.com` 直连，显式清空大小写代理变量，未使用 Clash
 7890/7891，且禁用了隐式 HF token 和 Xet。
@@ -24,7 +25,8 @@
 
 - 仓库：`ychenNLP/oven`
 - 固定 revision：`0f1568c5bcb16b70b189d77164c6bcdc38ee43c2`
-- 访问状态：HF `gated=auto`，必须先确认本机账户已经接受数据条款；不得通过镜像泄露 token。
+- 访问状态：HF `gated=auto`；2026-08-21 使用官方 HF 端点检查，本机现有凭据请求 gated
+  下载脚本返回 HTTP 401。当前不得下载，也不得借镜像绕过条款或泄露 token。
 - 目标资产：
   - `all_wikipedia_images.tar`：32,353,424,368 B；
   - `ovenid2impath.csv`：529,959,904 B。
@@ -33,9 +35,16 @@
 
 ### WIT / Wikimedia Image-Caption Matching
 
-- WIT 全量压缩元数据约 25 GB，含 3,760 万图文关系和 1,150 万唯一图片。
-- Wikimedia 像素发布约 600 万张 300px 图像、约 200 GB，并提供 ResNet-50 特征。
-- WIT 作为第二阶段补召回库；在 OVEN 覆盖率没有实测前不直接下载 200 GB pixels。
+- 采用公开 HF 仓库 `wikimedia/wit_base`，固定 revision
+  `ff6d4fb32fd566d3a1fa20e946cba3234179465e`，许可为 CC-BY-SA-4.0；无需搜索 API key。
+- 固定 revision 的 `data/` 共 330 个 Parquet 分片、308,150,150,366 B；单片约
+  910–969 MB。文件清单通过公开 API 分页核对，未下载数据本体。
+- 数据卡给出 6,477,255 个样本；每行带 300px 图像、Wikimedia 元数据、多语言描述/上下文，
+  以及 2,048 维 ResNet-50 特征，适合先验证本地图像近邻和实体候选链路。
+- 第一片 `data/train-00000-of-00330.parquet` 为 932,699,916 B，LFS SHA256
+  `8a9a449a0db937920b7c0dd13cd0bc9b1cadb19071567169dbac41a956273ec2`。
+- OVEN 权限恢复前，WIT 从“第二阶段补召回”提升为首个公开视觉候选库；先做单片 pilot，
+  索引与 observation 验收后才考虑 308 GB 全量下载，避免先下载再发现 schema/性能不适配。
 
 ## 2. RL 数据的实测组成
 
@@ -76,8 +85,8 @@ OVEN/WIT **适合做本地优先的视觉实体检索后端**，不适合直接�
 
 ```text
 image_search
-  -> OVEN 实体图像索引
-  -> 低置信度时查询 WIT 补召回索引
+  -> 当前：WIT 公开图像/特征索引
+  -> OVEN 获得正规访问权后：OVEN 实体索引优先、WIT 补召回
   -> 仍低置信度时返回可审计的 no-match
   -> 只有得到独立授权和预算时才允许在线 fallback
 
@@ -121,10 +130,10 @@ text_search
 
 ## 5. 下一步门禁
 
-1. 下载并校验 RL `images.zip`，拒绝覆盖，解压前检查路径穿越和膨胀大小；
-2. 通过官方 HF 端点验证本机账号是否接受 OVEN 条款；
-3. 只下载 OVEN README/映射与 `all_wikipedia_images.tar`，不下载八个 query shard；
-4. 实现离线索引适配器和稳定 observation schema；
-5. 固定随机种子抽取 200 条，按八个 dataset 子集分层报告；
-6. 未达到覆盖率门槛时不下载 WIT pixels，先分析失败类型；
-7. 任何 20 步以上 RL 或在线 fallback 仍需重新获得用户确认。
+1. 完成并校验 RL `images.zip`；只通过 `scripts/safe_extract_zip.py` 审计后解压；
+2. 下载并校验 WIT 单个约 0.93 GB 分片，验证 Parquet schema、图片和预计算特征；
+3. 实现离线索引适配器和稳定 observation schema；
+4. 固定随机种子抽取 200 条，按八个 dataset 子集分层报告；
+5. 根据覆盖率与索引成本决定是否分批扩展 WIT，不能把单片 pilot 冒充完整语料；
+6. OVEN 只有在用户正规接受条款、凭据授权后才恢复下载；初期仍不下载八个 query shard；
+7. 任何 20 步以上 RL、WIT 全量 308 GB 下载或在线 fallback 均需重新获得用户确认。
