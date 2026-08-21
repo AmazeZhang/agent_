@@ -36,7 +36,7 @@
 | P1 环境冻结 | 已完成 | P0 通过 | freeze、CPU import、受管 GPU1 FlashAttention 正反向 smoke |
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 进行中 | 固定模型/数据、本地工具安全补丁通过 | 基座离线单图 smoke 通过；agent 工具闭环未开始 |
-| P4 Agentic SFT | 进行中 | 推理闭环通过 | 合成数据 1→2 step LoRA 断点续训通过；5-step/adapter 推理待验证 |
+| P4 Agentic SFT | 进行中 | 推理闭环通过 | 合成数据 1→2→5 step LoRA 断点续训通过；adapter 推理待验证 |
 | P5 SFT→RL rollout-only | 未开始 | SFT checkpoint 通过固定对照 | 待补 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
@@ -237,5 +237,8 @@
 - 续训有限值：step 2 loss 2.51669、grad norm 3.15616；只说明第二次参数更新为有限值。
   checkpoint-1/2 adapter SHA256 分别为 `10f43014...`、`2d881fb4...`，证明保存权重发生变化。
 - 续训安全：Run `exit_code=0`，cleanup 后 GPU1 `compute_processes=none`，GPU0 未参与。
-- 边界：启动器最多执行工程 smoke，不授权真实 36K 数据或大规模训练；5-step 与 adapter
-  离线推理仍待验证。
+- 5-step 稳定性：Run `sft-lora-resume-step5-20260821` 从 global step 2 恢复；step 3/4/5
+  loss 为 2.25844/1.83030/1.41446，grad norm 均有限；checkpoint-5 adapter SHA256 为
+  `6be087a3...`。`exit_code=0`，cleanup 后 GPU1 无 compute process。
+- 边界：5 条训练记录来自循环使用 4 条合成样本，loss 下降极易过拟合，不能外推为模型质量；
+  启动器不授权真实 36K 数据或大规模训练，adapter 离线推理仍待验证。
