@@ -1,5 +1,7 @@
 # P3 clean-upstream GRPO vs GiGPO 状态（2026-08-20）
 
+> **历史快照（已失效）**：本文记录的是 GPU driver 与 Retriever 暂时不可用时的 preflight 状态。故障恢复后的双 smoke、GRPO10/GiGPO10 训练及 confirm-256 评测均已完成；当前结论以 [`P3_UPSTREAM_GRPO_VS_GIGPO_2026-08-20.md`](P3_UPSTREAM_GRPO_VS_GIGPO_2026-08-20.md) 为准。
+
 ## 当前判定
 
 本轮实验尚未启动。安全 preflight 在 GPU 检查阶段失败，因此没有创建新的

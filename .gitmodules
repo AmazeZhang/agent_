@@ -19,3 +19,6 @@
 [submodule "project3-search-agent-rl/vendor/verl-agent"]
 	path = project3-search-agent-rl/vendor/verl-agent
 	url = https://github.com/langfengQ/verl-agent.git
+[submodule "project4-opensearch-vl-rl/vendor/OpenSearch-VL"]
+	path = project4-opensearch-vl-rl/vendor/OpenSearch-VL
+	url = https://github.com/shawn0728/OpenSearch-VL.git

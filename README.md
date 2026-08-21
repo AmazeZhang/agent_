@@ -1,10 +1,14 @@
-# Agent 算法三项目工作区
+# Agent 算法项目工作区
 
-本目录当前包含三个独立项目：
+本目录当前包含五个独立项目：
 
 - `project1-harness-evolution/`：Trace、失败诊断、自进化与可靠性评测。
 - `project2-coding-agent-rl/`：Coding Agent 数据、轨迹、SFT 与 Agentic RL。
 - `project3-search-agent-rl/`：Search Agent 的检索环境、轨迹级/步骤级信用分配与Agentic RL。
+- `project4-opensearch-vl-rl/`：OpenSearch-VL 多模态搜索 Agent 的源码审计、学习路线与小规模复现规划。
+- `project5-mini-chartqa/`：基于 VTool-R1/veRL 的 MiniChartQA 视觉工具强化学习实验原型。
+
+项目四、项目五目前处于审计/原型阶段，不应表述为已经完成训练复现。第三方源码与个人文档、配置修改在各项目 README 中分别标注。
 
 环境和当前阻塞项见 [SETUP_STATUS.md](SETUP_STATUS.md)。
 
