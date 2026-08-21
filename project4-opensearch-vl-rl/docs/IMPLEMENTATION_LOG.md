@@ -13,7 +13,7 @@
 | 安全规范 | 已建立并由 P0 受管脚本落实 |
 | P0 受管运行 | 已完成并推送；真实 GPU1 preflight 和受管 smoke 通过 |
 | 推理环境 | 8B 基座已校验；离线单图生成通过 |
-| SFT 环境/训练 | 独立环境已冻结；合成 agentic 数据 1-step LoRA 参数更新通过 |
+| SFT 环境/训练 | 合成 agentic 数据 1→2→5 step LoRA、断点续训和 adapter 离线推理闭环通过 |
 | RL 环境/训练 | 未开始 |
 | 消融 | 未开始 |
 | 本地效果结论 | 无；不得引用上游论文数字作为本地结果 |
@@ -36,7 +36,7 @@
 | P1 环境冻结 | 已完成 | P0 通过 | freeze、CPU import、受管 GPU1 FlashAttention 正反向 smoke |
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 进行中 | 固定模型/数据、本地工具安全补丁通过 | 基座离线单图 smoke 通过；agent 工具闭环未开始 |
-| P4 Agentic SFT | 进行中 | 推理闭环通过 | 合成数据 1→2→5 step LoRA 断点续训通过；adapter 推理待验证 |
+| P4 Agentic SFT | 工程 smoke 完成 | 推理闭环通过 | 合成数据 1→2→5 step、断点续训、adapter 离线推理通过 |
 | P5 SFT→RL rollout-only | 未开始 | SFT checkpoint 通过固定对照 | 待补 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
@@ -241,4 +241,11 @@
   loss 为 2.25844/1.83030/1.41446，grad norm 均有限；checkpoint-5 adapter SHA256 为
   `6be087a3...`。`exit_code=0`，cleanup 后 GPU1 无 compute process。
 - 边界：5 条训练记录来自循环使用 4 条合成样本，loss 下降极易过拟合，不能外推为模型质量；
-  启动器不授权真实 36K 数据或大规模训练，adapter 离线推理仍待验证。
+  启动器不授权真实 36K 数据或大规模训练。
+- adapter 验收：Run `sft-adapter-infer-step5-20260821` 离线加载 checkpoint-5，PEFT
+  `active_adapters=["default"]`；确定性单图回答 `red`，输入/输出 83/2 tokens，精确
+  `torch.cuda.max_memory_allocated=16.493 GiB`。
+- adapter 安全：物理 GPU1，Run `exit_code=0`，cleanup 后 GPU1 无 compute process；GPU0
+  未参与，未使用网络或 API。
+- P4 结论：SFT 工程闭环已完成，但真实 SFT-36K 数据尚未就绪，因此不能声称完成论文级 SFT
+  复现或具备效果证据。下一步只进入 RL rollout/API 依赖审计，不启动大规模训练。
