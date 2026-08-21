@@ -30,6 +30,11 @@ class EvaluateLocalAgentTest(unittest.TestCase):
         )
         self.assertFalse(MODULE.score_final("An Entity", task)["format_valid"])
 
+    def test_every_runtime_message_uses_structured_content(self) -> None:
+        source = Path(MODULE.__file__).read_text()
+        self.assertNotIn('"content": output}', source)
+        self.assertIn('"type": "text", "text": output', source)
+
 
 if __name__ == "__main__":
     unittest.main()

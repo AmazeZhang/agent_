@@ -212,10 +212,16 @@ def evaluate_task(
     messages: list[dict[str, Any]] = [
         {
             "role": "system",
-            "content": (
-                "Use one tool call per turn. Image search returns entity candidates only; "
-                "text_lookup supplies answer evidence. Do not invent missing evidence."
-            ),
+            "content": [
+                {
+                    "type": "text",
+                    "text": (
+                        "Use one tool call per turn. Image search returns entity candidates "
+                        "only; text_lookup supplies answer evidence. Do not invent missing "
+                        "evidence."
+                    ),
+                }
+            ],
         },
         {
             "role": "user",
@@ -263,9 +269,19 @@ def evaluate_task(
         turn["tool_call"] = call
         turn["observation"] = observation
         turn["image_search_cache"] = used_image_cache
-        messages.append({"role": "assistant", "content": output})
         messages.append(
-            {"role": "user", "content": f"<tool_response>\n{observation}\n</tool_response>"}
+            {"role": "assistant", "content": [{"type": "text", "text": output}]}
+        )
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"<tool_response>\n{observation}\n</tool_response>",
+                    }
+                ],
+            }
         )
     else:
         fatal = "maximum-turns-exceeded"
