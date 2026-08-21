@@ -137,3 +137,20 @@ text_search
 5. 根据覆盖率与索引成本决定是否分批扩展 WIT，不能把单片 pilot 冒充完整语料；
 6. OVEN 只有在用户正规接受条款、凭据授权后才恢复下载；初期仍不下载八个 query shard；
 7. 任何 20 步以上 RL、WIT 全量 308 GB 下载或在线 fallback 均需重新获得用户确认。
+
+## 6. 已实现的本地检索契约
+
+`local_retrieval/visual_index.py` 已实现小语料 pilot 使用的只读精确余弦索引：
+
+- 建库时校验有限值、零范数、向量/元数据数量以及 `title/source/entity_id` 必填字段；
+- 向量归一化后保存为可 memory-map 的 `.npy`，元数据与 corpus revision 分离保存；
+- 输出目录拒绝覆盖，通过同盘 staging 原子发布；
+- 查询限制 `top_k` 为 1–50，支持显式相似度阈值，稳定返回
+  `title/source/summary/entity_id/similarity/corpus/corpus_revision`；
+- `tool_observation()` 输出带 `Tool execution result:` 前缀的稳定 JSON，可接到原有
+  `image_search` 轨迹格式；没有匹配时返回 `match_count=0`，不会伪造实体。
+
+当前实现是 `numpy-exact-cosine.v1`，只用于单片 WIT 或更小的 schema/工具 pilot。它不是 647 万
+样本的最终检索引擎；全量阶段需要引入分块或近似索引，并重新记录索引构建参数与召回验证。
+当前也没有擅自定义查询图像的 ResNet-50 预处理，必须在读取真实 WIT shard 的 schema/数据卡字段后
+与发布特征严格对齐。

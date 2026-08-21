@@ -289,3 +289,16 @@
 - 验证：`python3 -m unittest tests/test_safe_extract_zip.py tests/test_audit_rl_dataset.py`、Ruff、
   `compileall` 和 `git diff --check` 均通过。
 - 边界：没有启动 RL、没有调用搜索 API、没有使用 GPU；WIT 全量下载和 20 步以上 RL 仍受门禁。
+
+### Step P5b：本地视觉检索契约与小语料精确索引
+
+- 状态：完成；真实 WIT shard 尚未下载，当前只验收接口和数值实现。
+- 实现：新增 `local_retrieval`，以归一化 float32 `.npy` + JSONL metadata + manifest 构建
+  memory-map 只读精确余弦索引；输出 staging 原子发布且拒绝覆盖。
+- observation：稳定返回 `title/source/summary/entity_id/similarity/corpus/corpus_revision`，并包装为
+  上游兼容的 `Tool execution result:` JSON；低于阈值时返回空列表，不把 no-match 伪装成命中。
+- 防错：拒绝非有限值、零向量、维度错误、元数据缺失、数量不匹配、非法 top-k/阈值和未知格式。
+- 验证：合成三候选的排序、阈值、revision 传播、JSON observation、覆盖拒绝及三类非法输入均通过；
+  unittest、Ruff 和 `git diff --check` 通过。
+- 边界：精确 NumPy 后端只适合单 shard pilot，不声称能承载 647 万 WIT 样本；真实查询特征预处理
+  要等 shard schema 核对后固定，避免与发布的 ResNet-50 embedding 空间错配。
