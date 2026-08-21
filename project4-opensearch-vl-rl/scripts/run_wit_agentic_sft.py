@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run bounded LoRA SFT on the retrieval-verified WIT agentic pilot."""
+"""Run bounded LoRA SFT on the fixed offline WIT agent challenge."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ def validate_dataset(root: Path) -> dict[str, object]:
         if manifest.get(field) != expected:
             raise ValueError(f"dataset manifest {field} is not {expected!r}")
     if manifest.get("split_counts") != {"dev": 20, "test": 20, "train": 80}:
-        raise ValueError("dataset split counts are not the fixed 80/20/20 pilot")
+        raise ValueError("dataset split counts are not the fixed 80/20/20 challenge")
     if manifest.get("task_type_counts") != {
         "candidate-conflict": 48,
         "clean": 12,
@@ -97,7 +97,7 @@ def validate_checkpoint(raw_checkpoint: Path | None, max_steps: int) -> Path | N
 def main() -> int:
     args = parse_args()
     if not 1 <= args.max_steps <= 20:
-        raise ValueError("WIT SFT pilot is bounded to 1..20 optimizer steps")
+        raise ValueError("WIT challenge SFT is bounded to 1..20 optimizer steps")
     run_dir, physical_gpu = require_managed_run(dict(os.environ))
     dataset_manifest = validate_dataset(DATASET_ROOT)
     checkpoint = validate_checkpoint(args.resume_from_checkpoint, args.max_steps)
@@ -165,9 +165,10 @@ def main() -> int:
     config_path = run_dir / "wit-agentic-sft-config.yaml"
     config_path.write_text(yaml.safe_dump(config, sort_keys=True))
     provenance = {
-        "synthetic": False,
+        "fully_synthetic": False,
+        "contains_synthetic_safety_probes": True,
         "derived_dataset": True,
-        "purpose": "local-agentic-sft-rl-pilot",
+        "purpose": "local-agentic-sft-rl-challenge",
         "dataset_manifest_sha256": sha256_file(DATASET_ROOT / "manifest.json"),
         "tasks_sha256": sha256_file(DATASET_ROOT / "tasks.jsonl"),
         "dataset_manifest": dataset_manifest,
