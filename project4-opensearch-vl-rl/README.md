@@ -2,6 +2,10 @@
 
 本目录用于审计和缩小复现 OpenSearch-VL 的多模态搜索 Agent 训练链路，重点包括 Agentic SFT、多工具在线 rollout、Fatal-aware GRPO、故障 token masking 和 one-sided advantage clamp。
 
+当前项目定位为面试展示用的本地缩放复现：以固定 Wikipedia/Wikimedia 语料替代第三方搜索 API，
+保留多跳视觉数据、统一工具环境、Agentic SFT、GRPO 与 fatal-aware 方法。范围和验收标准见
+[`docs/INTERVIEW_PROJECT_SCOPE_2026-08-22.md`](docs/INTERVIEW_PROJECT_SCOPE_2026-08-22.md)。
+
 ## 当前状态
 
 - 已完成官方仓库固定版本的源码审计。

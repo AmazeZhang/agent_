@@ -302,3 +302,19 @@
   unittest、Ruff 和 `git diff --check` 通过。
 - 边界：精确 NumPy 后端只适合单 shard pilot，不声称能承载 647 万 WIT 样本；真实查询特征预处理
   要等 shard schema 核对后固定，避免与发布的 ResNet-50 embedding 空间错配。
+
+### Step P5c：200 条分层清单与 RL 图片引用门禁
+
+- 状态：实现、CPU 单测和实际 200 条清单均完成；等待图片包完成后执行真实图片审计并随报告提交。
+- 抽样：`select_stratified_rl_audit.py` 使用 dataset 比例、最大余数配额和 SHA256 稳定优先级；输出
+  只含 sample ID、row index 和 dataset，显式记录 `uses_answer_for_selection=false`。修改 answer 内容
+  不改变测试中的抽样结果。
+- 实际 200 条配额：`new_livevqa=94`、`WebQA=38`、`demo_1k=25`、`wiki_zh=13`、
+  `wiki_en=10`、`palace=9`、`wikiart=6`、`new_fvqa=5`。
+- 图片门禁：`audit_rl_images.py` 对每个安全相对引用拒绝路径逃逸、反斜杠、符号链接、缺失文件和
+  无法解码的内容；Pillow 进行完整 decode verify，并报告格式与尺寸范围。
+- 验证：4 个 unittest、Ruff 和 `git diff --check` 通过；覆盖答案无关性、配额、非法样本量、
+  JPEG/PNG 正常路径、路径逃逸、损坏图像和符号链接。
+- 清单：数据盘 `datasets/manifests/search-vl-rl-8k-offline-audit-200-8ef5672.json`，21,977 B，
+  SHA256 `cd16abbe9d91b4a09e0bbeddf012d23c87a0da58928375dab3271a9eee10fa7b`。首次审批失败的
+  问题在权限恢复后通过原命令解决，没有改用旁路或改变抽样算法。

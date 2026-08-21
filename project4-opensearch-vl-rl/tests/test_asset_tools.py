@@ -33,6 +33,7 @@ def main() -> None:
     assert ranges[-1][1] == 100
     assert sum(end - start + 1 for start, end in ranges) == 101
     assert all(left[1] + 1 == right[0] for left, right in pairwise(ranges))
+    assert downloader.CHUNK_BYTES == 1024 * 1024
 
     with tempfile.TemporaryDirectory(prefix="p4-asset-tools.") as temporary:
         root = Path(temporary)

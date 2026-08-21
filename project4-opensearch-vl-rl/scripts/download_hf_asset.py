@@ -13,6 +13,7 @@ import ipaddress
 import os
 import socket
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlparse
@@ -20,7 +21,7 @@ from urllib.parse import urlparse
 import requests
 
 DEFAULT_DATA_ROOT = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
-CHUNK_BYTES = 4 * 1024 * 1024
+CHUNK_BYTES = 1024 * 1024
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sha256", required=True)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--timeout", type=int, default=60)
+    parser.add_argument("--attempts", type=int, default=8)
     return parser.parse_args()
 
 
@@ -77,49 +79,76 @@ def make_session() -> requests.Session:
 
 
 def download_range(
-    url: str, part_path: Path, start: int, end: int, timeout: int
+    url: str,
+    part_path: Path,
+    start: int,
+    end: int,
+    timeout: int,
+    attempts: int,
 ) -> None:
     expected = end - start + 1
-    existing = part_path.stat().st_size if part_path.exists() else 0
-    if existing > expected:
-        raise RuntimeError(f"part is larger than expected: {part_path}")
-    if existing == expected:
-        return
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        existing = part_path.stat().st_size if part_path.exists() else 0
+        if existing > expected:
+            raise RuntimeError(f"part is larger than expected: {part_path}")
+        if existing == expected:
+            return
 
-    request_start = start + existing
-    with (
-        make_session() as session,
-        session.get(
-            url,
-            headers={"Range": f"bytes={request_start}-{end}"},
-            stream=True,
-            timeout=(timeout, timeout),
-        ) as response,
-    ):
-        response.raise_for_status()
-        if response.status_code != 206:
-            raise RuntimeError(
-                f"server ignored Range request: HTTP {response.status_code}"
+        request_start = start + existing
+        try:
+            with (
+                make_session() as session,
+                session.get(
+                    url,
+                    headers={"Range": f"bytes={request_start}-{end}"},
+                    stream=True,
+                    timeout=(timeout, timeout),
+                ) as response,
+            ):
+                response.raise_for_status()
+                if response.status_code != 206:
+                    raise RuntimeError(
+                        f"server ignored Range request: HTTP {response.status_code}"
+                    )
+                validate_public_https(response.url)
+                content_range = response.headers.get("Content-Range", "")
+                if not content_range.startswith(f"bytes {request_start}-{end}/"):
+                    raise RuntimeError(f"unexpected Content-Range: {content_range}")
+
+                written = existing
+                with part_path.open("ab") as handle:
+                    for chunk in response.iter_content(CHUNK_BYTES):
+                        if not chunk:
+                            continue
+                        written += len(chunk)
+                        if written > expected:
+                            raise RuntimeError(
+                                f"server sent too many bytes for {part_path}"
+                            )
+                        handle.write(chunk)
+            if written == expected:
+                return
+            last_error = RuntimeError(
+                f"short Range response for {part_path}: {written}/{expected}"
             )
-        validate_public_https(response.url)
-        content_range = response.headers.get("Content-Range", "")
-        if not content_range.startswith(f"bytes {request_start}-{end}/"):
-            raise RuntimeError(f"unexpected Content-Range: {content_range}")
+        except requests.RequestException as error:
+            last_error = error
 
-        written = existing
-        with part_path.open("ab") as handle:
-            for chunk in response.iter_content(CHUNK_BYTES):
-                if not chunk:
-                    continue
-                written += len(chunk)
-                if written > expected:
-                    raise RuntimeError(f"server sent too many bytes for {part_path}")
-                handle.write(chunk)
+        if attempt < attempts:
+            delay = min(2 ** (attempt - 1), 30)
+            current = part_path.stat().st_size if part_path.exists() else 0
+            print(
+                f"retrying {part_path.name}: attempt={attempt + 1}/{attempts} "
+                f"bytes={current}/{expected} delay={delay}s error={last_error}",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay)
 
-    if written != expected:
-        raise RuntimeError(
-            f"short Range response for {part_path}: {written}/{expected}"
-        )
+    raise RuntimeError(
+        f"Range failed after {attempts} attempts: {part_path}: {last_error}"
+    )
 
 
 def main() -> int:
@@ -130,6 +159,8 @@ def main() -> int:
         raise ValueError("workers must be between 1 and 16")
     if args.timeout < 10:
         raise ValueError("timeout must be at least 10 seconds")
+    if not 1 <= args.attempts <= 20:
+        raise ValueError("attempts must be between 1 and 20")
     expected_sha256 = args.sha256.lower()
     if len(expected_sha256) != 64 or any(
         c not in "0123456789abcdef" for c in expected_sha256
@@ -156,7 +187,7 @@ def main() -> int:
     tasks = []
     for index, (start, end) in enumerate(ranges):
         part_path = parts_dir / f"part-{index:02d}-{start}-{end}"
-        tasks.append((args.url, part_path, start, end, args.timeout))
+        tasks.append((args.url, part_path, start, end, args.timeout, args.attempts))
 
     with ThreadPoolExecutor(
         max_workers=args.workers, thread_name_prefix="hf-range"
@@ -169,7 +200,7 @@ def main() -> int:
     digest = hashlib.sha256()
     total = 0
     with assembling.open("xb") as destination:
-        for _, part_path, _, _, _ in tasks:
+        for _, part_path, _, _, _, _ in tasks:
             with part_path.open("rb") as source:
                 while chunk := source.read(CHUNK_BYTES):
                     destination.write(chunk)
