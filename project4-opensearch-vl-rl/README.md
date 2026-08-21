@@ -18,7 +18,9 @@
 - `docs/EXPERIMENT_SAFETY.md`：项目四 GPU、tmux、进程、存储、密钥和联网工具强制安全规范。
 - `docs/REPRODUCTION_IMPLEMENTATION_PLAN_2026-08-21.md`：7×4090 条件下的 SFT→RL→消融实施计划。
 - `docs/SFT_ENVIRONMENT_2026-08-21.md`：SFT 独立环境、安装源、版本与 GPU smoke 证据。
+- `docs/ASSET_STATUS_2026-08-21.md`：固定模型/数据清单、下载状态、哈希证据和阻塞项。
 - `environments/sft-py311.freeze.txt`：SFT 环境完整版本冻结。
+- `manifests/opensearch-vl-assets.json`：8B 基座和 SFT-36K 的不可变文件清单。
 - `vendor/OpenSearch-VL/`：官方仓库的 Git submodule，固定到审计 commit `c5c02a49780e26ae9cb6f1fb56731d1e594d59f0`。
 
 ## 运行边界

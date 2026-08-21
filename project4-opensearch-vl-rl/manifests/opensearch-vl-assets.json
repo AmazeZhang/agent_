@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "repo_type": "model",
+      "repo_id": "Qwen/Qwen3-VL-8B-Instruct",
+      "revision": "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b",
+      "total_size": 17545915883,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 1519,
+          "blob_sha1": "a6344aac8c09253b3b630fb776ae94478aa0275b"
+        },
+        {
+          "path": "README.md",
+          "size": 7133,
+          "blob_sha1": "06fb2c8220b4fb51ccca87dd694ef9d240c36745"
+        },
+        {
+          "path": "chat_template.json",
+          "size": 5499,
+          "blob_sha1": "1081bacf1af7c7c6de4a585ce02cd0fd34e382da"
+        },
+        {
+          "path": "config.json",
+          "size": 1474,
+          "blob_sha1": "0e2df614c5fe1ad2b6b540c8625bebf2d7ec43ca"
+        },
+        {
+          "path": "generation_config.json",
+          "size": 269,
+          "blob_sha1": "e116347d7ef42621c7a5957f82c015c38d939c1f"
+        },
+        {
+          "path": "merges.txt",
+          "size": 1671839,
+          "blob_sha1": "20024bfe7c83998e9aeaf98a0cd6a2ce6306c2f0"
+        },
+        {
+          "path": "model-00001-of-00004.safetensors",
+          "size": 4902275944,
+          "blob_sha1": "392e405fa984ab082e4db6cf265567819f687bcb",
+          "sha256": "d5d0aef0eb170fc7453a296c43c0849a56f510555d3588e4fd662bb35490aefa"
+        },
+        {
+          "path": "model-00002-of-00004.safetensors",
+          "size": 4915962496,
+          "blob_sha1": "1540d5047c7a275d06c06c8e271c4974f310e87e",
+          "sha256": "8be88fb5501e4d5719a6d4cc212e6a13480330e74f3e8c77daa1a68f199106b5"
+        },
+        {
+          "path": "model-00003-of-00004.safetensors",
+          "size": 4999831048,
+          "blob_sha1": "8e8450c4763c2a7e026dd9e83211603eb3e06207",
+          "sha256": "83de00eafe6e0d57ccd009dbcf71c9974d74df2f016c27afb7e95aafd16b2192"
+        },
+        {
+          "path": "model-00004-of-00004.safetensors",
+          "size": 2716270024,
+          "blob_sha1": "10f83d82617301ff5adc5588b8b1b2f0552aa9e3",
+          "sha256": "0a88b98e9f96270973f567e6a2c103ede6ccdf915ca3075e21c755604d0377a5"
+        },
+        {
+          "path": "model.safetensors.index.json",
+          "size": 67759,
+          "blob_sha1": "5857ec62530eb589b1876034dd5386f1d98131a6"
+        },
+        {
+          "path": "preprocessor_config.json",
+          "size": 390,
+          "blob_sha1": "2ea84a437d448ff71b08df68fdd949d5cc4ebb64"
+        },
+        {
+          "path": "tokenizer.json",
+          "size": 7032403,
+          "blob_sha1": "c6cc1014128b19d1fc46b1d30a23e3b1d35db421"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 10868,
+          "blob_sha1": "d3d3763207692c78780f4bf42d4dadf49a5c8012"
+        },
+        {
+          "path": "video_preprocessor_config.json",
+          "size": 385,
+          "blob_sha1": "3ba673a5ad7d4d13f54155ecd38b2a94a6dac8fe"
+        },
+        {
+          "path": "vocab.json",
+          "size": 2776833,
+          "blob_sha1": "4783fe10ac3adce15ac8f358ef5462739852c569"
+        }
+      ]
+    },
+    {
+      "repo_type": "dataset",
+      "repo_id": "OpenSearch-VL/Search-VL-SFT-36K",
+      "revision": "2c1c460af4fa15bd63210cbf426a96664b959944",
+      "total_size": 13073649606,
+      "files": [
+        {
+          "path": ".gitattributes",
+          "size": 3666,
+          "blob_sha1": "d31344dfbb6143763c56fcf4b6841bca48efaeb5"
+        },
+        {
+          "path": "README.md",
+          "size": 28400,
+          "blob_sha1": "d8c85078e9278d9f78d3101904e326e8ad289eb0"
+        },
+        {
+          "path": "fvqa/fvqa_llama_factory_clean.json",
+          "size": 142558117,
+          "blob_sha1": "6406987ed06bb4ce6bddeba695999eebe5462748",
+          "sha256": "71cea17526a232c7cb91d4e68d4da6ef1249fda669b0adf42df11c7f948f71dd"
+        },
+        {
+          "path": "fvqa/fvqa_llama_factory_clean_plan_mode.json",
+          "size": 164230220,
+          "blob_sha1": "7429c888ce926cfa146d9751cd6af3b5140cbc16",
+          "sha256": "13d5e5feb33f86c27fb1cda92f4c5506dd5529bd7928abc472c85a9d2815231e"
+        },
+        {
+          "path": "fvqa/images.zip",
+          "size": 1447536450,
+          "blob_sha1": "7a8ab195052ca129e18f91efd8a6c8385333d2c4",
+          "sha256": "c28185bfc8afcbcc0d84a43607f6eadc16e01c7b0ec4f9583f2b4617d64c725f"
+        },
+        {
+          "path": "livevqa/images.zip",
+          "size": 700452544,
+          "blob_sha1": "36ccbf618501c6ec47ebcb363223a743002000e4",
+          "sha256": "5ba40eb8f64bb8b8650219906916cb05572de58a1442196e4662de2b02e08877"
+        },
+        {
+          "path": "livevqa/livevqa_llama_factory_filtered.json",
+          "size": 650271656,
+          "blob_sha1": "5e32e96eda8a0c06d55085a2f184d7405c8a2812",
+          "sha256": "410eb192e4db7af43d71c3cb7379b8bd372a4c1a87421a1b40be5dc086152657"
+        },
+        {
+          "path": "livevqa/livevqa_llama_factory_filtered_plan_mode.json",
+          "size": 717626353,
+          "blob_sha1": "64bc500fdeab993a972dbd9f97f9a183ea4a5f41",
+          "sha256": "6e876b7ede315b83763282c1f79799d8c9d689d54eb609349e9b5da5adb726b1"
+        },
+        {
+          "path": "palace/images.zip",
+          "size": 2206345480,
+          "blob_sha1": "27db4544f12c1cc5af9b84a238cf2c419d01f43e",
+          "sha256": "385c92f2cc4fd4f45df694c138389a5872aa46340790bd80aa3df56a9a99be3d"
+        },
+        {
+          "path": "palace/palace_llama_factory_filtered.json",
+          "size": 126030590,
+          "blob_sha1": "c15852834b4ba26403db7bc866cc2838632b8525",
+          "sha256": "3f2ba5574e2e0f3e1e815023ae09b2a0574bef7696613b2bbab7ba8ed9e1298f"
+        },
+        {
+          "path": "palace/palace_llama_factory_filtered_plan_mode.json",
+          "size": 140671482,
+          "blob_sha1": "2485f4646bd5755b6bf486a26f244c929b6c178a",
+          "sha256": "1e0b4f78a3d0af9a10d0f4df14663d530ba095bbce5823afc381332fa0c6ec6b"
+        },
+        {
+          "path": "relocate_images.py",
+          "size": 7298,
+          "blob_sha1": "730116a9a934e9eecca67322ba2c9ac658d5f705"
+        },
+        {
+          "path": "webqa/images.zip",
+          "size": 3497762079,
+          "blob_sha1": "cd3708d0ca96cca5df7aaef9466ba789f9aeb4fa",
+          "sha256": "7f0d7b61b5f7b5c17cdb945978e55989793cb1ac1e690174f6825c6d513db1a9"
+        },
+        {
+          "path": "webqa/webqa_llama_factory_filtered.json",
+          "size": 147824979,
+          "blob_sha1": "fafe178bad94f86a9075c63818092af6c1792ad6",
+          "sha256": "b922293d16296106ffb8f32c11203ccf669d8d4c007c50c2dbf08fdfc5dbdd6c"
+        },
+        {
+          "path": "webqa/webqa_llama_factory_filtered_plan_mode.json",
+          "size": 166954153,
+          "blob_sha1": "35674d8f4c1c6e9ee2f5ff0cd44b917e732a20b5",
+          "sha256": "b9e6bfedb9aed178c261b1c5fd437d3ef1795bdc85480e30d4d425244e34cd15"
+        },
+        {
+          "path": "wiki_art/images.zip",
+          "size": 1807893160,
+          "blob_sha1": "eb8406b74344ef47318b42adeecc34b583f46ff0",
+          "sha256": "c3e3d671da4a4e35b9223504937fc6f12339f2e313a537f7c3a9d41a2e5c8e1c"
+        },
+        {
+          "path": "wiki_art/wikiart_llama_factory_filtered.json",
+          "size": 185803119,
+          "blob_sha1": "ebffd06617a5423e90d5428f7d9fe756e1db80ba",
+          "sha256": "6c50fb9b970918ab5d1470c6f75d8c583e7dd284cbaeae9b8a16349a7ea31d1b"
+        },
+        {
+          "path": "wiki_art/wikiart_llama_factory_filtered_plan_mode.json",
+          "size": 211186554,
+          "blob_sha1": "2111b6bd3971ea72f5a27f2719e6b2ab59b383b5",
+          "sha256": "5e3599309bc2d48e909d7d08ae4dd73de9d521bdc2fa62a601b590c30bd454b3"
+        },
+        {
+          "path": "wiki_en/images.zip",
+          "size": 104683505,
+          "blob_sha1": "69aec14d90aeea8cedca0092c477b7b6c1d6b369",
+          "sha256": "3576d4349aa8cca66f246b7dcdcf658ad8274567fc8d9eec16697ce34d264d0b"
+        },
+        {
+          "path": "wiki_en/wiki_en_llama_factory_filtered.json",
+          "size": 131910169,
+          "blob_sha1": "b75687df21fd41e6dc041591d68c5fa93614fb06",
+          "sha256": "a22a44c6a04d79d6dfd0064c89d8a792045278eed70a8e27c14b7c5e2f4850e3"
+        },
+        {
+          "path": "wiki_en/wiki_en_llama_factory_filtered_plan_mode.json",
+          "size": 149330962,
+          "blob_sha1": "9d811292e5331f6586f2a62c4edb41ac4762c95b",
+          "sha256": "83195c0cbae952186c97ce9ab916a4a47884be11a9a9764d8b1f7570c7d3bba3"
+        },
+        {
+          "path": "wiki_zh/images.zip",
+          "size": 102460300,
+          "blob_sha1": "be6233d706497a6438f62eb559d911776750e4b3",
+          "sha256": "46444364213fca0087907c5404814de6895e67c3adf78177269000dde249208b"
+        },
+        {
+          "path": "wiki_zh/wiki_zh_llama_factory_filtered.json",
+          "size": 127429008,
+          "blob_sha1": "f41365f6cf77124bd66312cc28be47ef77f1ceee",
+          "sha256": "eacdd6aaaa63f6ea9d513a3fa310178489a947d56def326020df2e0a4e9a4b65"
+        },
+        {
+          "path": "wiki_zh/wiki_zh_llama_factory_filtered_plan_mode.json",
+          "size": 144649362,
+          "blob_sha1": "93c4bb6b3dd7ec7b893390e270b804a8245f39d3",
+          "sha256": "2a964df6e6d63465d95f7cddf2b9a9bb5698c95daf7ae4894bb04cd3645e8d5d"
+        }
+      ]
+    }
+  ]
+}

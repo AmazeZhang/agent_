@@ -12,7 +12,7 @@
 | 源码审计 | 已完成第一轮 |
 | 安全规范 | 已建立并由 P0 受管脚本落实 |
 | P0 受管运行 | 已完成并推送；真实 GPU1 preflight 和受管 smoke 通过 |
-| 推理环境 | SFT 栈可用于后续基础模型加载；模型资产下载中 |
+| 推理环境 | 8B 基座已校验；离线单图生成通过 |
 | SFT 环境/训练 | 独立环境已冻结；尚未执行 SFT step |
 | RL 环境/训练 | 未开始 |
 | 消融 | 未开始 |
@@ -34,8 +34,8 @@
 |---|---|---|---|
 | P0 安全门禁 | 已完成 | 安全规范已审阅 | 受管脚本、CPU 假 GPU/进程组测试通过 |
 | P1 环境冻结 | 已完成 | P0 通过 | freeze、CPU import、受管 GPU1 FlashAttention 正反向 smoke |
-| P2 资产准备 | 进行中 | 环境方案确认、下载清单和空间预算完成 | 8B 基座分段下载中；数据尚未下载 |
-| P3 安全推理 | 未开始 | 固定模型/数据、本地工具安全补丁通过 | 待补 |
+| P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
+| P3 安全推理 | 进行中 | 固定模型/数据、本地工具安全补丁通过 | 基座离线单图 smoke 通过；agent 工具闭环未开始 |
 | P4 Agentic SFT | 未开始 | 推理闭环通过 | 待补 |
 | P5 SFT→RL rollout-only | 未开始 | SFT checkpoint 通过固定对照 | 待补 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
@@ -149,3 +149,16 @@
 - GPU 结果：进程内仅 1 张逻辑卡；RTX 4090 D sm89；BF16 FlashAttention forward/backward
   输出与梯度均 finite；`exit_code=0`，cleanup 后无遗留 compute process。
 - 边界：这不是模型加载、训练更新或效果证据。
+
+### Step P2a：固定资产清单、8B 基座和校验工具
+
+- 状态：8B 基座部分完成；SFT-36K 下载阻塞，不能把整个 P2 标记完成。
+- P1 提交：`41ca701`，已推送。
+- 清单：8B 基座固定 HF revision `0c351dd0...`；SFT-36K 固定 revision `2c1c460a...`。
+- 模型：ModelScope 分段直连完成；15 个功能文件、17,545,914,364 B 与 HF 清单一致；
+  `.gitattributes` 的镜像差异被显式忽略并记录。
+- 数据：发布清单约 13.07 GB；ModelScope 无镜像，hf-mirror LFS 对象存储链路零字节卡住；
+  未使用 7890/7891，未声称下载完成。
+- 工具：有界 Range、禁用继承代理、拒绝覆盖、size/SHA256 校验和 snapshot manifest 复核；
+  10.29 MB 真实下载与重复执行测试通过，CPU 单测通过。
+- 边界：下一步合成数据只用于 SFT 工程 smoke，不替代官方 36K 数据。
