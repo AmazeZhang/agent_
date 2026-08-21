@@ -552,3 +552,10 @@
   adapter/dataset/tasks hash 均与固定记录一致。物理 GPU1，`exit_code=0`，cleanup 无进程。
 - 决策：1 step 只消费 1/80 train 样本。允许从 checkpoint-1 有界恢复到 step5，再跑同 dev20；若仍无
   correctness 增益，则停止 SFT 扩大并转向数据/损失分析，不把路径小变化包装成效果。
+- challenge SFT step5：Run `wit-agent-challenge-v5-sft-resume-step5-20260822` 从 checkpoint-1 明确恢复；
+  step2–5 loss `0.14633/0.07097/0.04002/0.03842`，grad norm `1.6097/0.9843/1.0087/1.4100`，
+  均有限。loss 非单调且仅 5/80 样本，不作收敛结论。
+- checkpoint-5 adapter SHA256
+  `3e308b8f991e0ab6d2113c9a21879e05874b1243c4da22fa604613c85141bd89`；trainer state 保留 step1–5
+  历史。物理 GPU1，`exit_code=0`，cleanup 无进程，GPU0/5 未参与。
+- 下一步只做同一 dev20 的 SFT5 固定评测；在该结果前不允许 step20 或扩大数据。
