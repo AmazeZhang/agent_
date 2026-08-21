@@ -14,7 +14,7 @@
 | P0 受管运行 | 已完成并推送；真实 GPU1 preflight 和受管 smoke 通过 |
 | 推理环境 | 8B 基座已校验；离线单图生成通过 |
 | SFT 环境/训练 | 合成 agentic 数据 1→2→5 step LoRA、断点续训和 adapter 离线推理闭环通过 |
-| RL 环境/训练 | 已完成 API/资源门禁审计；按用户要求停在联网凭证配置前 |
+| RL 环境/训练 | 已完成 API/资源门禁和 RL-8K 元数据审计；正在准备本地优先多模态检索，尚未启动 RL |
 | 消融 | 未开始 |
 | 本地效果结论 | 无；不得引用上游论文数字作为本地结果 |
 
@@ -37,7 +37,7 @@
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 进行中 | 固定模型/数据、本地工具安全补丁通过 | 基座离线单图 smoke 通过；agent 工具闭环未开始 |
 | P4 Agentic SFT | 工程 smoke 完成 | 推理闭环通过 | 合成数据 1→2→5 step、断点续训、adapter 离线推理通过 |
-| P5 SFT→RL rollout-only | 等待用户配置 | SFT checkpoint 通过固定对照 | 搜索/judge/image provider 需求已审计，未启动 RL |
+| P5 SFT→RL rollout-only | 本地检索准备中 | SFT checkpoint 通过固定对照 | RL-8K 元数据已审计；OVEN/WIT 适用范围已收窄，未启动 RL |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -141,6 +141,19 @@
 - 决策：遵照用户指示，在 API 配置前停止；不创建 RL 环境、不启动 rollout/训练。详细门禁见
   `docs/RL_API_AND_RESOURCE_GATE_2026-08-21.md`。
 - 状态：等待用户提供或选择搜索、judge 和 image-search provider 方案。
+
+### 2026-08-21：RL-8K 不是单一 Wikipedia 子集
+
+- 固定 revision：`8ef567289043eef004b13da83b0e7bb7f5ae2daa`；已下载 8.9 MB JSONL，未下载图片包。
+- 实测：7,992 行中 LiveVQA 3,746、WebQA 1,507、demo_1k 1,000；`wiki_en/wiki_zh/wikiart/palace`
+  合计 1,555。每行一张且 7,992 个图像引用全部唯一。
+- 影响：OVEN/WIT 与百科实体子集匹配，但不能在无分层覆盖率证据时替代完整开放网络工具。
+- 决策：不修改官方 RL 样本；实现本地优先、低置信度可审计失败的 provider，覆盖率按八个子集分层。
+  工程 pilot 可以使用派生 ID 清单，但必须与完整复现实验明确区分。
+- 证据：`scripts/audit_rl_dataset.py` 和数据盘
+  `datasets/manifests/search-vl-rl-8k-audit-8ef5672.json`；详细研究见
+  `docs/OFFLINE_MULTIMODAL_RETRIEVAL_2026-08-21.md`。
+- 状态：元数据审计完成；尚未下载 OVEN gated 资产或运行 RL。
 
 ## 变更记录
 
