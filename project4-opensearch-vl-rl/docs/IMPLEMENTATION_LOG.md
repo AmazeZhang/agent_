@@ -152,7 +152,7 @@
 
 ### Step P2a：固定资产清单、8B 基座和校验工具
 
-- 状态：8B 基座部分完成；SFT-36K 下载阻塞，不能把整个 P2 标记完成。
+- 状态：8B 基座部分完成并推送，commit `3bc8839`；SFT-36K 下载阻塞，不能把整个 P2 标记完成。
 - P1 提交：`41ca701`，已推送。
 - 清单：8B 基座固定 HF revision `0c351dd0...`；SFT-36K 固定 revision `2c1c460a...`。
 - 模型：ModelScope 分段直连完成；15 个功能文件、17,545,914,364 B 与 HF 清单一致；
@@ -162,3 +162,17 @@
 - 工具：有界 Range、禁用继承代理、拒绝覆盖、size/SHA256 校验和 snapshot manifest 复核；
   10.29 MB 真实下载与重复执行测试通过，CPU 单测通过。
 - 边界：下一步合成数据只用于 SFT 工程 smoke，不替代官方 36K 数据。
+
+### Step P3a：8B 基座离线多模态推理 smoke
+
+- 状态：完成；推理测试与本记录随同一 P3a 提交推送。
+- 受管 Run：`p3-base-infer-smoke-dtype-20260821`，物理 GPU1，命名 tmux + 独立进程组；
+  进程内 `CUDA_VISIBLE_DEVICES=1`，GPU0 不可见。
+- 加载：固定本地 `Qwen3-VL-8B-Instruct`，BF16、FlashAttention 2、
+  `local_files_only=True`、`trust_remote_code=False`。
+- 输入：程序生成的 224×224 白底红色方块，只用于确定性管线 smoke，没有引入外部图片。
+- 结果：输入 83 tokens，输出 2 tokens，回答 `red`；峰值分配显存 16.362 GiB；
+  `exit_code=0`，cleanup 后物理 GPU1 无 compute process。
+- 警告：Transformers 报告模型 generation config 中 `temperature/top_p/top_k` 在贪心生成下被忽略；
+  不影响本次 `do_sample=False` 结果，后续训练配置不继承这些生成参数。
+- 边界：只证明基座离线图文加载/生成；尚未启用搜索、访问网页或其他 agent 工具，也不是效果评测。
