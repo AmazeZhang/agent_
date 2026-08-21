@@ -45,7 +45,7 @@ def similarity_score(a, b):
 def compute_score(predicts: List[str], ground_truths: List[str], format_weight: float = 0.1) -> List[Dict[str, float]]:
     scores = []
     for predict, ground_truth in zip(predicts, ground_truths):
-    r'''predict = re.sub(r"\s*(<|>|/)\s*", r"\1", predict)  # handle qwen2.5vl-32b format
+        r'''predict = re.sub(r"\s*(<|>|/)\s*", r"\1", predict)  # handle qwen2.5vl-32b format
         format_score = format_reward(predict)
         accuracy_score = accuracy_reward(predict, ground_truth)
         scores.append(

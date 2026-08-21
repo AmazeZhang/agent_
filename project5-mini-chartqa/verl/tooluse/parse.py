@@ -2,7 +2,7 @@ class Parser:
     def parse(self, response):
         if isinstance(response, dict) and 'content' in response:
             response = response['content']
-    oring_content = response.replace("\\_", "_")
+        oring_content = response.replace("\\_", "_")
         content = oring_content.replace("\\", "")
         
         try:
