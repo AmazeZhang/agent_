@@ -14,7 +14,7 @@
 | P0 受管运行 | 已完成并推送；真实 GPU1 preflight 和受管 smoke 通过 |
 | 推理环境 | 8B 基座已校验；离线单图生成通过 |
 | SFT 环境/训练 | 合成 agentic 数据 1→2→5 step LoRA、断点续训和 adapter 离线推理闭环通过 |
-| RL 环境/训练 | 未开始 |
+| RL 环境/训练 | 已完成 API/资源门禁审计；按用户要求停在联网凭证配置前 |
 | 消融 | 未开始 |
 | 本地效果结论 | 无；不得引用上游论文数字作为本地结果 |
 
@@ -37,7 +37,7 @@
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 进行中 | 固定模型/数据、本地工具安全补丁通过 | 基座离线单图 smoke 通过；agent 工具闭环未开始 |
 | P4 Agentic SFT | 工程 smoke 完成 | 推理闭环通过 | 合成数据 1→2→5 step、断点续训、adapter 离线推理通过 |
-| P5 SFT→RL rollout-only | 未开始 | SFT checkpoint 通过固定对照 | 待补 |
+| P5 SFT→RL rollout-only | 等待用户配置 | SFT checkpoint 通过固定对照 | 搜索/judge/image provider 需求已审计，未启动 RL |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -129,7 +129,18 @@
   `compute_processes=none`，失败日志和配置完整保留。
 - 决策：使用同一解析器原生支持且已由上游示例采用的 YAML 配置，不修改 vendor 源码；用新 Run ID
   重试，绝不覆盖失败 Run。
-- 状态：已修复启动器，待新 Run 验证。
+- 状态：已解决；YAML 新 Run 完成 1-step 参数更新并通过 cleanup。
+
+### 2026-08-21：RL 已到联网 API 门禁
+
+- 现象：RL 主执行器实际依赖 Serper/gateway 搜索；query-utility reward 没有 judge key 时固定为
+  0；image search 还依赖发布仓库中缺失的 COS uploader 与 lens provider。
+- 一致性问题：根 README 的 `SERPER_API_KEY` 与代码实际读取的 `SERP_API_KEY` 不一致；
+  `VisitTool` 存在但未注册，`PythonInterpreter` 却默认注册。
+- 资源问题：上游单机 preset 要 8 GPU/80GB 级卡，本机排除 GPU0 后只有 7×24GB，不能原样运行。
+- 决策：遵照用户指示，在 API 配置前停止；不创建 RL 环境、不启动 rollout/训练。详细门禁见
+  `docs/RL_API_AND_RESOURCE_GATE_2026-08-21.md`。
+- 状态：等待用户提供或选择搜索、judge 和 image-search provider 方案。
 
 ## 变更记录
 
