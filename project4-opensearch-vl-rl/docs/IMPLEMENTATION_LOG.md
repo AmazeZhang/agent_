@@ -544,3 +544,11 @@
   `exit_code=0`，cleanup `compute_processes=none`，GPU0/5 未参与。
 - provenance：明确 `fully_synthetic=false`、`contains_synthetic_safety_probes=true`，不隐藏 24 条 no-match
   合成安全探针。下一步只加载该 adapter 跑完全相同的 dev20；未看到 held-out 改善前不续训。
+- SFT1 dev20 Run：`wit-agent-challenge-v5-sft1-dev20-20260822`；总体 full success/title/evidence/format/fatal
+  与 Base 完全相同，分别为 `0.55/0.95/0.55/1.0/0`，没有任务正确性增益。
+- 唯一变化：candidate-conflict 的 `oracle_path_exact` 从 `0.125` 到 `0.25`，总体从 `0.65` 到
+  `0.70`；相当于 1 条 held-out 样本少走一次 lookup，是弱行为更新证据，不足以声称 SFT 有效。
+- SFT1 评测报告 SHA256 `1bfaa1da7f1a702e84791c6c094e8ca6afbdfbc2f7bdc20a926ece703d2f39d3`；
+  adapter/dataset/tasks hash 均与固定记录一致。物理 GPU1，`exit_code=0`，cleanup 无进程。
+- 决策：1 step 只消费 1/80 train 样本。允许从 checkpoint-1 有界恢复到 step5，再跑同 dev20；若仍无
+  correctness 增益，则停止 SFT 扩大并转向数据/损失分析，不把路径小变化包装成效果。
