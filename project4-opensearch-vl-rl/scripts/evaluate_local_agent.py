@@ -337,6 +337,25 @@ def evaluate_task(
     }
 
 
+def aggregate_metrics(results: list[dict[str, Any]]) -> dict[str, float]:
+    if not results:
+        raise ValueError("cannot aggregate an empty result set")
+    metric_names = ("format_valid", "title_exact", "evidence_exact", "full_success")
+    metrics = {
+        name: sum(bool(result["score"][name]) for result in results) / len(results)
+        for name in metric_names
+    }
+    metrics.update(
+        {
+            "expected_tool_path": sum(result["expected_tool_path"] for result in results)
+            / len(results),
+            "fatal_rate": sum(result["fatal"] is not None for result in results)
+            / len(results),
+        }
+    )
+    return metrics
+
+
 def main() -> int:
     from peft import PeftModel
     from transformers import AutoModelForImageTextToText, AutoProcessor
@@ -395,24 +414,14 @@ def main() -> int:
                 ),
                 flush=True,
             )
-    metric_names = (
-        "format_valid",
-        "title_exact",
-        "evidence_exact",
-        "full_success",
-    )
-    metrics = {
-        name: sum(bool(result["score"][name]) for result in results) / len(results)
-        for name in metric_names
+    metrics = aggregate_metrics(results)
+    task_types = sorted({str(result["task_type"]) for result in results})
+    metrics_by_task_type = {
+        task_type: aggregate_metrics(
+            [result for result in results if result["task_type"] == task_type]
+        )
+        for task_type in task_types
     }
-    metrics.update(
-        {
-            "expected_tool_path": sum(result["expected_tool_path"] for result in results)
-            / len(results),
-            "fatal_rate": sum(result["fatal"] is not None for result in results)
-            / len(results),
-        }
-    )
     report = {
         "schema_version": 1,
         "model": "base" if adapter is None else "lora-adapter",
@@ -429,6 +438,7 @@ def main() -> int:
         "image_search_backend": "frozen-verified-cache",
         "physical_gpu": physical_gpu,
         "metrics": metrics,
+        "metrics_by_task_type": metrics_by_task_type,
         "results": results,
     }
     with output.open("x", encoding="utf-8") as handle:

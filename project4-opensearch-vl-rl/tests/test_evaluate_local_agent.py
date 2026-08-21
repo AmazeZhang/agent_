@@ -59,6 +59,35 @@ class EvaluateLocalAgentTest(unittest.TestCase):
         self.assertIn("TRANSIENT_FAILURE", first)
         self.assertIn("entity-1", second)
 
+    def test_metrics_are_aggregated_without_score_normalisation(self) -> None:
+        results = [
+            {
+                "score": {
+                    "format_valid": True,
+                    "title_exact": True,
+                    "evidence_exact": True,
+                    "full_success": True,
+                },
+                "expected_tool_path": True,
+                "fatal": None,
+            },
+            {
+                "score": {
+                    "format_valid": False,
+                    "title_exact": False,
+                    "evidence_exact": False,
+                    "full_success": False,
+                },
+                "expected_tool_path": False,
+                "fatal": "failure",
+            },
+        ]
+        metrics = MODULE.aggregate_metrics(results)
+        self.assertEqual(metrics["full_success"], 0.5)
+        self.assertEqual(metrics["fatal_rate"], 0.5)
+        with self.assertRaises(ValueError):
+            MODULE.aggregate_metrics([])
+
 
 if __name__ == "__main__":
     unittest.main()
