@@ -22,7 +22,7 @@ from local_retrieval.resnet50_encoder import sha256_file  # noqa: E402
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 MODEL_ROOT = PROJECT_DATA / "models/Qwen3-VL-8B-Instruct"
-DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v2"
+DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v3"
 RUN_ROOT = PROJECT_DATA / "runs"
 TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
 
@@ -127,6 +127,8 @@ def load_tasks(split: str, max_tasks: int) -> tuple[dict[str, Any], list[dict[st
         manifest.get("status") != "retrieval-verified"
         or manifest.get("image_observation_contains_text_summary") is not False
         or manifest.get("image_runtime_handle") != "img_1"
+        or manifest.get("final_response_format")
+        != "Title: <exact title>\\nEvidence: <first sentence>"
     ):
         raise ValueError("evaluation dataset is not a verified no-leak pilot")
     with (DATASET_ROOT / "tasks.jsonl").open(encoding="utf-8") as handle:
@@ -223,7 +225,8 @@ def evaluate_task(
                         "Use one tool call per turn. Pass the literal handle img_1 to "
                         "image_search; do not replace it with a filename or image description. "
                         "Image search returns entity candidates only; text_lookup supplies "
-                        "answer evidence. Do not invent missing evidence."
+                        "answer evidence. Do not invent missing evidence. The final response "
+                        "must contain exactly two lines named Title and Evidence."
                     ),
                 }
             ],
@@ -238,7 +241,8 @@ def evaluate_task(
                         "The provided image has runtime handle img_1. Identify the Wikipedia "
                         "subject most closely matching this image. "
                         "Then use text_lookup on the selected entity and report its exact "
-                        "title and the first evidence sentence."
+                        "title and the first evidence sentence. The final response must contain "
+                        "exactly two lines: `Title: ...` followed by `Evidence: ...`."
                     ),
                 },
             ],

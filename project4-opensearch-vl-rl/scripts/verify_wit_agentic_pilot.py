@@ -115,7 +115,8 @@ def make_record(
                     "<image> The provided image has runtime handle img_1. Identify the "
                     "Wikipedia subject most closely matching this image. "
                     "Then use text_lookup on the selected entity and report its exact title "
-                    "and the first evidence sentence."
+                    "and the first evidence sentence. The final response must contain exactly "
+                    "two lines: `Title: ...` followed by `Evidence: ...`."
                 ),
             },
             {
@@ -141,7 +142,8 @@ def make_record(
             "Use one tool call per turn. Pass the literal handle img_1 to image_search; "
             "do not replace it with a filename or image description. Image search returns "
             "entity candidates only; text_lookup supplies answer evidence. Do not invent "
-            "missing evidence."
+            "missing evidence. The final response must contain exactly two lines named "
+            "Title and Evidence."
         ),
         "tools": tool_schema(),
     }
@@ -325,6 +327,7 @@ def verify_and_publish(
             "records": len(published_tasks),
             "image_observation_contains_text_summary": False,
             "image_runtime_handle": "img_1",
+            "final_response_format": "Title: <exact title>\\nEvidence: <first sentence>",
             "oracle_steps": ["image_search", "text_lookup", "final"],
         }
         with (staging / "manifest.json").open("x", encoding="utf-8") as handle:
