@@ -10,10 +10,10 @@
 |---|---|
 | 上游源码 | 已固定到 submodule commit `c5c02a49780e26ae9cb6f1fb56731d1e594d59f0` |
 | 源码审计 | 已完成第一轮 |
-| 安全规范 | 已建立，尚待 P0 脚本落地 |
-| P0 受管运行 | 已完成 CPU 安全门禁；真实 GPU preflight 留待 P1 smoke 前执行 |
-| 推理环境 | 未创建 |
-| SFT 环境/训练 | 未开始 |
+| 安全规范 | 已建立并由 P0 受管脚本落实 |
+| P0 受管运行 | 已完成并推送；真实 GPU1 preflight 和受管 smoke 通过 |
+| 推理环境 | SFT 栈可用于后续基础模型加载；模型资产下载中 |
+| SFT 环境/训练 | 独立环境已冻结；尚未执行 SFT step |
 | RL 环境/训练 | 未开始 |
 | 消融 | 未开始 |
 | 本地效果结论 | 无；不得引用上游论文数字作为本地结果 |
@@ -33,8 +33,8 @@
 | 阶段 | 状态 | 进入条件 | 完成证据 |
 |---|---|---|---|
 | P0 安全门禁 | 已完成 | 安全规范已审阅 | 受管脚本、CPU 假 GPU/进程组测试通过 |
-| P1 环境冻结 | 未开始 | P0 通过 | 待补 |
-| P2 资产准备 | 未开始 | 环境方案确认、下载清单和空间预算完成 | 待补 |
+| P1 环境冻结 | 已完成 | P0 通过 | freeze、CPU import、受管 GPU1 FlashAttention 正反向 smoke |
+| P2 资产准备 | 进行中 | 环境方案确认、下载清单和空间预算完成 | 8B 基座分段下载中；数据尚未下载 |
 | P3 安全推理 | 未开始 | 固定模型/数据、本地工具安全补丁通过 | 待补 |
 | P4 Agentic SFT | 未开始 | 推理闭环通过 | 待补 |
 | P5 SFT→RL rollout-only | 未开始 | SFT checkpoint 通过固定对照 | 待补 |
@@ -76,7 +76,32 @@
 
 - 现象：根分区只剩约 91 GiB；数据盘约有 2.2 TiB 可用。
 - 决策：环境、模型、数据、缓存、Run 和 checkpoint 全部放入项目四数据盘命名空间；启动门槛初始设为至少 300 GiB 可用。
-- 状态：路径规范已确定，目录尚未创建。
+- 状态：数据盘目录已创建；环境、缓存与下载均写入项目四命名空间。
+
+### 2026-08-21：上游 SFT extras 声明缺失
+
+- 现象：README 使用 `pip install -e ".[torch,metrics,deepspeed,ray]"`，但当前
+  `SFT/pyproject.toml` 没有 `project.optional-dependencies`。
+- 影响：照抄 README 不会安装这些 extra，环境表面成功但缺少训练依赖。
+- 决策：先固定 torch 栈，再 editable 安装 SFT，显式安装 DeepSpeed、Ray 和 VL 工具包；保存完整 freeze。
+- 状态：已规避并记录。
+
+### 2026-08-21：大文件源与 FlashAttention 构建
+
+- 现象：PyTorch 官方 CUDA index 和 PyPI 直连可连接但吞吐过低；FlashAttention 官方
+  GitHub release 资产 CDN 超时。华为云 PyPI wheel 分段测速约 3.7 MiB/s。
+- 决策：所有代理变量清空；PyPI 包改走华为云镜像。FlashAttention 2.7.4.post1 从源码
+  限并发构建，禁用 setup.py 自动尝试 GitHub wheel，仅生成 sm80 cubin。
+- 结果：构建成功；物理 GPU1 上 sm89 正反向测试 output/gradient 均 finite。
+- 状态：已解决。
+
+### 2026-08-21：HF Xet 与模型下载吞吐
+
+- 现象：hf-mirror 配合 huggingface-hub 1.28 默认进入官方 Xet CAS，返回 401；禁用 Xet 后
+  普通镜像约 0.08 MiB/s。ModelScope 单连接约 0.3–0.4 MiB/s。
+- 决策：停止的下载均只终止精确独立进程组并保留缓存；ModelScope 客户端设置每个 shard
+  8 路 Range 下载。完成后逐文件 SHA256 对照固定 HF revision 的 LFS OID，不能仅凭文件名验收。
+- 状态：8B 基座下载中；未使用 Clash 7890/7891。
 
 ## 变更记录
 
@@ -92,7 +117,7 @@
 
 ### Step P0：项目四受管运行与精确停止
 
-- 状态：完成，等待提交与推送。
+- 状态：完成并推送，commit `7c4c2b8`。
 - 新增：
   - `scripts/gpu_guard.sh`
   - `scripts/preflight.sh`
@@ -112,3 +137,15 @@
 - 命令：`bash project4-opensearch-vl-rl/tests/test_p0_safety.sh`
 - 结果：`P0 safety tests: PASS`。
 - 资源：测试仅使用 `/tmp` 和伪造的 `nvidia-smi`，未调用真实 GPU、未下载依赖。
+
+### Step P1：独立 SFT 环境与真实 GPU 栈 smoke
+
+- 状态：完成；本文档、freeze 与 GPU smoke 测试随同一 P1 提交推送。
+- 环境：数据盘 `envs/sft-py311`，Python 3.11.15、torch 2.6.0+cu124、DeepSpeed 0.18.4、
+  Ray 2.34.0、FlashAttention 2.7.4.post1；完整清单见 `environments/sft-py311.freeze.txt`。
+- CPU 验证：核心训练包、LLaMA Factory CLI、FlashAttention 导入通过。
+- GPU preflight：物理 GPU1 空闲，约 24.1 GiB 可用，数据盘约 2.2 TiB 可用；GPU0 未涉及。
+- 受管 Run：`p1-gpu-stack-smoke-20260821`，物理 GPU1，tmux + 独立进程组，代理已净化。
+- GPU 结果：进程内仅 1 张逻辑卡；RTX 4090 D sm89；BF16 FlashAttention forward/backward
+  输出与梯度均 finite；`exit_code=0`，cleanup 后无遗留 compute process。
+- 边界：这不是模型加载、训练更新或效果证据。
