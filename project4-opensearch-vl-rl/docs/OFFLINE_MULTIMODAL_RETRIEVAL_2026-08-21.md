@@ -132,12 +132,14 @@ text_search
 
 ## 5. 下一步门禁
 
-1. 下载并校验 WIT 单个约 0.93 GB 分片，验证 Parquet schema、图片和预计算特征；
-2. 把真实 WIT 字段接入已实现的离线索引适配器和稳定 observation schema；
-3. 使用已固定的 200 条清单，按八个 dataset 子集分层报告检索覆盖率；
-4. 根据覆盖率与索引成本决定是否分批扩展 WIT，不能把单片 pilot 冒充完整语料；
-5. OVEN 只有在用户正规接受条款、凭据授权后才恢复下载；初期仍不下载八个 query shard；
-6. 任何 20 步以上 RL、WIT 全量 308 GB 下载或在线 fallback 均需重新获得用户确认。
+1. 从已索引 WIT 实体中生成小型派生任务，图片查询用 crop/压缩等非恒等变换，答案来自独立文本证据；
+2. 按 `entity_id` 切分 train/dev/test，防止原图、变换图或同实体跨 split；
+3. 先构建不包含模型推理的可执行 oracle 轨迹，覆盖 `image_search -> text_lookup -> final`、
+   no-match 和一次失败恢复；
+4. 用固定 held-out 评测 Base，再执行 1→5→20 step 的真实 LoRA SFT 工程 smoke；
+5. 单 shard 只作面试项目 pilot；扩展至 2–4 shards 要由派生任务规模驱动，不为追高无语义的 cosine 分数；
+6. OVEN 只有在用户正规接受条款、凭据授权后才恢复下载；初期仍不下载八个 query shard；
+7. 任何 20 步以上 RL、WIT 全量 308 GB 下载或在线 fallback 均需重新获得用户确认。
 
 ## 6. 已实现的本地检索契约
 
@@ -202,3 +204,24 @@ split 仍需在数据 pilot 中固定。
 `LocalImageSearchBackend` 在加载时强制检查 visual index revision 以同一完整 encoder weights SHA256
 结尾；不匹配会在查询前拒绝。工具只接受允许根目录下的本地绝对/相对图片，拒绝路径逃逸和符号
 链接，不在 image search 内访问 URL。
+
+## 8. RL-8K 分层审计与数据路线决策
+
+固定 200 条清单使用统一 torchvision V1 encoder 查询 shard 00000 的 19,629 个候选。运行不使用
+gold answer，输出每条 top-3 和按八个数据子集的统计。top-1 cosine 总体 mean/p50/p90 为
+0.828596/0.821322/0.892470，189/200 超过预设 0.75 阈值。
+
+这个结果不能解读为 94.5% 覆盖率。人可读抽查显示众多候选只是视觉风格相近，与问题中的具体实体无关；
+仅 4/200 的 top-1 similarity 达到 0.9999，可视为近似原图重合候选。因此：
+
+- 单 shard WIT 适合验证本地工具协议、失败语义和训练闭环；
+- 它不适合直接把原 RL-8K 改标为“可离线检索”，也不适合直接用来评估答案准确率；
+- 面试项目的主训练集改用 WIT/Wikipedia 派生任务，确保候选库内存在视觉锚点，同时要求从文本证据完成
+  第二跳，不把候选 title 直接当作最终答案；
+- 原 RL-8K 保持不变，仅用于工具压力测试、no-match 测试和与原项目的可执行性边界说明。
+
+报告位于数据盘
+`datasets/manifests/rl200-wit-shard00000-retrieval-audit-20260822.json`，大小 578,640 B，SHA256 为
+`1963d5d61a95a929d7801387bbf75e7e0c4cf7feb2e55fef83fb7ee2450d5082`。受管 Run 为
+`wit-rl200-coverage-20260822`，固定 commit `de615de`，物理 GPU1，正常退出并确认无残留进程；
+GPU0/5 未参与。

@@ -376,7 +376,7 @@
 
 ### Step P6d：可执行本地 image_search backend
 
-- 状态：实现和真实端到端 smoke 完成；RL-8K 分层覆盖率尚未评估。
+- 状态：实现和真实端到端 smoke 完成；RL-8K 分层检索审计已在 P6e 完成。
 - backend：查询图使用与候选完全相同的 torchvision ResNet-50 V1/preprocess；初始化时校验索引
   revision 包含完整 weights SHA256，阻止混合向量空间。
 - 路径安全：只读取显式 allowed root 下的本地文件，支持相对引用，拒绝根目录逃逸、非文件和路径
@@ -385,3 +385,21 @@
   0.980778；其余高位候选也是蜈蚣相关实体。该 smoke 不声明对 RL-8K 的覆盖率。
 - 验证：encoder revision 一致/不一致与本地路径正常/相对/逃逸/符号链接测试通过；unittest、Ruff
   和 `git diff --check` 通过。
+
+### Step P6e：RL-8K 200 条分层本地检索审计
+
+- 状态：完成；单 WIT shard 不适合直接承载原 RL-8K，后续改用有 provenance 的
+  WIT/Wikipedia 派生多跳任务做本地 SFT/RL pilot。
+- 实现：`ExactVisualIndex.search_batch()` 一次计算有界 batch 的精确余弦搜索；
+  `audit_local_retrieval_coverage.py` 只读固定 200 条清单，校验原 JSONL SHA256，不读取答案做选样或检索。
+- 数值：top-1 cosine mean/p50/p90 为 `0.828596/0.821322/0.892470`；按预设阈值有
+  189 high、11 medium、0 low。这只是视觉邻近置信代理，不是语义覆盖率或答案正确率。
+- 语义核查：200 条中仅 4 条 top-1 similarity `>=0.9999`，候选为 196 个不同实体；抽查可见
+  大量高余弦但与问题实体无关的近邻。因此不得用 `>=0.75` 当作可回答样本的自动筛选规则。
+- 真实 Run：`wit-rl200-coverage-20260822`，固定 repo commit `de615de`，物理 GPU1，
+  `exit_code=0`；启动前后 GPU1 均为 18 MiB，cleanup 确认 `compute_processes=none`，GPU0/5 未参与。
+- 证据：数据盘报告 578,640 B，SHA256
+  `1963d5d61a95a929d7801387bbf75e7e0c4cf7feb2e55fef83fb7ee2450d5082`；报告含每条 top-3、按八个子集的分层
+  数值和 encoder/index revision，不包含 gold answer。
+- 启动纠错：首次把 `PROJECT4_DATA_ROOT` 多写了项目子目录；安全守卫在接触 GPU 前拒绝，
+  没有进程或结果文件。清理已退出的精确 tmux 会话后，用规定根路径重启并完成。
