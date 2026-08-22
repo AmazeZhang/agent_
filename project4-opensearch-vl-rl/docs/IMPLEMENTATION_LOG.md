@@ -700,3 +700,9 @@
   dataset/tasks hash 与 Base 一致，`exit_code=0`、无 traceback/OOM/NaN/Xid。GPU1 启动/结束 18 MiB，
   轮询最高 57°C，cleanup 无 compute process；GPU0/GPU5 未参与。下一步只允许 SFT1 的 v7 train
   stochastic rollout-only 方差门禁，仍不启动 optimizer。
+- v7 rollout-only 协议在运行前冻结于 `configs/stochastic_rollout_boundary_v7.json`：train 四类按 task ID
+  排序首条，依次为 `wit-00000885`、`wit-00001521`、`wit-00011482`、
+  `boundary-no-match-train-000`；每题 4 条、seed `20260901`、`temperature=0.7/top_p=1.0`、
+  evidence-fidelity-v2。dataset/tasks/adapter hash 已固定，批级门槛沿用预声明的
+  variable-group `>=0.25`、format-valid `>=0.75`、fatal `<=0.25`。只用物理 GPU1、无网络/API/optimizer；
+  不根据运行结果更换题目、reward 或门槛。
