@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""Audit small stochastic rollout groups before any RL parameter update."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import statistics
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from local_retrieval import LocalTextIndex
+from local_retrieval.resnet50_encoder import sha256_file
+from local_rl import compute_group_advantages, score_trajectory
+from scripts.evaluate_local_agent import (
+    DATASET_ROOT,
+    MODEL_ROOT,
+    evaluate_task,
+    require_managed_run,
+    validate_adapter,
+)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--task-id", action="append", required=True)
+    parser.add_argument("--rollouts", type=int, default=4)
+    parser.add_argument("--seed", type=int, default=20260822)
+    parser.add_argument("--temperature", type=float, default=0.7)
+    parser.add_argument("--top-p", type=float, default=0.9)
+    parser.add_argument("--max-new-tokens", type=int, default=192)
+    parser.add_argument("--adapter", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    return parser.parse_args()
+
+
+def load_selected_tasks(task_ids: list[str]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    if not 1 <= len(task_ids) <= 2 or len(task_ids) != len(set(task_ids)):
+        raise ValueError("provide one or two unique task IDs")
+    with (DATASET_ROOT / "manifest.json").open(encoding="utf-8") as handle:
+        manifest = json.load(handle)
+    with (DATASET_ROOT / "tasks.jsonl").open(encoding="utf-8") as handle:
+        all_tasks = {
+            item["task_id"]: item
+            for line in handle
+            if line.strip() and (item := json.loads(line))
+        }
+    missing = set(task_ids) - set(all_tasks)
+    if missing:
+        raise KeyError(f"unknown task IDs: {sorted(missing)}")
+    tasks = [all_tasks[task_id] for task_id in task_ids]
+    if any(task["split"] != "train" for task in tasks):
+        raise ValueError("stochastic pre-RL audit is restricted to train tasks")
+    return manifest, tasks
+
+
+def summarize_group(items: list[dict[str, Any]]) -> dict[str, Any]:
+    rewards = [float(item["reward"]["reward"]) for item in items]
+    fatal_flags = [bool(item["reward"]["is_fatal"]) for item in items]
+    advantages = compute_group_advantages(rewards, fatal_flags)
+    return {
+        "rollout_count": len(items),
+        "reward_mean": statistics.fmean(rewards),
+        "reward_population_variance": statistics.pvariance(rewards),
+        "unique_rewards": sorted(set(rewards)),
+        "full_success_count": sum(item["result"]["score"]["full_success"] for item in items),
+        "format_valid_count": sum(item["result"]["score"]["format_valid"] for item in items),
+        "fatal_count": sum(fatal_flags),
+        "query_only_reward_count": sum(
+            item["reward"]["r_query"] > 0 and item["reward"]["r_accuracy"] == 0
+            for item in items
+        ),
+        "advantages": advantages,
+    }
+
+
+def main() -> int:
+    import torch
+    from peft import PeftModel
+    from transformers import AutoModelForImageTextToText, AutoProcessor
+
+    args = parse_args()
+    if not 2 <= args.rollouts <= 8:
+        raise ValueError("rollouts must be between 2 and 8")
+    if not 0.0 < args.temperature <= 1.5 or not 0.0 < args.top_p <= 1.0:
+        raise ValueError("invalid sampling temperature/top-p")
+    if not 32 <= args.max_new_tokens <= 256:
+        raise ValueError("max-new-tokens must be between 32 and 256")
+    run_dir, physical_gpu = require_managed_run(dict(os.environ))
+    adapter = validate_adapter(args.adapter)
+    assert adapter is not None
+    output = args.output.resolve()
+    if output != (run_dir / "stochastic_rollout_audit.json").resolve():
+        raise ValueError("output must be the managed Run stochastic_rollout_audit.json")
+    if output.exists():
+        raise FileExistsError(f"refusing to overwrite audit report: {output}")
+    manifest, tasks = load_selected_tasks(args.task_id)
+
+    processor = AutoProcessor.from_pretrained(
+        MODEL_ROOT, local_files_only=True, trust_remote_code=False
+    )
+    base = AutoModelForImageTextToText.from_pretrained(
+        MODEL_ROOT,
+        dtype=torch.bfloat16,
+        attn_implementation="flash_attention_2",
+        device_map="cuda:0",
+        local_files_only=True,
+        trust_remote_code=False,
+    )
+    model = PeftModel.from_pretrained(base, adapter, is_trainable=False).eval()
+
+    groups = []
+    text_path = Path(manifest["text_index"])
+    with LocalTextIndex(text_path) as text_index:
+        for task_index, task in enumerate(tasks):
+            items = []
+            for rollout_index in range(args.rollouts):
+                seed = args.seed + task_index * 1000 + rollout_index
+                result = evaluate_task(
+                    model,
+                    processor,
+                    task,
+                    text_index,
+                    max_new_tokens=args.max_new_tokens,
+                    do_sample=True,
+                    temperature=args.temperature,
+                    top_p=args.top_p,
+                    seed=seed,
+                )
+                reward = score_trajectory(result, task)
+                items.append({"seed": seed, "result": result, "reward": reward})
+                print(
+                    json.dumps(
+                        {
+                            "task_id": task["task_id"],
+                            "rollout": rollout_index + 1,
+                            "seed": seed,
+                            "fatal": result["fatal"],
+                            "tools": result["tool_names"],
+                            "full_success": result["score"]["full_success"],
+                            "reward": reward["reward"],
+                        },
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
+            groups.append(
+                {
+                    "task_id": task["task_id"],
+                    "task_type": task["task_type"],
+                    "items": items,
+                    "summary": summarize_group(items),
+                }
+            )
+
+    variance_pass = all(
+        group["summary"]["reward_population_variance"] > 0 for group in groups
+    )
+    format_pass = all(
+        group["summary"]["format_valid_count"] > 0 for group in groups
+    )
+    nonfatal_pass = all(group["summary"]["fatal_count"] < args.rollouts for group in groups)
+    repo_commit = subprocess.run(
+        ["git", "-C", str(PROJECT_ROOT.parent), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    payload = {
+        "schema_version": 1,
+        "mode": "stochastic-rollout-only-no-optimizer-no-api",
+        "repo_commit": repo_commit,
+        "model": str(MODEL_ROOT),
+        "adapter": str(adapter),
+        "adapter_sha256": sha256_file(adapter / "adapter_model.safetensors"),
+        "dataset_manifest_sha256": sha256_file(DATASET_ROOT / "manifest.json"),
+        "tasks_sha256": sha256_file(DATASET_ROOT / "tasks.jsonl"),
+        "physical_gpu": physical_gpu,
+        "generation": {
+            "do_sample": True,
+            "rollouts_per_task": args.rollouts,
+            "base_seed": args.seed,
+            "temperature": args.temperature,
+            "top_p": args.top_p,
+            "max_new_tokens": args.max_new_tokens,
+        },
+        "groups": groups,
+        "gate": {
+            "variance_nonzero_for_every_group": variance_pass,
+            "at_least_one_valid_format_per_group": format_pass,
+            "not_all_fatal_per_group": nonfatal_pass,
+            "passed": variance_pass and format_pass and nonfatal_pass,
+            "note": (
+                "Passing authorizes only a separately reviewed one-step GRPO smoke; "
+                "it is not evidence of policy improvement. Query-only reward is disclosed "
+                "per group and capped by the 0.2 query weight."
+            ),
+        },
+    }
+    with output.open("x", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+        handle.write("\n")
+    print(json.dumps({"gate": payload["gate"]}, sort_keys=True))
+    return 0 if payload["gate"]["passed"] else 4
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

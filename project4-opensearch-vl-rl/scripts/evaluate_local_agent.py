@@ -172,6 +172,9 @@ def generate_turn(
     messages: list[dict[str, Any]],
     *,
     max_new_tokens: int,
+    do_sample: bool = False,
+    temperature: float = 1.0,
+    top_p: float = 1.0,
 ) -> tuple[str, int, int]:
     import torch
 
@@ -183,11 +186,16 @@ def generate_turn(
         return_dict=True,
         return_tensors="pt",
     ).to("cuda:0")
+    generation = {
+        "max_new_tokens": max_new_tokens,
+        "do_sample": do_sample,
+    }
+    if do_sample:
+        generation.update({"temperature": temperature, "top_p": top_p})
     with torch.inference_mode():
         generated = model.generate(
             **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
+            **generation,
         )
     suffix = generated[:, inputs["input_ids"].shape[1] :]
     text = processor.batch_decode(suffix, skip_special_tokens=True)[0].strip()
@@ -236,7 +244,16 @@ def evaluate_task(
     text_index: LocalTextIndex,
     *,
     max_new_tokens: int,
+    do_sample: bool = False,
+    temperature: float = 1.0,
+    top_p: float = 1.0,
+    seed: int | None = None,
 ) -> dict[str, Any]:
+    if seed is not None:
+        import torch
+
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
     image_path = resolve_local_image(Path(task["query_image"]), DATASET_ROOT)
     with Image.open(image_path) as image:
         image.load()
@@ -276,7 +293,13 @@ def evaluate_task(
     image_search_call_count = 0
     for _ in range(5):
         output, input_tokens, output_tokens = generate_turn(
-            model, processor, messages, max_new_tokens=max_new_tokens
+            model,
+            processor,
+            messages,
+            max_new_tokens=max_new_tokens,
+            do_sample=do_sample,
+            temperature=temperature,
+            top_p=top_p,
         )
         turn = {
             "assistant": output,
