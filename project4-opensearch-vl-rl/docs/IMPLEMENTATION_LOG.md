@@ -792,3 +792,14 @@
   adapter 换为已验证 v7 SFT5，其余沿用原四题、每题 4 条、相同 seed/temperature/top-p/reward/gate，
   总计 16 条 rollout-only。仅物理 GPU1、无网络/API/optimizer；不增到 8、不换题、不改 reward。若仍
   无题内方差或 gate 失败，本轮后立即停止，不自动扩大。
+- 最小 SFT5 Run `wit-boundary-v7-sft5-rollout-g4n4-20260822`，commit `bc6c529`，16 条按固定协议完成。
+  rank3 4/4 strict、reward 全 1；rank2 4/4 strict，其中 1 条用 oracle 两次 lookup 得 1，3 条多查一次
+  得 0.95，population variance `0.00046875`，raw advantages 为
+  `[+0.0375,-0.0125,-0.0125,-0.0125]`。新 SFT5 已从旧 SFT1 的全零 advantage 转为真实题内信号。
+- transient 仍 4/4 maximum-turn fatal、no-match 仍 4/4 format invalid，两组 reward/variance 均 0。
+  批级 variable group fraction `0.25` 达标且 `has_nonzero_advantage=true`，fatal `0.25` 达标；唯一未过项是
+  format-valid `0.50 < 0.75`，所以正式 gate 仍失败并以预期 `exit_code=4` 保存，不启动 optimizer。
+- 报告 SHA256 `b2249ae78bbb7b872f666531725b3edd99526c77440d06435fcc50a2a6983714`；adapter/data/tasks
+  hash 匹配，无异常。GPU1 启动/结束 18 MiB、轮询最高 61°C、cleanup 无 compute process；GPU0/GPU5
+  未参与，无网络/API。结论：4 rollouts 已足以发现方差，当前没有必要增到 8；瓶颈明确是 transient 与
+  no-match 的格式/turn-budget，而不是纯粹 rollout 数量。本轮按用户要求停止，不做更多大规模改动。
