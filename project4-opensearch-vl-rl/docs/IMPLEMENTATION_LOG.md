@@ -690,3 +690,13 @@
 - Base 报告 SHA256 `77bc29168d9caf318f507ea9869eb694189ead0603caf002d142aad40d03f380`；
   `exit_code=0`，stderr 无 traceback/OOM/NaN/Xid。GPU1 启动/结束均 18 MiB，最高轮询温度 56°C，cleanup
   `compute_processes=none`；GPU0/GPU5 未参与。下一步只运行同四题 SFT1 对照，不据 4 条样本声明提升。
+- SFT1 对照 Run `wit-boundary-v7-sft1-dev4-20260822`，commit `36831be`，加载固定 v5 1-step adapter
+  SHA256 `637169695b4b96022e003b2ad59bea780288da0c31aab94a1c64f962856399f5`。同四题的完整
+  `results` 对象与 Base 逐字段相同，严格指标也完全相同；因此该 1-step SFT 对 v7 小样本没有可观察改善。
+- 对两份新轨迹做 CPU evidence-fidelity-v2 诊断，Base/SFT1 mean 均为 `0.37003`；分题均为
+  rank3 `1.0`、rank2 `0.48013`、transient `0`、no-match `0`。后两题虽取得 query-path 分，但格式硬门
+  将总 reward 置 0，未把无 final/错误 final 当成成功。
+- SFT1 报告 SHA256 `2689e63d4f176b36bc3972ee18494c6c5301af21bcffaa88b0bd2f3a453bd70e`；
+  dataset/tasks hash 与 Base 一致，`exit_code=0`、无 traceback/OOM/NaN/Xid。GPU1 启动/结束 18 MiB，
+  轮询最高 57°C，cleanup 无 compute process；GPU0/GPU5 未参与。下一步只允许 SFT1 的 v7 train
+  stochastic rollout-only 方差门禁，仍不启动 optimizer。
