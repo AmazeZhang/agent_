@@ -739,3 +739,11 @@
 - `exit_code=0`，无 traceback/OOM/NaN/Inf/Xid/segfault；GPU1 启动/结束 18 MiB，cleanup 无 compute
   process，GPU0/GPU5 未参与，无网络/API。1-step 只通过训练/保存/resume-ready 链路门；下一步先跑已固定
   的同四条 v7 dev greedy 对照，不直接 resume 扩大。
+- v7 SFT1 held-out Run `wit-boundary-v7-sftv7-1step-dev4-20260822`，commit `00eac34`，同四题的完整
+  results 对象与 Base 逐字段相同，指标仍为 format/title/evidence/full/oracle/fatal
+  `0.50/0.50/0.25/0.25/0.50/0.25`；1 step 没有可观察行为变化。报告 SHA256
+  `03de6a11e90ac44d78c20e4d5d7648b23bd48a5a916fbbb6a84c084c4684826e`，adapter/data/tasks hash
+  均匹配；`exit_code=0`，GPU1 启动/结束 18 MiB、最高轮询 57°C、cleanup 无进程，GPU0/GPU5 未参与。
+- 下一晋级固定为从 v7 checkpoint-1 resume 到总 step5（只新增 4 step），保持 dataset/hash、LoRA、batch、
+  lr、seed、cutoff 和 GPU1 不变；resume 同数据集门必须通过。step5 后仍先跑同四题 held-out，若仍无变化
+  或出现回归就停止扩大；不启动 RL，不把训练 loss 下降当作质量提升。
