@@ -669,10 +669,14 @@
   observation 只保留 `entity_id/title/summary`。用真实 v7 首条 train 任务 `wit-00000885` 和 SQLite
   index 逐字节比对，image/text 两种运行时 observation 均与 `sft_train.json` 完全相同。
 - stochastic rollout 审计器同步支持受限 dataset root 和显式 `evidence-fidelity-v2`，并兼容 v1/v2
-  的严格成功字段；其余预声明 group variance/format/fatal 门槛不变。相关 16 个单测、Ruff 和 diff check
+  的严格成功字段；其余预声明 group variance/format/fatal 门槛不变。相关 17 个单测、Ruff 和 diff check
   通过；本步纯 CPU、无网络/API/GPU，尚未启动模型 rollout 或 optimizer。
 - v7 小规模难度基线在运行前固定：dev 四类各 1 条，按类内首个 task ID 选择
   `wit-00001777`（rank3）、`wit-00004467`（rank2）、`wit-00014422`（transient）和
   `boundary-no-match-dev-000`；先 Base、再既有 v5 SFT1 adapter，均 greedy、`max_new_tokens=192`。
   评测器新增显式 task-ID 白名单并保持请求顺序，防止用“前 N 条”误采成单一类别。每个模型单独受管
   Run，只用空闲物理 GPU1；不使用 GPU0/GPU5，不启用 optimizer，结果无论好坏均保留。
+- 首次 Base 启动 `wit-boundary-v7-base-dev4-20260822` 在模型加载前失败：误用了宿主 Conda
+  `llama_factory` Python，其 `peft/transformers` 来自 user-site 且缺少 `tqdm`，退出码 1。没有安装或升级
+  依赖，没有生成轨迹；GPU1 始终 18 MiB/0% 且 cleanup `compute_processes=none`。失败 Run 和 traceback
+  原样保留。后续改用此前 SFT/评测已验证并冻结的 data 盘 `envs/sft-py311/bin/python`，不修改环境。
