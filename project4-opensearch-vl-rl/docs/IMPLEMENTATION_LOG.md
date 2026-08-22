@@ -634,4 +634,13 @@
 - 根因与 v7 修复：三次 lookup observation 重复携带 corpus revision、URL 等非决策元数据。v7 固定
   `boundary-compact-v1`：image_search 只返回 `entity_id/title/similarity`，text_lookup 只返回
   `entity_id/title/summary`；完整来源仍由 manifest、source hash 和 text index 固定。不得截短 gold
-  evidence 或删除任务判定所需线索。构建器与 compact-field 回归测试已通过，待发布 v7 后重跑全部 80 条模板门禁。
+  evidence 或删除任务判定所需线索。构建器与 compact-field 回归测试已通过。
+- v7 发布与模板门禁：数据盘 `wit-rl-boundary-v7`，任务/图片/划分与 v6 相同，仅 SFT/tool observation
+  序列改变；manifest/tasks/train SFT/dataset-info SHA256 分别为
+  `dd2714d4c8727405d619d760251f7d4edb29c9f4d8dddc0aaa5135a9a78d09e1`、
+  `c86929792a5660da2452aeeeda0250fcb295c21b75e19cf2fbc41be1e5981f11`、
+  `ba185294248f0d164440b0e6a243246ef8adb20acd3391899b767377393b8541`、
+  `c6af8b94cad773bea557393f27c6fbbf9569a1ee0df838fe6853357faefe6ce6`。
+- 真实 `qwen3_vl_nothink` CPU 离线解析 80/80：每条 1 图，tokens `573–1485`、supervised tokens
+  `74–283`，全部低于 2048 且有监督；显式 `CUDA_VISIBLE_DEVICES=`，无网络/API/GPU。v7 通过数据入口
+  门禁，可进入分级 reward 的 CPU 历史重放设计；尚未据此启动 SFT 或 RL。
