@@ -788,3 +788,7 @@
   下一合理动作是先做 recovery/no-match 定向且不泄漏 dev answer 的 train curriculum/采样审计，再考虑总
   step20；安全规范要求 20 step 及以上在运行前重新说明并获得用户确认。现在不启动 step20、rollout 重跑
   或 RL optimizer，等待用户审阅本次更新与下一阶段资源/停止条件。
+- 用户要求额度有限下做最小尝试。新协议固定于 `configs/stochastic_rollout_boundary_v7_sft5.json`：只把
+  adapter 换为已验证 v7 SFT5，其余沿用原四题、每题 4 条、相同 seed/temperature/top-p/reward/gate，
+  总计 16 条 rollout-only。仅物理 GPU1、无网络/API/optimizer；不增到 8、不换题、不改 reward。若仍
+  无题内方差或 gate 失败，本轮后立即停止，不自动扩大。

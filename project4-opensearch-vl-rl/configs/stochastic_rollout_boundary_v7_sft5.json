@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "purpose": "minimal SFT5 rollout-only variance recheck; no optimizer and no API",
+  "task_ids": [
+    "wit-00000885",
+    "wit-00001521",
+    "wit-00011482",
+    "boundary-no-match-train-000"
+  ],
+  "generation": {
+    "rollouts_per_task": 4,
+    "base_seed": 20260901,
+    "temperature": 0.7,
+    "top_p": 1.0,
+    "max_new_tokens": 192
+  },
+  "reward_version": "evidence-fidelity-v2",
+  "gate": {
+    "minimum_variable_group_fraction": 0.25,
+    "minimum_format_valid_fraction": 0.75,
+    "maximum_fatal_fraction": 0.25
+  },
+  "frozen_inputs": {
+    "dataset_manifest_sha256": "dd2714d4c8727405d619d760251f7d4edb29c9f4d8dddc0aaa5135a9a78d09e1",
+    "tasks_sha256": "c86929792a5660da2452aeeeda0250fcb295c21b75e19cf2fbc41be1e5981f11",
+    "adapter_sha256": "fc8c922fd1e233fd30833dcb03454fe2c2afe3d31c32dd1f0ba4be655fb6ce97"
+  },
+  "safety": {
+    "physical_gpu_ids": [1],
+    "forbidden_gpu_ids": [0, 5],
+    "network_or_api": false,
+    "optimizer": false,
+    "stop_after_this_gate": true
+  }
+}
