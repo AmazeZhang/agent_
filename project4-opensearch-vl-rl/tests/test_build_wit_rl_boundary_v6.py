@@ -10,7 +10,12 @@ SPEC.loader.exec_module(MODULE)
 
 
 def result(entity_id: str, title: str, summary: str) -> dict:
-    return {"entity_id": entity_id, "title": title, "summary": summary}
+    return {
+        "entity_id": entity_id,
+        "title": title,
+        "summary": summary,
+        "similarity": 0.8,
+    }
 
 
 class BuildWitRlBoundaryV6Test(unittest.TestCase):
@@ -54,6 +59,20 @@ class BuildWitRlBoundaryV6Test(unittest.TestCase):
         self.assertTrue(task["synthetic_safety_probe"])
         self.assertEqual(task["image_search_failures_before_success"], 1)
         self.assertEqual(task["oracle_steps"], ["image_search", "image_search", "final"])
+
+    def test_compact_observations_keep_decision_fields_only(self) -> None:
+        candidate = {
+            **self.candidates()[0],
+            "similarity": 0.9,
+            "source": "https://must-not-leak.test",
+            "corpus_revision": "verbose-revision",
+        }
+        image_observation = MODULE.compact_entity_observation([candidate])
+        text_observation = MODULE.compact_text_observation(candidate)
+        self.assertIn('"similarity": 0.9', image_observation)
+        self.assertNotIn("source", image_observation)
+        self.assertIn("summary", text_observation)
+        self.assertNotIn("corpus_revision", text_observation)
 
 
 if __name__ == "__main__":

@@ -619,3 +619,19 @@
   1-step GRPO 没有更新信号。停止重复扩大同分布采样。下一步应在 CPU 侧构建/筛选更接近决策边界的
   RL prompt，并优先把 evidence fidelity 变成可追溯的分级信号；新 reward 必须先对 Base/SFT1/SFT5
   历史轨迹重放、检查排序和 reward hacking，再允许新的 rollout-only 门禁。
+- 决策边界数据构建器：从 retrieval-verified WIT pilot 选择真实 top-3，生成 rank2/rank3 双唯一线索、
+  transient+rank2 双线索和 retry 后空结果四类任务。正向线索只来自目标 SQLite summary 且不出现在
+  其他 top-3 summary/目标标题；排除线索来自 rank1 且不在目标 summary。最坏 oracle 为 5 turns。
+- 首次发布 `wit-rl-boundary-v6`：120 条，train/dev/test `80/20/20`；rank2/rank3 各 36、transient
+  24、no-match safety probe 24。120 张图全部 decode；所有 top-3 candidate entity ID 跨 split 零重叠；
+  线索、gold entity 和本地 SQLite evidence 逐条一致。manifest/tasks/train SFT SHA256 分别为
+  `7a001dd3bc9b974e3e7992d2923083eb54571c678cc591b288d867b21363dc16`、
+  `c86929792a5660da2452aeeeda0250fcb295c21b75e19cf2fbc41be1e5981f11`、
+  `8ca3b4c3bbe9ef7cec118e0e8a9705010697fc8bf8bdfc9371356288cbd99489`。
+- v6 真实模板门禁失败：用离线 CPU、`CUDA_VISIBLE_DEVICES=` 和真实 `qwen3_vl_nothink` 在
+  `cutoff_len=4096` 做诊断，80 条 token 范围 `573–2237`；21 条达到/超过拟用的 2048，其中 rank3
+  20/24、transient 1/16。最长 2237。v6 不作为训练入口且目录保留，不覆盖。
+- 根因与 v7 修复：三次 lookup observation 重复携带 corpus revision、URL 等非决策元数据。v7 固定
+  `boundary-compact-v1`：image_search 只返回 `entity_id/title/similarity`，text_lookup 只返回
+  `entity_id/title/summary`；完整来源仍由 manifest、source hash 和 text index 固定。不得截短 gold
+  evidence 或删除任务判定所需线索。构建器与 compact-field 回归测试已通过，待发布 v7 后重跑全部 80 条模板门禁。

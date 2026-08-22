@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build an immutable decision-boundary RL task suite from verified WIT data."""
+"""Build a compact immutable decision-boundary RL suite from verified WIT data."""
 
 from __future__ import annotations
 
@@ -29,16 +29,12 @@ from build_wit_agentic_challenge import (
 )
 from verify_wit_agentic_pilot import first_sentence
 
-from local_retrieval import (
-    LocalTextIndex,
-    entity_tool_observation,
-    text_tool_observation,
-)
+from local_retrieval import LocalTextIndex
 from local_retrieval.resnet50_encoder import sha256_file
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 SOURCE_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-pilot-v4"
-OUTPUT_ROOT = PROJECT_DATA / "datasets/processed/wit-rl-boundary-v6"
+OUTPUT_ROOT = PROJECT_DATA / "datasets/processed/wit-rl-boundary-v7"
 WORD_RE = re.compile(r"[A-Za-z][A-Za-z-]{5,}")
 COUNTS = {
     "train": {"dual-clue-rank2": 24, "dual-clue-rank3": 24, "transient-dual-clue": 16, "no-match-after-retry": 16},
@@ -113,6 +109,42 @@ def lookup_candidates(
     return results
 
 
+def compact_entity_observation(results: list[dict[str, Any]]) -> str:
+    payload = {
+        "backend": "local_visual_index",
+        "evidence_scope": "entity-candidates-only",
+        "match_count": len(results),
+        "results": [
+            {
+                "entity_id": str(result["entity_id"]),
+                "title": str(result["title"]),
+                "similarity": float(result["similarity"]),
+            }
+            for result in results
+        ],
+    }
+    return "Tool execution result:\n" + json.dumps(
+        payload, ensure_ascii=False, indent=2, sort_keys=True
+    )
+
+
+def compact_text_observation(result: dict[str, Any]) -> str:
+    payload = {
+        "backend": "local_text_index",
+        "match_count": 1,
+        "results": [
+            {
+                "entity_id": str(result["entity_id"]),
+                "title": str(result["title"]),
+                "summary": str(result["summary"]),
+            }
+        ],
+    }
+    return "Tool execution result:\n" + json.dumps(
+        payload, ensure_ascii=False, indent=2, sort_keys=True
+    )
+
+
 def boundary_example(
     source: dict[str, Any],
     image_name: str,
@@ -147,7 +179,7 @@ def boundary_example(
             function_message("image_search", {"image": "img_1", "top_k": 3}),
             {
                 "from": "observation",
-                "value": entity_tool_observation(source["retrieval_results"][:3]),
+                "value": compact_entity_observation(source["retrieval_results"][:3]),
             },
         ]
     )
@@ -155,7 +187,7 @@ def boundary_example(
         calls.extend(
             [
                 function_message("text_lookup", {"entity_id": result["entity_id"]}),
-                {"from": "observation", "value": text_tool_observation([result])},
+                {"from": "observation", "value": compact_text_observation(result)},
             ]
         )
     calls.append({"from": "gpt", "value": final})
@@ -198,7 +230,7 @@ def no_match_after_retry_example(
         function_message("image_search", {"image": "img_1", "top_k": 3}),
         {"from": "observation", "value": TRANSIENT_OBSERVATION},
         function_message("image_search", {"image": "img_1", "top_k": 3}),
-        {"from": "observation", "value": entity_tool_observation([])},
+        {"from": "observation", "value": compact_entity_observation([])},
         {"from": "gpt", "value": NO_MATCH_FINAL},
     ]
     task = {
@@ -316,7 +348,7 @@ def build(source_root: Path, output: Path) -> Path:
         split_counts = Counter(task["split"] for task in published)
         type_counts = Counter(task["task_type"] for task in published)
         manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "status": "rl-boundary-ready",
             "purpose": "local-agentic-decision-boundary-sft-rl",
             "source_manifest_sha256": sha256_file(source_root / "manifest.json"),
@@ -338,6 +370,11 @@ def build(source_root: Path, output: Path) -> Path:
             "image_search_top_k_maximum": 3,
             "image_observation_contains_text_summary": False,
             "text_lookup_summary_max_characters": 360,
+            "tool_observation_schema": "boundary-compact-v1",
+            "tool_observation_fields": {
+                "image_search": ["entity_id", "title", "similarity"],
+                "text_lookup": ["entity_id", "title", "summary"],
+            },
             "final_response_format": "Title: <exact title>\\nEvidence: <first sentence-or-no-match>",
             "evidence_extraction": "first_terminal_punctuation_or_360_characters",
             "maximum_agent_turns": 5,
