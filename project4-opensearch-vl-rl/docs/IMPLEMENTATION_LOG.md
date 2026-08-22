@@ -680,3 +680,13 @@
   `llama_factory` Python，其 `peft/transformers` 来自 user-site 且缺少 `tqdm`，退出码 1。没有安装或升级
   依赖，没有生成轨迹；GPU1 始终 18 MiB/0% 且 cleanup `compute_processes=none`。失败 Run 和 traceback
   原样保留。后续改用此前 SFT/评测已验证并冻结的 data 盘 `envs/sft-py311/bin/python`，不修改环境。
+- Base 重试 Run `wit-boundary-v7-base-dev4-v2-20260822` 使用固定 sft-py311 环境成功完成，commit
+  `6f86f18`、物理 GPU1、greedy、4 条、无 optimizer/API/网络。严格指标：format/title/evidence/full
+  success/oracle-path/fatal 分别为 `0.50/0.50/0.25/0.25/0.50/0.25`。
+- 分题：rank3 `wit-00001777` 严格成功；rank2 `wit-00004467` 标题正确但输出了两句而非 gold 首句，且
+  多查一次 rank3，严格失败；transient `wit-00014422` 在 retry 后查了 3 个 entity，耗尽 5 turns 而
+  没有 final；no-match 在正确 retry/空结果路径后只输出 `NO_MATCH`，未遵守两行 final 格式。说明 v7
+  确实暴露了证据边界、工具预算和格式三类非饱和错误，不是旧集合的全成功复刻。
+- Base 报告 SHA256 `77bc29168d9caf318f507ea9869eb694189ead0603caf002d142aad40d03f380`；
+  `exit_code=0`，stderr 无 traceback/OOM/NaN/Xid。GPU1 启动/结束均 18 MiB，最高轮询温度 56°C，cleanup
+  `compute_processes=none`；GPU0/GPU5 未参与。下一步只运行同四题 SFT1 对照，不据 4 条样本声明提升。
