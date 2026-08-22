@@ -35,12 +35,44 @@ class RunWitAgenticSftTest(unittest.TestCase):
                     "transient-tool-failure": 36,
                 },
             }
+            (root / "dataset_info.json").write_text(
+                json.dumps(
+                    {
+                        "wit_agentic_train_v1": {
+                            "file_name": "sft_train.json"
+                        }
+                    }
+                )
+            )
+            (root / "sft_train.json").write_text("[]")
             (root / "manifest.json").write_text(json.dumps(manifest))
             self.assertEqual(MODULE.validate_dataset(root), manifest)
             manifest["image_observation_contains_text_summary"] = True
             (root / "manifest.json").write_text(json.dumps(manifest))
             with self.assertRaisesRegex(ValueError, "image_observation"):
                 MODULE.validate_dataset(root)
+
+    def test_boundary_dataset_profile_is_explicit(self) -> None:
+        manifest = {
+            "status": "rl-boundary-ready",
+            "purpose": "local-agentic-decision-boundary-sft-rl",
+            "task_type_counts": {
+                "dual-clue-rank2": 36,
+                "dual-clue-rank3": 36,
+                "no-match-after-retry": 24,
+                "transient-dual-clue": 24,
+            },
+        }
+        self.assertEqual(
+            MODULE.dataset_profile(manifest),
+            (
+                "wit_agentic_train_v6",
+                "all-top3-candidate-entity-ids-or-synthetic-probe-id",
+            ),
+        )
+        manifest["task_type_counts"]["dual-clue-rank2"] = 35
+        with self.assertRaisesRegex(ValueError, "task type counts"):
+            MODULE.dataset_profile(manifest)
 
     def test_managed_run_excludes_gpu_zero_and_five(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

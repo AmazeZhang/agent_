@@ -719,3 +719,13 @@
 - 决策：RL 继续阻断。现有 adapter 是在 v5 上只训 1 step，并未学习 v7 compact protocol；下一步回到
   晋级链的 v7 SFT 1-step smoke，再做同条件 held-out 和 rollout 门禁。不得通过提高 temperature、事后换题
   或取消 format 门来人为制造 advantage。
+- SFT 启动器现支持受限 `--dataset-root`，仅接受 project4 processed 目录下的两个显式 profile：原 v5
+  `wit_agentic_train_v1` 与 v7 `wit_agentic_train_v6`。v5 默认不变；v7 会校验固定 status/purpose、
+  split/task counts、no-leak/turn/tool 合约，以及 tasks/dataset-info/train-SFT hashes。
+- resume 新增同数据集 provenance hash 门：checkpoint 必须属于受管 Run、包含 trainer state/adapter，且
+  原 Run 的 manifest hash 与本次完全一致，禁止把 v5 checkpoint 当成 v7 resume。真实 v7 manifest 验证、
+  3 个启动器单测、Ruff 和 diff check 通过，CPU、无网络/GPU。
+- 下一 Run 预定为 v7 SFT 1-step smoke：固定 Qwen3-VL-8B、LoRA rank8、vision/projector frozen、
+  batch1、cutoff2048、seed42、80 条 train 数据入口，只执行 1 个 optimizer step 并保存完整 checkpoint。
+  单独受管 tmux Run、仅物理 GPU1；不使用 GPU0/GPU5，不 resume v5，不联网，不覆盖既有结果。完成后先
+  验证 checkpoint/梯度/loss/清理，再决定 held-out 对照；1 step 只证明链路，不声称质量提升。

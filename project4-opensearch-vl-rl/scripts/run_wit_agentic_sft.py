@@ -25,6 +25,7 @@ RUN_ROOT = PROJECT_DATA / "runs"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset-root", type=Path, default=DATASET_ROOT)
     parser.add_argument("--max-steps", type=int, required=True)
     parser.add_argument("--resume-from-checkpoint", type=Path)
     return parser.parse_args()
@@ -45,17 +46,54 @@ def require_managed_run(environment: dict[str, str]) -> tuple[Path, str]:
     return run_dir, visible
 
 
+def validate_dataset_root(raw_root: Path) -> Path:
+    root = raw_root.resolve()
+    allowed = (PROJECT_DATA / "datasets/processed").resolve()
+    if not root.is_relative_to(allowed) or not root.is_dir():
+        raise ValueError("dataset root must be an existing project4 processed dataset")
+    return root
+
+
+def dataset_profile(manifest: dict[str, object]) -> tuple[str, str]:
+    identity = (manifest.get("status"), manifest.get("purpose"))
+    if identity == ("challenge-ready", "local-agentic-sft-rl-challenge"):
+        expected_types = {
+            "candidate-conflict": 48,
+            "clean": 12,
+            "no-match": 24,
+            "transient-tool-failure": 36,
+        }
+        dataset_name = "wit_agentic_train_v1"
+        split_unit = "entity_id-or-synthetic-probe-id"
+    elif identity == (
+        "rl-boundary-ready",
+        "local-agentic-decision-boundary-sft-rl",
+    ):
+        expected_types = {
+            "dual-clue-rank2": 36,
+            "dual-clue-rank3": 36,
+            "no-match-after-retry": 24,
+            "transient-dual-clue": 24,
+        }
+        dataset_name = "wit_agentic_train_v6"
+        split_unit = "all-top3-candidate-entity-ids-or-synthetic-probe-id"
+    else:
+        raise ValueError("dataset manifest identity is not an approved SFT profile")
+    if manifest.get("task_type_counts") != expected_types:
+        raise ValueError("dataset task type counts are not fixed")
+    return dataset_name, split_unit
+
+
 def validate_dataset(root: Path) -> dict[str, object]:
     with (root / "manifest.json").open(encoding="utf-8") as handle:
         manifest = json.load(handle)
+    dataset_name, split_unit = dataset_profile(manifest)
     required = {
-        "status": "challenge-ready",
-        "purpose": "local-agentic-sft-rl-challenge",
         "image_observation_contains_text_summary": False,
         "image_runtime_handle": "img_1",
         "final_response_format": "Title: <exact title>\\nEvidence: <first sentence-or-no-match>",
         "evidence_extraction": "first_terminal_punctuation_or_360_characters",
-        "split_unit": "entity_id-or-synthetic-probe-id",
+        "split_unit": split_unit,
         "maximum_agent_turns": 5,
         "text_lookup_summary_max_characters": 360,
         "image_search_top_k_maximum": 3,
@@ -65,17 +103,31 @@ def validate_dataset(root: Path) -> dict[str, object]:
             raise ValueError(f"dataset manifest {field} is not {expected!r}")
     if manifest.get("split_counts") != {"dev": 20, "test": 20, "train": 80}:
         raise ValueError("dataset split counts are not the fixed 80/20/20 challenge")
-    if manifest.get("task_type_counts") != {
-        "candidate-conflict": 48,
-        "clean": 12,
-        "no-match": 24,
-        "transient-tool-failure": 36,
-    }:
-        raise ValueError("dataset task type counts are not fixed")
+    task_path = root / "tasks.jsonl"
+    expected_tasks_hash = manifest.get("tasks_sha256")
+    if expected_tasks_hash is not None and expected_tasks_hash != sha256_file(task_path):
+        raise ValueError("dataset tasks do not match the manifest hash")
+    with (root / "dataset_info.json").open(encoding="utf-8") as handle:
+        dataset_info = json.load(handle)
+    if dataset_name not in dataset_info:
+        raise ValueError(f"dataset_info lacks approved train entry {dataset_name}")
+    expected_info_hash = manifest.get("dataset_info_sha256")
+    if expected_info_hash is not None and expected_info_hash != sha256_file(
+        root / "dataset_info.json"
+    ):
+        raise ValueError("dataset_info does not match the manifest hash")
+    train_file = root / str(dataset_info[dataset_name]["file_name"])
+    expected_sft_hash = dict(manifest.get("sft_sha256", {})).get("train")
+    if expected_sft_hash is not None and expected_sft_hash != sha256_file(train_file):
+        raise ValueError("train SFT data does not match the manifest hash")
     return manifest
 
 
-def validate_checkpoint(raw_checkpoint: Path | None, max_steps: int) -> Path | None:
+def validate_checkpoint(
+    raw_checkpoint: Path | None,
+    max_steps: int,
+    expected_dataset_hash: str | None = None,
+) -> Path | None:
     if raw_checkpoint is None:
         return None
     checkpoint = raw_checkpoint.resolve()
@@ -91,6 +143,14 @@ def validate_checkpoint(raw_checkpoint: Path | None, max_steps: int) -> Path | N
         raise ValueError(
             f"max_steps={max_steps} must exceed checkpoint global_step={previous_step}"
         )
+    if expected_dataset_hash is not None:
+        provenance_path = checkpoint.parents[1] / "wit-agentic-sft-provenance.json"
+        if not provenance_path.is_file():
+            raise FileNotFoundError("resume checkpoint lacks SFT provenance")
+        with provenance_path.open(encoding="utf-8") as handle:
+            previous_hash = json.load(handle).get("dataset_manifest_sha256")
+        if previous_hash != expected_dataset_hash:
+            raise ValueError("resume checkpoint belongs to a different SFT dataset")
     return checkpoint
 
 
@@ -99,8 +159,13 @@ def main() -> int:
     if not 1 <= args.max_steps <= 20:
         raise ValueError("WIT challenge SFT is bounded to 1..20 optimizer steps")
     run_dir, physical_gpu = require_managed_run(dict(os.environ))
-    dataset_manifest = validate_dataset(DATASET_ROOT)
-    checkpoint = validate_checkpoint(args.resume_from_checkpoint, args.max_steps)
+    dataset_root = validate_dataset_root(args.dataset_root)
+    dataset_manifest = validate_dataset(dataset_root)
+    dataset_name, _ = dataset_profile(dataset_manifest)
+    dataset_hash = sha256_file(dataset_root / "manifest.json")
+    checkpoint = validate_checkpoint(
+        args.resume_from_checkpoint, args.max_steps, dataset_hash
+    )
     output_dir = run_dir / "output"
     if output_dir.exists():
         raise FileExistsError(f"refusing to overwrite SFT output: {output_dir}")
@@ -131,8 +196,8 @@ def main() -> int:
         "lora_dropout": 0.0,
         "freeze_vision_tower": True,
         "freeze_multi_modal_projector": True,
-        "dataset": "wit_agentic_train_v1",
-        "dataset_dir": str(DATASET_ROOT),
+        "dataset": dataset_name,
+        "dataset_dir": str(dataset_root),
         "template": "qwen3_vl_nothink",
         "cutoff_len": 2048,
         "max_samples": 80,
@@ -165,12 +230,16 @@ def main() -> int:
     config_path = run_dir / "wit-agentic-sft-config.yaml"
     config_path.write_text(yaml.safe_dump(config, sort_keys=True))
     provenance = {
-        "fully_synthetic": False,
-        "contains_synthetic_safety_probes": True,
+        "fully_synthetic": bool(dataset_manifest.get("fully_synthetic", False)),
+        "contains_synthetic_safety_probes": bool(
+            dataset_manifest.get("contains_synthetic_safety_probes", True)
+        ),
         "derived_dataset": True,
-        "purpose": "local-agentic-sft-rl-challenge",
-        "dataset_manifest_sha256": sha256_file(DATASET_ROOT / "manifest.json"),
-        "tasks_sha256": sha256_file(DATASET_ROOT / "tasks.jsonl"),
+        "purpose": str(dataset_manifest["purpose"]),
+        "dataset_root": str(dataset_root),
+        "dataset_name": dataset_name,
+        "dataset_manifest_sha256": dataset_hash,
+        "tasks_sha256": sha256_file(dataset_root / "tasks.jsonl"),
         "dataset_manifest": dataset_manifest,
         "template": "qwen3_vl_nothink",
         "max_steps": args.max_steps,
