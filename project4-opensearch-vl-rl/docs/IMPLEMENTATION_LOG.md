@@ -729,3 +729,13 @@
   batch1、cutoff2048、seed42、80 条 train 数据入口，只执行 1 个 optimizer step 并保存完整 checkpoint。
   单独受管 tmux Run、仅物理 GPU1；不使用 GPU0/GPU5，不 resume v5，不联网，不覆盖既有结果。完成后先
   验证 checkpoint/梯度/loss/清理，再决定 held-out 对照；1 step 只证明链路，不声称质量提升。
+- v7 SFT Run `wit-boundary-v7-sft-1step-20260822`，commit `8b4e404`，按预定只完成 1 step：loss
+  `0.001019`、grad norm `0.1637`、lr `1e-4`、epoch `0.0125`，均为有限值；运行时约 3.2 秒。
+- checkpoint-1 完整包含 adapter、trainer state、optimizer、scheduler、RNG、training args 和 tokenizer，
+  global step=1，无 `.partial`。adapter/config/provenance SHA256 分别为
+  `45cb6a5867e462f5499c8a74e8e34e70781f3b1b363463331b8bc72e240f339a`、
+  `212e0be52f0185b4baadf7a40cc70376c5da54790815656ed92aa736fc0b18db`、
+  `16733f18e5ee3eb9a19039c692dc7f3fb60df1a366ff053b8874f8f96500ca4b`。
+- `exit_code=0`，无 traceback/OOM/NaN/Inf/Xid/segfault；GPU1 启动/结束 18 MiB，cleanup 无 compute
+  process，GPU0/GPU5 未参与，无网络/API。1-step 只通过训练/保存/resume-ready 链路门；下一步先跑已固定
+  的同四条 v7 dev greedy 对照，不直接 resume 扩大。
