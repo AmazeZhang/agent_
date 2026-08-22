@@ -846,3 +846,17 @@
 - 声明边界：该 step 只证明新数据协议可被实际 SFT、保存和清理，不能证明质量提升。下一步是从同一固定
   v8 dev20 运行 Base 与该 SFT1 的 greedy 对照；在生成 checkpoint 之前不进入 RL，也不把 1-step loss
   当作效果证据。
+
+### 2026-08-22：v8 Base 评测工具白名单泄漏（已精确停止并修复）
+
+- 现象：首个 v8 Base dev20 Run 在第 1/20 条生成 `image_search → text_search → text_lookup`。虽然 prompt
+  说使用 `text_search`，评测器当时仍把遗留 `text_lookup` 同时传给 chat template，违反“统一工具环境”要求。
+  因此该 Run 的部分轨迹不构成 v8 对照，不能用于任何指标或训练判断。
+- 处置：使用 `stop_managed.sh wit-protocol-v8-base-dev20-20260822` 校验 identity token 后只向该 Run
+  的 process group 发送 TERM；Run 为预期 `exit_code=143`，cleanup 显示 GPU1 `compute_processes=none`。
+  保留 Run、日志和已生成的第一条轨迹作为失败证据，未删除或覆盖；精确 tmux 会话随后关闭。
+- 修复：评测器改为按 manifest `tool_protocol` 构建工具白名单。`official-local-v1` 只注册
+  `image_search/text_search`，legacy 仅注册 `image_search/text_lookup`；执行器也 fail-closed 拒绝协议外调用。
+  新增白名单回归测试，protocol/evaluator/reward 16 个相关 CPU 测试、`py_compile` 和 diff check 通过。
+- 下一步：以新 Run ID 重跑完全相同的 v8 Base dev20 greedy 对照；停止的 Run 不重用、不改数据、reward、
+  seed 或生成参数。未重新启动 SFT、RL 或 optimizer。

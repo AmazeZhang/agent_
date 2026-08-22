@@ -26,7 +26,7 @@ DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v5"
 RUN_ROOT = PROJECT_DATA / "runs"
 TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
 
-TOOLS = [
+COMMON_TOOLS = [
     {
         "type": "function",
         "function": {
@@ -45,37 +45,44 @@ TOOLS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "text_search",
-            "description": (
-                "Search frozen local Wikipedia evidence with a natural-language query. "
-                "Results contain a title, source, and short evidence summary."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "q": {"type": "string", "minLength": 1, "maxLength": 1000},
-                    "top_k": {"type": "integer", "minimum": 1, "maximum": 3},
-                },
-                "required": ["q"],
+]
+
+TEXT_SEARCH_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "text_search",
+        "description": "Search frozen local Wikipedia evidence with a natural-language query.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "q": {"type": "string", "minLength": 1, "maxLength": 1000},
+                "top_k": {"type": "integer", "minimum": 1, "maximum": 3},
             },
+            "required": ["q"],
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "text_lookup",
-            "description": "Legacy compatibility lookup by entity ID; do not use in protocol v8.",
+}
+
+TEXT_LOOKUP_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "text_lookup",
+        "description": "Look up local Wikipedia evidence by entity ID.",
             "parameters": {
                 "type": "object",
                 "properties": {"entity_id": {"type": "string"}},
                 "required": ["entity_id"],
             },
-        },
     },
-]
+}
+
+
+def tools_for_protocol(tool_protocol: str) -> list[dict[str, Any]]:
+    if tool_protocol == "official-local-v1":
+        return [*COMMON_TOOLS, TEXT_SEARCH_TOOL]
+    if tool_protocol == "legacy-v1":
+        return [*COMMON_TOOLS, TEXT_LOOKUP_TOOL]
+    raise ValueError(f"unsupported tool protocol: {tool_protocol}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -242,6 +249,7 @@ def generate_turn(
     processor: Any,
     messages: list[dict[str, Any]],
     *,
+    tools: list[dict[str, Any]],
     max_new_tokens: int,
     do_sample: bool = False,
     temperature: float = 1.0,
@@ -251,7 +259,7 @@ def generate_turn(
 
     inputs = processor.apply_chat_template(
         messages,
-        tools=TOOLS,
+        tools=tools,
         tokenize=True,
         add_generation_prompt=True,
         return_dict=True,
@@ -280,6 +288,7 @@ def execute_call(
     *,
     image_search_call_count: int,
     observation_format: str = "verbose-v1",
+    tool_protocol: str = "legacy-v1",
 ) -> tuple[str, bool]:
     name = call["name"]
     arguments = call["arguments"]
@@ -321,6 +330,8 @@ def execute_call(
             raise ValueError(f"unsupported tool observation schema: {observation_format}")
         return entity_tool_observation(results), True
     if name == "text_lookup":
+        if tool_protocol != "legacy-v1":
+            raise ValueError("text_lookup is not registered in official-local-v1")
         if set(arguments) != {"entity_id"}:
             raise ValueError("text_lookup accepts only entity_id")
         result = text_index.lookup(str(arguments["entity_id"]))
@@ -345,6 +356,8 @@ def execute_call(
             raise ValueError(f"unsupported tool observation schema: {observation_format}")
         return text_tool_observation([] if result is None else [result]), False
     if name == "text_search":
+        if tool_protocol != "official-local-v1":
+            raise ValueError("text_search is not registered in legacy-v1")
         if set(arguments) - {"q", "top_k"} or not isinstance(arguments.get("q"), str):
             raise ValueError("text_search requires q and accepts optional top_k")
         top_k = int(arguments.get("top_k", 3))
@@ -435,11 +448,13 @@ def evaluate_task(
     fatal = None
     final_text = ""
     image_search_call_count = 0
+    active_tools = tools_for_protocol(tool_protocol)
     for _ in range(maximum_turns):
         output, input_tokens, output_tokens = generate_turn(
             model,
             processor,
             messages,
+            tools=active_tools,
             max_new_tokens=max_new_tokens,
             do_sample=do_sample,
             temperature=temperature,
@@ -468,6 +483,7 @@ def evaluate_task(
                 text_index,
                 image_search_call_count=image_search_call_count,
                 observation_format=observation_format,
+                tool_protocol=tool_protocol,
             )
         except (ValueError, TypeError) as error:
             fatal = f"tool-error:{error}"

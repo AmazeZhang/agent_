@@ -30,10 +30,15 @@ class ProtocolV8Tests(unittest.TestCase):
             index_path = Path(tmp) / "wiki.sqlite"
             build_text_index(index_path, [{"entity_id": "a", "title": "Alpha subject", "source": "wiki", "text": "Alpha subject has an evidence sentence."}], corpus="test", corpus_revision="1")
             with LocalTextIndex(index_path) as index:
-                observation, _ = EVALUATOR.execute_call({"name": "text_search", "arguments": {"q": "Alpha subject", "top_k": 1}}, {}, index, image_search_call_count=0, observation_format="boundary-compact-v1")
+                observation, _ = EVALUATOR.execute_call({"name": "text_search", "arguments": {"q": "Alpha subject", "top_k": 1}}, {}, index, image_search_call_count=0, observation_format="boundary-compact-v1", tool_protocol="official-local-v1")
                 self.assertIn("Alpha subject", observation)
                 with self.assertRaises(ValueError):
-                    EVALUATOR.execute_call({"name": "text_search", "arguments": {"entity_id": "a"}}, {}, index, image_search_call_count=0)
+                    EVALUATOR.execute_call({"name": "text_search", "arguments": {"entity_id": "a"}}, {}, index, image_search_call_count=0, tool_protocol="official-local-v1")
+
+    def test_protocol_tool_whitelist_excludes_legacy_lookup(self) -> None:
+        names = [item["function"]["name"] for item in EVALUATOR.tools_for_protocol("official-local-v1")]
+        self.assertIn("text_search", names)
+        self.assertNotIn("text_lookup", names)
 
 
 if __name__ == "__main__":
