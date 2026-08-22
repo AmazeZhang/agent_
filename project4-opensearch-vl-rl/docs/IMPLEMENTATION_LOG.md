@@ -671,3 +671,8 @@
 - stochastic rollout 审计器同步支持受限 dataset root 和显式 `evidence-fidelity-v2`，并兼容 v1/v2
   的严格成功字段；其余预声明 group variance/format/fatal 门槛不变。相关 16 个单测、Ruff 和 diff check
   通过；本步纯 CPU、无网络/API/GPU，尚未启动模型 rollout 或 optimizer。
+- v7 小规模难度基线在运行前固定：dev 四类各 1 条，按类内首个 task ID 选择
+  `wit-00001777`（rank3）、`wit-00004467`（rank2）、`wit-00014422`（transient）和
+  `boundary-no-match-dev-000`；先 Base、再既有 v5 SFT1 adapter，均 greedy、`max_new_tokens=192`。
+  评测器新增显式 task-ID 白名单并保持请求顺序，防止用“前 N 条”误采成单一类别。每个模型单独受管
+  Run，只用空闲物理 GPU1；不使用 GPU0/GPU5，不启用 optimizer，结果无论好坏均保留。

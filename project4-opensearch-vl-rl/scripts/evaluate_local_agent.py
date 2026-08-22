@@ -65,6 +65,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset-root", type=Path, default=DATASET_ROOT)
     parser.add_argument("--split", choices=("dev", "test"), default="dev")
     parser.add_argument("--max-tasks", type=int, default=5)
+    parser.add_argument("--task-id", action="append")
     parser.add_argument("--adapter", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-new-tokens", type=int, default=192)
@@ -144,7 +145,10 @@ def observation_schema(manifest: dict[str, Any]) -> str:
 
 
 def load_tasks(
-    split: str, max_tasks: int, dataset_root: Path = DATASET_ROOT
+    split: str,
+    max_tasks: int,
+    dataset_root: Path = DATASET_ROOT,
+    task_ids: list[str] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     if not 1 <= max_tasks <= 20:
         raise ValueError("max_tasks must be between 1 and 20")
@@ -176,6 +180,14 @@ def load_tasks(
             if line.strip()
             and (item := json.loads(line)).get("split") == split
         ]
+    if task_ids:
+        if len(task_ids) != len(set(task_ids)) or len(task_ids) > max_tasks:
+            raise ValueError("task IDs must be unique and no more than max_tasks")
+        tasks_by_id = {str(task["task_id"]): task for task in tasks}
+        missing = set(task_ids) - set(tasks_by_id)
+        if missing:
+            raise KeyError(f"unknown {split} task IDs: {sorted(missing)}")
+        tasks = [tasks_by_id[task_id] for task_id in task_ids]
     return manifest, tasks[:max_tasks]
 
 
@@ -467,7 +479,9 @@ def main() -> int:
     if output.exists():
         raise FileExistsError(f"refusing to overwrite evaluation: {output}")
     dataset_root = validate_dataset_root(args.dataset_root)
-    dataset_manifest, tasks = load_tasks(args.split, args.max_tasks, dataset_root)
+    dataset_manifest, tasks = load_tasks(
+        args.split, args.max_tasks, dataset_root, args.task_id
+    )
     runtime_observation_format = observation_schema(dataset_manifest)
     processor = AutoProcessor.from_pretrained(
         MODEL_ROOT, local_files_only=True, trust_remote_code=False

@@ -1,6 +1,9 @@
 import importlib.util
+import json
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPT = Path(__file__).parents[1] / "scripts/evaluate_local_agent.py"
 SPEC = importlib.util.spec_from_file_location("evaluate_local_agent", SCRIPT)
@@ -85,6 +88,33 @@ class EvaluateLocalAgentTest(unittest.TestCase):
         self.assertIn('"entity_id": "entity-1"', observation)
         self.assertNotIn("source", observation)
         self.assertNotIn("corpus", observation)
+
+    def test_task_id_selection_preserves_requested_order(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_root:
+            root = Path(raw_root)
+            manifest = {
+                "status": "rl-boundary-ready",
+                "image_observation_contains_text_summary": False,
+                "image_runtime_handle": "img_1",
+                "final_response_format": (
+                    "Title: <exact title>\\nEvidence: <first sentence-or-no-match>"
+                ),
+                "evidence_extraction": "first_terminal_punctuation_or_360_characters",
+                "maximum_agent_turns": 5,
+                "text_lookup_summary_max_characters": 360,
+                "image_search_top_k_maximum": 3,
+                "tool_observation_schema": "boundary-compact-v1",
+            }
+            (root / "manifest.json").write_text(json.dumps(manifest))
+            tasks = [{"task_id": task_id, "split": "dev"} for task_id in ("a", "b")]
+            (root / "tasks.jsonl").write_text(
+                "".join(json.dumps(task) + "\n" for task in tasks)
+            )
+            with mock.patch.object(
+                MODULE, "validate_dataset_root", return_value=root
+            ):
+                _, selected = MODULE.load_tasks("dev", 2, root, ["b", "a"])
+            self.assertEqual([task["task_id"] for task in selected], ["b", "a"])
 
     def test_metrics_are_aggregated_without_score_normalisation(self) -> None:
         results = [
