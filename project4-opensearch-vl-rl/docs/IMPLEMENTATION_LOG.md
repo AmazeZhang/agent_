@@ -706,3 +706,16 @@
   evidence-fidelity-v2。dataset/tasks/adapter hash 已固定，批级门槛沿用预声明的
   variable-group `>=0.25`、format-valid `>=0.75`、fatal `<=0.25`。只用物理 GPU1、无网络/API/optimizer；
   不根据运行结果更换题目、reward 或门槛。
+- v7 rollout-only Run `wit-boundary-v7-sft1-rollout-g4n4-20260822`，commit `00df34c`，16 条全部按
+  冻结协议完成。四组 reward/方差依次为 rank3 `0.48545/0`、rank2 `0.95/0`、transient `0/0`、
+  no-match `0/0`；所有 raw/fatal-clamped advantages 均为 0，不能形成任何 GRPO 梯度。
+- 严格分布：rank3 0/4 full success、4/4 query-only partial；rank2 4/4 full success，但均多一次 lookup，
+  故效率折扣到 `0.95`；transient 4/4 在 retry+3 lookup 后耗尽 turns 并 fatal；no-match 4/4 走对工具路径
+  但输出格式错误。批级 variable-group fraction `0 < 0.25`、format-valid `0.50 < 0.75`、fatal
+  `0.25 <= 0.25`，正式 gate 失败，受管 Run 以预期 `exit_code=4` 保留报告；未启动 optimizer。
+- 报告 SHA256 `b0210b7af31457932e39c201c9be594d8de167e7c65f67cbe38ebdaedb14d259`；
+  adapter/manifest/tasks hash 与冻结配置完全一致，stderr 无 traceback/OOM/NaN/Xid。GPU1 启动/结束
+  18 MiB，轮询最高 60°C，cleanup 无 compute process；GPU0/GPU5 未参与，无网络/API。
+- 决策：RL 继续阻断。现有 adapter 是在 v5 上只训 1 step，并未学习 v7 compact protocol；下一步回到
+  晋级链的 v7 SFT 1-step smoke，再做同条件 held-out 和 rollout 门禁。不得通过提高 temperature、事后换题
+  或取消 format 门来人为制造 advantage。
