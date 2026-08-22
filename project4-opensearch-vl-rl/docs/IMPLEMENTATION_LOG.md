@@ -644,3 +644,21 @@
 - 真实 `qwen3_vl_nothink` CPU 离线解析 80/80：每条 1 图，tokens `573–1485`、supervised tokens
   `74–283`，全部低于 2048 且有监督；显式 `CUDA_VISIBLE_DEVICES=`，无网络/API/GPU。v7 通过数据入口
   门禁，可进入分级 reward 的 CPU 历史重放设计；尚未据此启动 SFT 或 RL。
+- evidence-fidelity reward v2：保留总式 `r_format*(0.8*r_answer+0.2*r_query)`；answer 预先固定为
+  `0.5*strict_success+0.2*title_exact+0.3*evidence_token_F1`。格式仍是乘法硬门；完整正确仍为 1，partial
+  evidence 只提供连续但受限的信号。query 只有在正确 entity 的真实 lookup observation 中确实包含 gold
+  evidence 时才成立，再乘 oracle/实际工具数效率；仅调用 entity ID 或 observation 缺证据均为 0。
+- v2 单测覆盖 partial evidence、缺失 observation evidence、retry no-match 未走完整 oracle、旧 v1 格式门和
+  fatal clamp。旧 rules-v1 默认入口和历史报告保持不变；重放脚本通过显式 `--reward-version` 选择 v2。
+- 历史 dev20 CPU 重放：Base/SFT1 的 `r_exact/r_title/r_evidence_f1/r_answer/r_query/total` 均为
+  `0.55/0.95/0.74055/0.68717/0.90/0.72973`；SFT5 为
+  `0.50/0.95/0.71560/0.65468/0.85/0.69374`，仍正确识别整体回归。
+- 分层一致性：SFT5 candidate-conflict total 从 `0.63648` 升到 `0.72689`，但 transient 从
+  `0.75640` 降到 `0.51589`，与严格指标的 trade-off 一致。已知 `wit-00012098` 从 Base/SFT1 `1.0`
+  降至 SFT5 `0.048`（title 错、evidence F1 0.2、未取得正确 evidence），没有被连续分掩盖。
+- reward-hacking 检查：Base/SFT1 的 9 条、SFT5 的 10 条严格错误轨迹中，最高 v2 reward 均仅 `0.552`，
+  错误轨迹 `>=0.8` 为 0。报告 SHA256
+  `0221e41eb45638149eeaadc34d91d824dd3785cff38a60b81980af3e88ca9671`，路径
+  `offline-evidence-fidelity-v2-replay-base-sft1-sft5-20260822.json`；CPU、无网络/API/GPU。
+- 判断：v2 通过历史排序和初步防投机门，可接入 v7 rollout-only evaluator；仍须用新随机轨迹检查是否真正
+  产生组内方差，不能因为历史重放更细就直接启动 optimizer。
