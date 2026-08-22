@@ -14,7 +14,7 @@
 | P0 受管运行 | 已完成并推送；真实 GPU1 preflight 和受管 smoke 通过 |
 | 推理环境 | 8B 基座已校验；离线单图生成通过 |
 | SFT 环境/训练 | 合成 agentic 数据 1→2→5 step LoRA、断点续训和 adapter 离线推理闭环通过 |
-| RL 环境/训练 | 已完成 API/资源门禁和 RL-8K 元数据审计；正在准备本地优先多模态检索，尚未启动 RL |
+| RL 环境/训练 | 本地 reward/rollout-only 已通；首个随机组审计因组内零方差拒绝进入 optimizer，尚未启动 RL 更新 |
 | 消融 | 未开始 |
 | 本地效果结论 | 无；不得引用上游论文数字作为本地结果 |
 
@@ -37,7 +37,7 @@
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 本地工具闭环已通 | 固定模型/数据、本地工具安全补丁通过 | 基座单图 smoke；WIT image/text 双工具真实轨迹可执行 |
 | P4 Agentic SFT | challenge-v5 1-step 完成 | 检索验证数据与 loss mask 通过 | 新协议 checkpoint 已生成，待固定 dev20 复评 |
-| P5 SFT→RL rollout-only | challenge Base dev20 完成 | challenge SFT 通过固定对照 | Base full success 0.55；待 challenge SFT 1-step/复评 |
+| P5 SFT→RL rollout-only | 首个随机组审计完成但未过门 | challenge SFT 通过固定对照 | SFT1 两个 train prompt 各 4 轨迹均为组内零方差 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -584,3 +584,19 @@
   `deterministic-rules-only-no-api`。构建、测试和重放均为 CPU，无网络/API/GPU。
 - RL 门禁：贪心单轨迹没有组内 reward 方差，不能直接形成 GRPO 更新。下一步必须先做 1–2 个 train task、
   每题少量随机 rollout 的 group variance/reward hacking 审计；通过前不启动 optimizer step。
+- 随机 rollout 审计实现：`audit_stochastic_rollout_groups.py` 复用同一真实本地工具执行器，固定 seed、
+  temperature/top-p 和 adapter/data hash；每条保留完整 turn、tool observation、fatal、分项 reward 和
+  fatal-aware advantage。输出明确标记 `no-optimizer-no-api`，门禁失败仍原子保留报告并返回非零退出码。
+- 首个随机组 Run：`wit-agent-challenge-v5-sft1-stochastic-groups4-20260822`，固定 commit `79c1131`，
+  SFT1 adapter；两个 train task 各 4 条，`temperature=0.7/top_p=0.9`，物理 GPU1。candidate-conflict
+  `wit-00000885` 四次均输出同一错误实体，reward 全为 `0.15`；transient `wit-00008586` 四次均严格
+  正确，reward 全为 `1.0`。两组 population variance 均为 `0`，raw/clamped advantage 全为 `0`。
+- 完整性解释：candidate 组 4/4 都是 query-only reward，报告没有把它们算作 accuracy；transient 组
+  4/4 accuracy/query/format 都通过。8/8 格式合法、0 fatal，因此失败不是工具协议或格式崩溃，而是当前
+  prompt/采样设置下策略与离散 reward 都饱和。不得用跨 prompt 均值差伪造组内 GRPO 方差。
+- 报告 SHA256 `082174558e55181349c8854be6498a321f29bdcbe34035462a311f94afdf8889`；受管 Run
+  按预期 `exit_code=4` 表示门禁未过，cleanup `compute_processes=none`。GPU1 峰值观测约 18.4 GiB、
+  64°C；结束后 18 MiB，GPU0/5 未参与。
+- 决策：不启动 1-step GRPO。下一轮应先在不改 reward 的前提下做有界采样校准（更接近上游 rollout
+  temperature，并选择更多非饱和 train prompt）；门槛和失败报告必须预先固定。若仍大面积零方差，
+  再讨论可追溯的 evidence fidelity shaping，而不是事后归一化或把跨题差异当作组内 advantage。
