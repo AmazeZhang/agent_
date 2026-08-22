@@ -1,6 +1,6 @@
 import unittest
 
-from scripts.audit_stochastic_rollout_groups import summarize_group
+from scripts.audit_stochastic_rollout_groups import evaluate_batch_gate, summarize_group
 
 
 def _item(reward: float, *, fatal: bool = False, success: bool = False) -> dict:
@@ -27,6 +27,27 @@ class StochasticRolloutAuditTest(unittest.TestCase):
         self.assertEqual(summary["query_only_reward_count"], 1)
         self.assertEqual(summary["fatal_count"], 1)
         self.assertEqual(summary["advantages"]["fatal_clamped"][-1], 0.0)
+
+    def test_batch_gate_requires_predeclared_variable_group_fraction(self) -> None:
+        variable = summarize_group([_item(1.0, success=True), _item(0.0)])
+        constant = summarize_group([_item(1.0, success=True), _item(1.0, success=True)])
+        gate = evaluate_batch_gate(
+            [{"summary": variable}, {"summary": constant}, {"summary": constant}]
+        )
+        self.assertTrue(gate["passed"])
+        self.assertEqual(gate["variable_group_fraction"], 1 / 3)
+
+    def test_batch_gate_rejects_zero_variance_and_fatal_collapse(self) -> None:
+        constant = summarize_group([_item(1.0, success=True), _item(1.0, success=True)])
+        zero_variance = evaluate_batch_gate([{"summary": constant}] * 4)
+        self.assertFalse(zero_variance["passed"])
+
+        fatal = summarize_group([_item(0.0, fatal=True), _item(0.0, fatal=True)])
+        variable = summarize_group([_item(1.0, success=True), _item(0.0)])
+        fatal_collapse = evaluate_batch_gate(
+            [{"summary": variable}, {"summary": fatal}]
+        )
+        self.assertFalse(fatal_collapse["passed"])
 
 
 if __name__ == "__main__":

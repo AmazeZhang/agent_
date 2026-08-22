@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "purpose": "predeclared rollout-only calibration; no optimizer and no API",
+  "selection_rule": "lexicographically first train task not used by calibration v1, one per task type",
+  "task_ids": [
+    "wit-00000937",
+    "wit-00002223",
+    "no-match-train-000",
+    "wit-00008826"
+  ],
+  "task_types": [
+    "candidate-conflict",
+    "clean",
+    "no-match",
+    "transient-tool-failure"
+  ],
+  "generation": {
+    "rollouts_per_task": 4,
+    "base_seed": 20260830,
+    "temperature": 0.7,
+    "top_p": 1.0,
+    "max_new_tokens": 192
+  },
+  "upstream_alignment": {
+    "source": "vendor/OpenSearch-VL/RL/rllm/vision_deepresearch_async_workflow/run/qwen3-vl-8b-single-node.sh",
+    "temperature": 0.7,
+    "top_p": 1.0,
+    "top_k": -1,
+    "note": "Transformers top_p=1.0 is untruncated multinomial sampling; no explicit top-k filter is passed."
+  },
+  "gate": {
+    "minimum_variable_group_fraction": 0.25,
+    "minimum_format_valid_fraction": 0.75,
+    "maximum_fatal_fraction": 0.25,
+    "note": "Zero-variance groups contribute zero GRPO gradient and are allowed, but at least one of four groups must have nonzero within-prompt reward variance."
+  },
+  "frozen_inputs": {
+    "dataset_manifest_sha256": "341194a665682699853fe6704d45bfe49f5e520179011b29b092cb666a7cbbf1",
+    "tasks_sha256": "14435f66801d623ff55045693a31c55cf139f82a6985d2aa24a0c73a1ba6e70b",
+    "adapter_sha256": "637169695b4b96022e003b2ad59bea780288da0c31aab94a1c64f962856399f5"
+  }
+}

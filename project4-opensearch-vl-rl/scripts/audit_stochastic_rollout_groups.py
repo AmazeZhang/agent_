@@ -26,6 +26,10 @@ from scripts.evaluate_local_agent import (
     validate_adapter,
 )
 
+MINIMUM_VARIABLE_GROUP_FRACTION = 0.25
+MINIMUM_FORMAT_VALID_FRACTION = 0.75
+MAXIMUM_FATAL_FRACTION = 0.25
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -33,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rollouts", type=int, default=4)
     parser.add_argument("--seed", type=int, default=20260822)
     parser.add_argument("--temperature", type=float, default=0.7)
-    parser.add_argument("--top-p", type=float, default=0.9)
+    parser.add_argument("--top-p", type=float, default=1.0)
     parser.add_argument("--max-new-tokens", type=int, default=192)
     parser.add_argument("--adapter", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -41,8 +45,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_selected_tasks(task_ids: list[str]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    if not 1 <= len(task_ids) <= 2 or len(task_ids) != len(set(task_ids)):
-        raise ValueError("provide one or two unique task IDs")
+    if not 1 <= len(task_ids) <= 8 or len(task_ids) != len(set(task_ids)):
+        raise ValueError("provide between one and eight unique task IDs")
     with (DATASET_ROOT / "manifest.json").open(encoding="utf-8") as handle:
         manifest = json.load(handle)
     with (DATASET_ROOT / "tasks.jsonl").open(encoding="utf-8") as handle:
@@ -77,6 +81,44 @@ def summarize_group(items: list[dict[str, Any]]) -> dict[str, Any]:
             for item in items
         ),
         "advantages": advantages,
+    }
+
+
+def evaluate_batch_gate(groups: list[dict[str, Any]]) -> dict[str, Any]:
+    if not groups:
+        raise ValueError("cannot gate an empty rollout batch")
+    rollout_count = sum(group["summary"]["rollout_count"] for group in groups)
+    variable_group_count = sum(
+        group["summary"]["reward_population_variance"] > 0 for group in groups
+    )
+    format_valid_count = sum(
+        group["summary"]["format_valid_count"] for group in groups
+    )
+    fatal_count = sum(group["summary"]["fatal_count"] for group in groups)
+    variable_group_fraction = variable_group_count / len(groups)
+    format_valid_fraction = format_valid_count / rollout_count
+    fatal_fraction = fatal_count / rollout_count
+    return {
+        "variable_group_count": variable_group_count,
+        "group_count": len(groups),
+        "variable_group_fraction": variable_group_fraction,
+        "minimum_variable_group_fraction": MINIMUM_VARIABLE_GROUP_FRACTION,
+        "format_valid_fraction": format_valid_fraction,
+        "minimum_format_valid_fraction": MINIMUM_FORMAT_VALID_FRACTION,
+        "fatal_fraction": fatal_fraction,
+        "maximum_fatal_fraction": MAXIMUM_FATAL_FRACTION,
+        "has_nonzero_advantage": variable_group_count > 0,
+        "passed": (
+            variable_group_fraction >= MINIMUM_VARIABLE_GROUP_FRACTION
+            and format_valid_fraction >= MINIMUM_FORMAT_VALID_FRACTION
+            and fatal_fraction <= MAXIMUM_FATAL_FRACTION
+        ),
+        "note": (
+            "The batch gate allows zero-variance prompts because they contribute zero GRPO "
+            "gradient, but requires a predeclared minimum variable-group fraction. Passing "
+            "authorizes only a separately reviewed one-step GRPO smoke; it is not evidence "
+            "of policy improvement. Query-only reward remains disclosed per group."
+        ),
     }
 
 
@@ -159,13 +201,7 @@ def main() -> int:
                 }
             )
 
-    variance_pass = all(
-        group["summary"]["reward_population_variance"] > 0 for group in groups
-    )
-    format_pass = all(
-        group["summary"]["format_valid_count"] > 0 for group in groups
-    )
-    nonfatal_pass = all(group["summary"]["fatal_count"] < args.rollouts for group in groups)
+    gate = evaluate_batch_gate(groups)
     repo_commit = subprocess.run(
         ["git", "-C", str(PROJECT_ROOT.parent), "rev-parse", "HEAD"],
         check=True,
@@ -173,7 +209,7 @@ def main() -> int:
         text=True,
     ).stdout.strip()
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "mode": "stochastic-rollout-only-no-optimizer-no-api",
         "repo_commit": repo_commit,
         "model": str(MODEL_ROOT),
@@ -191,17 +227,7 @@ def main() -> int:
             "max_new_tokens": args.max_new_tokens,
         },
         "groups": groups,
-        "gate": {
-            "variance_nonzero_for_every_group": variance_pass,
-            "at_least_one_valid_format_per_group": format_pass,
-            "not_all_fatal_per_group": nonfatal_pass,
-            "passed": variance_pass and format_pass and nonfatal_pass,
-            "note": (
-                "Passing authorizes only a separately reviewed one-step GRPO smoke; "
-                "it is not evidence of policy improvement. Query-only reward is disclosed "
-                "per group and capped by the 0.2 query weight."
-            ),
-        },
+        "gate": gate,
     }
     with output.open("x", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
