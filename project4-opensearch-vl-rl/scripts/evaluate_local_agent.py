@@ -48,8 +48,26 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "text_search",
+            "description": (
+                "Search frozen local Wikipedia evidence with a natural-language query. "
+                "Results contain a title, source, and short evidence summary."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "q": {"type": "string", "minLength": 1, "maxLength": 1000},
+                    "top_k": {"type": "integer", "minimum": 1, "maximum": 3},
+                },
+                "required": ["q"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "text_lookup",
-            "description": "Look up local Wikipedia evidence by entity ID.",
+            "description": "Legacy compatibility lookup by entity ID; do not use in protocol v8.",
             "parameters": {
                 "type": "object",
                 "properties": {"entity_id": {"type": "string"}},
@@ -91,6 +109,12 @@ def normalise(text: str) -> str:
 
 
 def score_final(text: str, task: dict[str, Any]) -> dict[str, bool]:
+    response_match = re.fullmatch(r"\s*<response>\s*(.*?)\s*</response>\s*", text, re.DOTALL)
+    requires_response_wrapper = task.get("final_response_wrapper") == "response-v1"
+    if requires_response_wrapper and response_match is None:
+        return {"format_valid": False, "title_exact": False, "evidence_exact": False}
+    if response_match is not None:
+        text = response_match.group(1)
     title_match = re.search(r"(?:^|\n)Title:\s*(.+?)(?:\n|$)", text)
     evidence_match = re.search(r"(?:^|\n)Evidence:\s*(.+?)\s*$", text, re.DOTALL)
     format_valid = title_match is not None and evidence_match is not None
@@ -144,6 +168,13 @@ def observation_schema(manifest: dict[str, Any]) -> str:
     return schema
 
 
+def protocol_version(manifest: dict[str, Any]) -> str:
+    protocol = str(manifest.get("tool_protocol", "legacy-v1"))
+    if protocol not in {"legacy-v1", "official-local-v1"}:
+        raise ValueError(f"unsupported tool protocol: {protocol}")
+    return protocol
+
+
 def load_tasks(
     split: str,
     max_tasks: int,
@@ -156,14 +187,18 @@ def load_tasks(
     with (dataset_root / "manifest.json").open(encoding="utf-8") as handle:
         manifest = json.load(handle)
     if (
-        manifest.get("status") not in {"challenge-ready", "rl-boundary-ready"}
+        manifest.get("status")
+        not in {"challenge-ready", "rl-boundary-ready", "rl-protocol-ready"}
         or manifest.get("image_observation_contains_text_summary") is not False
         or manifest.get("image_runtime_handle") != "img_1"
         or manifest.get("final_response_format")
-        != "Title: <exact title>\\nEvidence: <first sentence-or-no-match>"
+        not in {
+            "Title: <exact title>\\nEvidence: <first sentence-or-no-match>",
+            "<response>Title: <exact title>\\nEvidence: <first sentence-or-no-match></response>",
+        }
         or manifest.get("evidence_extraction")
         != "first_terminal_punctuation_or_360_characters"
-        or manifest.get("maximum_agent_turns") != 5
+        or manifest.get("maximum_agent_turns") not in {5, 8}
         or manifest.get("text_lookup_summary_max_characters") != 360
         or manifest.get("image_search_top_k_maximum") != 3
     ):
@@ -309,6 +344,31 @@ def execute_call(
         if observation_format != "verbose-v1":
             raise ValueError(f"unsupported tool observation schema: {observation_format}")
         return text_tool_observation([] if result is None else [result]), False
+    if name == "text_search":
+        if set(arguments) - {"q", "top_k"} or not isinstance(arguments.get("q"), str):
+            raise ValueError("text_search requires q and accepts optional top_k")
+        top_k = int(arguments.get("top_k", 3))
+        if not 1 <= top_k <= 3:
+            raise ValueError("text_search top_k must be between 1 and 3")
+        matches = text_index.search(arguments["q"], top_k=top_k)
+        if observation_format == "boundary-compact-v1":
+            payload = {
+                "backend": "frozen_local_wikipedia_search",
+                "match_count": len(matches),
+                "results": [
+                    {
+                        "entity_id": str(match["entity_id"]),
+                        "title": str(match["title"]),
+                        "source": str(match["source"]),
+                        "summary": str(match["summary"]),
+                    }
+                    for match in matches
+                ],
+            }
+            return "Tool execution result:\n" + json.dumps(
+                payload, ensure_ascii=False, indent=2, sort_keys=True
+            ), False
+        return text_tool_observation(matches), False
     raise ValueError(f"unsupported tool: {name}")
 
 
@@ -325,6 +385,8 @@ def evaluate_task(
     seed: int | None = None,
     dataset_root: Path = DATASET_ROOT,
     observation_format: str = "verbose-v1",
+    maximum_turns: int = 5,
+    tool_protocol: str = "legacy-v1",
 ) -> dict[str, Any]:
     if seed is not None:
         import torch
@@ -344,10 +406,15 @@ def evaluate_task(
                     "text": (
                         "Use one tool call per turn. Pass the literal handle img_1 to "
                         "image_search; do not replace it with a filename or image description. "
-                        "Image search returns entity candidates only; text_lookup supplies "
-                        "answer evidence. Retry a tool only when its error says retryable=true. "
-                        "Do not invent missing evidence. The final response must contain exactly "
-                        "two lines named Title and Evidence."
+                        "Image search returns entity candidates only. "
+                        + (
+                            "Use text_search with a natural-language query to verify evidence. "
+                            "Reply exactly once with <response> containing Title and Evidence lines. "
+                            if tool_protocol == "official-local-v1"
+                            else "text_lookup supplies answer evidence. The final response must contain exactly "
+                            "two lines named Title and Evidence. "
+                        )
+                        + "Retry a tool only when its error says retryable=true. Do not invent missing evidence."
                     ),
                 }
             ],
@@ -368,7 +435,7 @@ def evaluate_task(
     fatal = None
     final_text = ""
     image_search_call_count = 0
-    for _ in range(5):
+    for _ in range(maximum_turns):
         output, input_tokens, output_tokens = generate_turn(
             model,
             processor,
@@ -483,6 +550,7 @@ def main() -> int:
         args.split, args.max_tasks, dataset_root, args.task_id
     )
     runtime_observation_format = observation_schema(dataset_manifest)
+    runtime_protocol = protocol_version(dataset_manifest)
     processor = AutoProcessor.from_pretrained(
         MODEL_ROOT, local_files_only=True, trust_remote_code=False
     )
@@ -511,6 +579,8 @@ def main() -> int:
                 max_new_tokens=args.max_new_tokens,
                 dataset_root=dataset_root,
                 observation_format=runtime_observation_format,
+                maximum_turns=int(dataset_manifest["maximum_agent_turns"]),
+                tool_protocol=runtime_protocol,
             )
             results.append(result)
             print(
@@ -545,6 +615,7 @@ def main() -> int:
         "dataset_manifest_sha256": sha256_file(dataset_root / "manifest.json"),
         "tasks_sha256": sha256_file(dataset_root / "tasks.jsonl"),
         "tool_observation_schema": runtime_observation_format,
+        "tool_protocol": runtime_protocol,
         "split": args.split,
         "task_count": len(results),
         "task_ids": [result["task_id"] for result in results],

@@ -10,7 +10,7 @@
 ```text
 图片 + 知识型问题
   -> 模型识别信息缺口
-  -> crop / OCR / image_search / text_lookup
+  -> crop / OCR / image_search / text_search
   -> 根据 observation 继续多轮决策
   -> 输出有本地证据支持的最终答案
   -> Agentic SFT 冷启动
@@ -37,7 +37,7 @@
 | 原项目 | 本项目 |
 |---|---|
 | 开放 Web image/text search | 固定 revision 的 WIT/Wikimedia 图像与 Wikipedia 文本索引 |
-| Serper/Jina/外部视觉搜索 | 本地 `image_search` 与 `text_lookup`，无 API key |
+| Serper/Jina/外部视觉搜索 | 本地 `image_search` 与自然语言 `text_search`，无 API key |
 | 原始 RL-8K 全量开放环境 | 可执行原始子集 + 有 provenance 的 `offline-agentic-rl` 派生集 |
 | 36K 全参数 LLM/ViT/projector SFT | 先 LoRA/QLoRA 缩放复现；资源验证后再讨论更大设置 |
 | 大集群异步 Megatron 训练 | 当前主机可承载的有界 GRPO；必要时保持 rLLM/verl 接口但缩小并行度 |
@@ -95,7 +95,7 @@ no-match 幻觉率、fatal 比例，以及按任务类型分层的 reward。不�
 1. 完成 RL 图片资产校验、安全解压和 7,992 条引用审计；
 2. 完成 200 条分层清单；
 3. 下载一个 WIT shard 并固定真实 schema；
-4. 完成本地 `image_search`/`text_lookup` 与多跳数据 pilot；**已完成**；
+4. 完成本地 `image_search`/`text_search` 与多跳数据 pilot；**已完成**；
 5. 运行 Base 固定评测；**v4 clean dev5 已完成且满分，只作执行正控**；
 6. 扩充候选冲突、no-match、工具失败恢复并重跑 Base；**challenge-v5 Base dev20 已完成，full success 0.55**；
 7. 运行新协议真实数据小规模 SFT 并复评；**step5 总体回归，停止扩大并审计任务平衡**；

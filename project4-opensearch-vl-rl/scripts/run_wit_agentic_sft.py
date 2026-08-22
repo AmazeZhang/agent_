@@ -77,6 +77,15 @@ def dataset_profile(manifest: dict[str, object]) -> tuple[str, str]:
         }
         dataset_name = "wit_agentic_train_v6"
         split_unit = "all-top3-candidate-entity-ids-or-synthetic-probe-id"
+    elif identity == ("rl-protocol-ready", "local-agentic-official-protocol-sft-rl"):
+        expected_types = {
+            "dual-clue-rank2": 36,
+            "dual-clue-rank3": 36,
+            "no-match-after-retry": 24,
+            "transient-dual-clue": 24,
+        }
+        dataset_name = "wit_agentic_train_v8"
+        split_unit = "all-top3-candidate-entity-ids-or-synthetic-probe-id"
     else:
         raise ValueError("dataset manifest identity is not an approved SFT profile")
     if manifest.get("task_type_counts") != expected_types:
@@ -91,10 +100,14 @@ def validate_dataset(root: Path) -> dict[str, object]:
     required = {
         "image_observation_contains_text_summary": False,
         "image_runtime_handle": "img_1",
-        "final_response_format": "Title: <exact title>\\nEvidence: <first sentence-or-no-match>",
+        "final_response_format": (
+            "<response>Title: <exact title>\\nEvidence: <first sentence-or-no-match></response>"
+            if manifest.get("tool_protocol") == "official-local-v1"
+            else "Title: <exact title>\\nEvidence: <first sentence-or-no-match>"
+        ),
         "evidence_extraction": "first_terminal_punctuation_or_360_characters",
         "split_unit": split_unit,
-        "maximum_agent_turns": 5,
+        "maximum_agent_turns": 8 if manifest.get("tool_protocol") == "official-local-v1" else 5,
         "text_lookup_summary_max_characters": 360,
         "image_search_top_k_maximum": 3,
     }

@@ -803,3 +803,25 @@
   hash 匹配，无异常。GPU1 启动/结束 18 MiB、轮询最高 61°C、cleanup 无 compute process；GPU0/GPU5
   未参与，无网络/API。结论：4 rollouts 已足以发现方差，当前没有必要增到 8；瓶颈明确是 transient 与
   no-match 的格式/turn-budget，而不是纯粹 rollout 数量。本轮按用户要求停止，不做更多大规模改动。
+
+### 2026-08-22：v8 官方式本地协议对齐（CPU 与数据发布）
+
+- 源码对照结论：官方 agent 使用自然语言 `text_search(q, top_k)`、`<response>...</response>` 最终包裹、
+  单动作循环和最多 50 次模型调用；无效动作与临时工具错误会以 observation 反馈重试。v7 并非只替换了
+  搜索内容，还额外压缩为 `text_lookup(entity_id)`、两行裸 final 和 5 turn，导致 transient/no-match 的
+  失败不能归因到 SFT 或 RL 方法本身。
+- 变更：新增 `official-local-v1` 兼容协议。冻结 WIT/Wikipedia 后端保持不联网、无 API key，但模型改用
+  `image_search(image=img_1)` 后的 `text_search(q, top_k)` 取回 `entity_id/title/source/summary`；最终回答
+  必须置于 `<response>`，且为可审计的本地 benchmark 保留内部 `Title/Evidence` 字段。v7 的 legacy
+  evaluator 与数据入口继续兼容，未被覆盖。
+- 数据：从不可变 `wit-rl-boundary-v7` 非覆盖派生
+  `/media/imc/data/yzy/agent/project4-opensearch-vl-rl/datasets/processed/wit-rl-protocol-v8`。保持 120 条、
+  80/20/20、图像与 split 不变；将专家轨迹/Oracle 的 `text_lookup` 全部改为 `text_search`，最大动作数仅从
+  5 放宽到 8（刻意不直接照搬官方 50）。v8 manifest 和 SFT launcher 的 SHA/profile 校验均通过。
+- 验证：新增 CPU 合约测试，覆盖 `<response>` 强制门与 `text_search` 不接受 entity_id；既有 evaluator、
+  SFT launcher、local-text-retrieval、fatal-aware reward 共 20 个相关测试通过，`py_compile` 与
+  `git diff --check` 通过。对首条真实任务的冻结索引查询返回同一候选的 title/source/summary。
+- 边界与下一步：本次未下载、未联网、未调用 API、未启动 GPU/SFT/RL，也未变更优化器或 reward 公式。
+  后续只允许 v8 的 1-step LoRA SFT smoke（GPU1、受管 tmux、无 GPU0/GPU5、无网络/API），再做固定 dev20
+  对照；通过后才重新冻结 4-rollout gate。任何达到 20 step、扩卡、GPU5 使用或 RL optimizer 更新仍需在
+  执行前重新说明并获得用户确认。
