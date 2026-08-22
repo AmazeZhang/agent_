@@ -1175,3 +1175,22 @@ LR 调度分段问题：300 步总调度长度 vs 50/100/300 段停止点拆分�
   retriever 测试属另一环境，排除）。
 
 **下一步：等待 Step 0–50 单独批准后启动正式训练（本阶段未启动 GPU）。**
+
+---
+
+## 2026-08-22 追加：Search-aware GRPO 10-step 实验收尾（结果报告）
+
+- **10-step 训练完成**：`p3-search-aware-instruct-grpo10-fsdp6-b66-n5-s0-20260822a`，exit 0，
+  3:28:05，gs5+gs10 checkpoint 完整，无 OOM/NaN/Xid/掉卡。配置指纹
+  `6e861cde…`；merged 模型 SHA `d00d0d7f…`/`391039c2…`，verify PASS。
+- **评测完成**：official-confirm256-v1 greedy GPU1-only，EM **11.7%（30/256）**，搜索率 24.2%，
+  **search→correct = 0/62**，搜索轨迹无一产出答案；全部答对题来自闭卷。
+- **方向判断：C（搜索率持续下降，shaping 不足返回诊断）**。训练内搜索率 83.3%→23.6%，
+  useful-search 169→40/330；EM 从 patched Step0 的 8.2% 微升至 11.7% 但全来自闭卷，
+  不能视为 search-aware reward 正面证据。clean GRPO10（28.9%）/GiGPO10（27.0%）仅作辅助参照
+  （patched/clean 语义差异已字节级确认，不声称"唯一变量只有 reward"）。
+- **问题与解决**：(1) 评测 search→answer=0 与训练内不可见的查询格式退化（greedy 下
+  invalid 41.9%）——诊断项，未自动调参；(2) redundant 惩罚主导策略演化，模型学会"少搜"。
+- **收尾**：监控 cron 与本轮 tmux 会话已清除，GPU 回基线，不启动 50 步/GiGPO，不修改
+  final-confirm512。完整数字见
+  `docs/P3_SEARCH_AWARE_GRPO10_RESULT_REPORT_2026-08-22.md`。
