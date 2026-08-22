@@ -662,3 +662,12 @@
   `offline-evidence-fidelity-v2-replay-base-sft1-sft5-20260822.json`；CPU、无网络/API/GPU。
 - 判断：v2 通过历史排序和初步防投机门，可接入 v7 rollout-only evaluator；仍须用新随机轨迹检查是否真正
   产生组内方差，不能因为历史重放更细就直接启动 optimizer。
+- v7 真实评测接入：`evaluate_local_agent.py` 新增受限 `--dataset-root`，仅允许项目 data 盘下现存的
+  processed dataset；同时校验 no-leak 公共合约、可选 tasks hash 和 `tool_observation_schema`。v5 默认
+  行为保持不变，v7 自动选择 `boundary-compact-v1`，报告固定实际 dataset path/hash/schema。
+- 训练/推理一致性：运行时 compact image observation 只保留 `entity_id/title/similarity`，text
+  observation 只保留 `entity_id/title/summary`。用真实 v7 首条 train 任务 `wit-00000885` 和 SQLite
+  index 逐字节比对，image/text 两种运行时 observation 均与 `sft_train.json` 完全相同。
+- stochastic rollout 审计器同步支持受限 dataset root 和显式 `evidence-fidelity-v2`，并兼容 v1/v2
+  的严格成功字段；其余预声明 group variance/format/fatal 门槛不变。相关 16 个单测、Ruff 和 diff check
+  通过；本步纯 CPU、无网络/API/GPU，尚未启动模型 rollout 或 optimizer。

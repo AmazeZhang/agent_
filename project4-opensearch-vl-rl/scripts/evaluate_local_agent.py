@@ -62,6 +62,7 @@ TOOLS = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset-root", type=Path, default=DATASET_ROOT)
     parser.add_argument("--split", choices=("dev", "test"), default="dev")
     parser.add_argument("--max-tasks", type=int, default=5)
     parser.add_argument("--adapter", type=Path)
@@ -127,13 +128,31 @@ def require_managed_run(environment: dict[str, str]) -> tuple[Path, str]:
     return run_dir, visible
 
 
-def load_tasks(split: str, max_tasks: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def validate_dataset_root(raw_root: Path) -> Path:
+    root = raw_root.resolve()
+    allowed = (PROJECT_DATA / "datasets/processed").resolve()
+    if not root.is_relative_to(allowed) or not root.is_dir():
+        raise ValueError("dataset root must be an existing project4 processed dataset")
+    return root
+
+
+def observation_schema(manifest: dict[str, Any]) -> str:
+    schema = str(manifest.get("tool_observation_schema", "verbose-v1"))
+    if schema not in {"verbose-v1", "boundary-compact-v1"}:
+        raise ValueError(f"unsupported tool observation schema: {schema}")
+    return schema
+
+
+def load_tasks(
+    split: str, max_tasks: int, dataset_root: Path = DATASET_ROOT
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     if not 1 <= max_tasks <= 20:
         raise ValueError("max_tasks must be between 1 and 20")
-    with (DATASET_ROOT / "manifest.json").open(encoding="utf-8") as handle:
+    dataset_root = validate_dataset_root(dataset_root)
+    with (dataset_root / "manifest.json").open(encoding="utf-8") as handle:
         manifest = json.load(handle)
     if (
-        manifest.get("status") != "challenge-ready"
+        manifest.get("status") not in {"challenge-ready", "rl-boundary-ready"}
         or manifest.get("image_observation_contains_text_summary") is not False
         or manifest.get("image_runtime_handle") != "img_1"
         or manifest.get("final_response_format")
@@ -145,7 +164,12 @@ def load_tasks(split: str, max_tasks: int) -> tuple[dict[str, Any], list[dict[st
         or manifest.get("image_search_top_k_maximum") != 3
     ):
         raise ValueError("evaluation dataset is not a verified no-leak pilot")
-    with (DATASET_ROOT / "tasks.jsonl").open(encoding="utf-8") as handle:
+    observation_schema(manifest)
+    task_path = dataset_root / "tasks.jsonl"
+    expected_tasks_hash = manifest.get("tasks_sha256")
+    if expected_tasks_hash is not None and expected_tasks_hash != sha256_file(task_path):
+        raise ValueError("evaluation task file does not match its manifest hash")
+    with task_path.open(encoding="utf-8") as handle:
         tasks = [
             item
             for line in handle
@@ -208,6 +232,7 @@ def execute_call(
     text_index: LocalTextIndex,
     *,
     image_search_call_count: int,
+    observation_format: str = "verbose-v1",
 ) -> tuple[str, bool]:
     name = call["name"]
     arguments = call["arguments"]
@@ -228,11 +253,49 @@ def execute_call(
                 True,
             )
         results = task["retrieval_results"][:top_k]
+        if observation_format == "boundary-compact-v1":
+            payload = {
+                "backend": "local_visual_index",
+                "evidence_scope": "entity-candidates-only",
+                "match_count": len(results),
+                "results": [
+                    {
+                        "entity_id": str(result["entity_id"]),
+                        "title": str(result["title"]),
+                        "similarity": float(result["similarity"]),
+                    }
+                    for result in results
+                ],
+            }
+            return "Tool execution result:\n" + json.dumps(
+                payload, ensure_ascii=False, indent=2, sort_keys=True
+            ), True
+        if observation_format != "verbose-v1":
+            raise ValueError(f"unsupported tool observation schema: {observation_format}")
         return entity_tool_observation(results), True
     if name == "text_lookup":
         if set(arguments) != {"entity_id"}:
             raise ValueError("text_lookup accepts only entity_id")
         result = text_index.lookup(str(arguments["entity_id"]))
+        if observation_format == "boundary-compact-v1":
+            matches = [] if result is None else [result]
+            payload = {
+                "backend": "local_text_index",
+                "match_count": len(matches),
+                "results": [
+                    {
+                        "entity_id": str(match["entity_id"]),
+                        "title": str(match["title"]),
+                        "summary": str(match["summary"]),
+                    }
+                    for match in matches
+                ],
+            }
+            return "Tool execution result:\n" + json.dumps(
+                payload, ensure_ascii=False, indent=2, sort_keys=True
+            ), False
+        if observation_format != "verbose-v1":
+            raise ValueError(f"unsupported tool observation schema: {observation_format}")
         return text_tool_observation([] if result is None else [result]), False
     raise ValueError(f"unsupported tool: {name}")
 
@@ -248,13 +311,15 @@ def evaluate_task(
     temperature: float = 1.0,
     top_p: float = 1.0,
     seed: int | None = None,
+    dataset_root: Path = DATASET_ROOT,
+    observation_format: str = "verbose-v1",
 ) -> dict[str, Any]:
     if seed is not None:
         import torch
 
         torch.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
-    image_path = resolve_local_image(Path(task["query_image"]), DATASET_ROOT)
+    image_path = resolve_local_image(Path(task["query_image"]), dataset_root)
     with Image.open(image_path) as image:
         image.load()
         query_image = image.convert("RGB")
@@ -323,6 +388,7 @@ def evaluate_task(
                 task,
                 text_index,
                 image_search_call_count=image_search_call_count,
+                observation_format=observation_format,
             )
         except (ValueError, TypeError) as error:
             fatal = f"tool-error:{error}"
@@ -400,7 +466,9 @@ def main() -> int:
         raise ValueError("evaluation output must be the managed Run evaluation.json")
     if output.exists():
         raise FileExistsError(f"refusing to overwrite evaluation: {output}")
-    dataset_manifest, tasks = load_tasks(args.split, args.max_tasks)
+    dataset_root = validate_dataset_root(args.dataset_root)
+    dataset_manifest, tasks = load_tasks(args.split, args.max_tasks, dataset_root)
+    runtime_observation_format = observation_schema(dataset_manifest)
     processor = AutoProcessor.from_pretrained(
         MODEL_ROOT, local_files_only=True, trust_remote_code=False
     )
@@ -427,6 +495,8 @@ def main() -> int:
                 task,
                 text_index,
                 max_new_tokens=args.max_new_tokens,
+                dataset_root=dataset_root,
+                observation_format=runtime_observation_format,
             )
             results.append(result)
             print(
@@ -457,8 +527,10 @@ def main() -> int:
         "adapter_sha256": (
             sha256_file(adapter / "adapter_model.safetensors") if adapter else None
         ),
-        "dataset_manifest_sha256": sha256_file(DATASET_ROOT / "manifest.json"),
-        "tasks_sha256": sha256_file(DATASET_ROOT / "tasks.jsonl"),
+        "dataset_root": str(dataset_root),
+        "dataset_manifest_sha256": sha256_file(dataset_root / "manifest.json"),
+        "tasks_sha256": sha256_file(dataset_root / "tasks.jsonl"),
+        "tool_observation_schema": runtime_observation_format,
         "split": args.split,
         "task_count": len(results),
         "task_ids": [result["task_id"] for result in results],

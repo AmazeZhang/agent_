@@ -15,15 +15,21 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from local_retrieval import LocalTextIndex
-from local_retrieval.resnet50_encoder import sha256_file
-from local_rl import compute_group_advantages, score_trajectory
-from scripts.evaluate_local_agent import (
+from local_retrieval import LocalTextIndex  # noqa: E402
+from local_retrieval.resnet50_encoder import sha256_file  # noqa: E402
+from local_rl import (  # noqa: E402
+    compute_group_advantages,
+    score_evidence_fidelity_trajectory,
+    score_trajectory,
+)
+from scripts.evaluate_local_agent import (  # noqa: E402
     DATASET_ROOT,
     MODEL_ROOT,
     evaluate_task,
+    observation_schema,
     require_managed_run,
     validate_adapter,
+    validate_dataset_root,
 )
 
 MINIMUM_VARIABLE_GROUP_FRACTION = 0.25
@@ -33,6 +39,7 @@ MAXIMUM_FATAL_FRACTION = 0.25
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset-root", type=Path, default=DATASET_ROOT)
     parser.add_argument("--task-id", action="append", required=True)
     parser.add_argument("--rollouts", type=int, default=4)
     parser.add_argument("--seed", type=int, default=20260822)
@@ -41,15 +48,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-new-tokens", type=int, default=192)
     parser.add_argument("--adapter", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--reward-version",
+        choices=("rules-v1", "evidence-fidelity-v2"),
+        default="rules-v1",
+    )
     return parser.parse_args()
 
 
-def load_selected_tasks(task_ids: list[str]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def load_selected_tasks(
+    task_ids: list[str], dataset_root: Path = DATASET_ROOT
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     if not 1 <= len(task_ids) <= 8 or len(task_ids) != len(set(task_ids)):
         raise ValueError("provide between one and eight unique task IDs")
-    with (DATASET_ROOT / "manifest.json").open(encoding="utf-8") as handle:
+    dataset_root = validate_dataset_root(dataset_root)
+    with (dataset_root / "manifest.json").open(encoding="utf-8") as handle:
         manifest = json.load(handle)
-    with (DATASET_ROOT / "tasks.jsonl").open(encoding="utf-8") as handle:
+    with (dataset_root / "tasks.jsonl").open(encoding="utf-8") as handle:
         all_tasks = {
             item["task_id"]: item
             for line in handle
@@ -77,7 +92,11 @@ def summarize_group(items: list[dict[str, Any]]) -> dict[str, Any]:
         "format_valid_count": sum(item["result"]["score"]["format_valid"] for item in items),
         "fatal_count": sum(fatal_flags),
         "query_only_reward_count": sum(
-            item["reward"]["r_query"] > 0 and item["reward"]["r_accuracy"] == 0
+            item["reward"]["r_query"] > 0
+            and item["reward"].get(
+                "r_accuracy", item["reward"].get("r_exact_success")
+            )
+            == 0
             for item in items
         ),
         "advantages": advantages,
@@ -142,7 +161,14 @@ def main() -> int:
         raise ValueError("output must be the managed Run stochastic_rollout_audit.json")
     if output.exists():
         raise FileExistsError(f"refusing to overwrite audit report: {output}")
-    manifest, tasks = load_selected_tasks(args.task_id)
+    dataset_root = validate_dataset_root(args.dataset_root)
+    manifest, tasks = load_selected_tasks(args.task_id, dataset_root)
+    runtime_observation_format = observation_schema(manifest)
+    reward_function = (
+        score_trajectory
+        if args.reward_version == "rules-v1"
+        else score_evidence_fidelity_trajectory
+    )
 
     processor = AutoProcessor.from_pretrained(
         MODEL_ROOT, local_files_only=True, trust_remote_code=False
@@ -174,8 +200,10 @@ def main() -> int:
                     temperature=args.temperature,
                     top_p=args.top_p,
                     seed=seed,
+                    dataset_root=dataset_root,
+                    observation_format=runtime_observation_format,
                 )
-                reward = score_trajectory(result, task)
+                reward = reward_function(result, task)
                 items.append({"seed": seed, "result": result, "reward": reward})
                 print(
                     json.dumps(
@@ -215,8 +243,11 @@ def main() -> int:
         "model": str(MODEL_ROOT),
         "adapter": str(adapter),
         "adapter_sha256": sha256_file(adapter / "adapter_model.safetensors"),
-        "dataset_manifest_sha256": sha256_file(DATASET_ROOT / "manifest.json"),
-        "tasks_sha256": sha256_file(DATASET_ROOT / "tasks.jsonl"),
+        "dataset_root": str(dataset_root),
+        "dataset_manifest_sha256": sha256_file(dataset_root / "manifest.json"),
+        "tasks_sha256": sha256_file(dataset_root / "tasks.jsonl"),
+        "tool_observation_schema": runtime_observation_format,
+        "reward_version": args.reward_version,
         "physical_gpu": physical_gpu,
         "generation": {
             "do_sample": True,

@@ -28,6 +28,13 @@ class StochasticRolloutAuditTest(unittest.TestCase):
         self.assertEqual(summary["fatal_count"], 1)
         self.assertEqual(summary["advantages"]["fatal_clamped"][-1], 0.0)
 
+    def test_group_summary_accepts_evidence_fidelity_reward(self) -> None:
+        item = _item(0.2)
+        item["reward"].pop("r_accuracy")
+        item["reward"]["r_exact_success"] = 0.0
+        summary = summarize_group([item, item])
+        self.assertEqual(summary["query_only_reward_count"], 2)
+
     def test_batch_gate_requires_predeclared_variable_group_fraction(self) -> None:
         variable = summarize_group([_item(1.0, success=True), _item(0.0)])
         constant = summarize_group([_item(1.0, success=True), _item(1.0, success=True)])
