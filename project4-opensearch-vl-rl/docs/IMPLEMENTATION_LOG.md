@@ -14,7 +14,7 @@
 | P0 受管运行 | 已完成并推送；真实 GPU1 preflight 和受管 smoke 通过 |
 | 推理环境 | 8B 基座已校验；离线单图生成通过 |
 | SFT 环境/训练 | 合成 agentic 数据 1→2→5 step LoRA、断点续训和 adapter 离线推理闭环通过 |
-| RL 环境/训练 | 本地 reward/rollout-only 已通；首个随机组审计因组内零方差拒绝进入 optimizer，尚未启动 RL 更新 |
+| RL 环境/训练 | 本地 reward/rollout-only 已通；两轮随机组审计均因组内零方差拒绝进入 optimizer，尚未启动 RL 更新 |
 | 消融 | 未开始 |
 | 本地效果结论 | 无；不得引用上游论文数字作为本地结果 |
 
@@ -37,7 +37,7 @@
 | P2 资产准备 | 部分完成 | 环境方案确认、下载清单和空间预算完成 | 8B 基座已校验；SFT-36K 清单完成但 LFS 下载受阻 |
 | P3 安全推理 | 本地工具闭环已通 | 固定模型/数据、本地工具安全补丁通过 | 基座单图 smoke；WIT image/text 双工具真实轨迹可执行 |
 | P4 Agentic SFT | challenge-v5 1-step 完成 | 检索验证数据与 loss mask 通过 | 新协议 checkpoint 已生成，待固定 dev20 复评 |
-| P5 SFT→RL rollout-only | 首个随机组审计完成但未过门 | challenge SFT 通过固定对照 | SFT1 两个 train prompt 各 4 轨迹均为组内零方差 |
+| P5 SFT→RL rollout-only | 两轮随机组审计完成但未过门 | challenge SFT 通过固定对照 | 第二轮对齐上游采样，四类 train prompt 各 4 轨迹仍全部零方差 |
 | P6 小规模 RL | 未开始 | rollout/reward/mask 可审计 | 待补 |
 | P7 消融 | 未开始 | RL 1→resume→5/20 step 通过 | 待补 |
 | P8 结果审计 | 未开始 | 有 held-out、baseline 和原始结果 | 待补 |
@@ -600,3 +600,22 @@
 - 决策：不启动 1-step GRPO。下一轮应先在不改 reward 的前提下做有界采样校准（更接近上游 rollout
   temperature，并选择更多非饱和 train prompt）；门槛和失败报告必须预先固定。若仍大面积零方差，
   再讨论可追溯的 evidence fidelity shaping，而不是事后归一化或把跨题差异当作组内 advantage。
+- 第二轮协议在运行前提交为 `configs/stochastic_rollout_calibration_v2.json`：四种 task type 各取按
+  task ID 排序后首个未被 v1 使用的 train prompt，每题 4 条；固定 seed `20260830`。上游项目四
+  8B single-node RL 脚本实际使用 `temperature=0.7/top_p=1.0/top_k=-1`，因此本轮严格使用
+  `0.7/1.0`，没有为了制造差异而事后升温。
+- 批级门槛同样在运行前固定：variable group fraction 至少 `0.25`、format-valid fraction 至少
+  `0.75`、fatal fraction 至多 `0.25`。允许零方差 prompt（它们真实贡献零 GRPO gradient），但至少
+  1/4 prompt 必须有题内非零 reward variance；禁止把跨 prompt reward 差异用于组内 advantage。
+- 第二轮 Run：`wit-agent-challenge-v5-sft1-calibration-v2-g4n4-20260822`，commit `9ff478c`，物理
+  GPU1，16/16 格式合法、16/16 full success、0 fatal。candidate-conflict 四条均因额外一次合法 lookup
+  得 `0.95`；clean、no-match、transient 各四条均得 `1.0`。4/4 group 的 population variance 和
+  raw/clamped advantage 全为 `0`，variable group fraction `0`，批级门禁失败。
+- 报告 SHA256 `eb15a211cfef344e492deb734f786e4f0ad5803a815b424bfd9c8a031999eecd`；模式为
+  `stochastic-rollout-only-no-optimizer-no-api`，adapter/data/task hashes 均固定。受管 Run 按预期
+  `exit_code=4`；GPU1 峰值观测约 18.3 GiB、63°C，cleanup 后 18 MiB/无 compute process，GPU0/5
+  未参与。
+- 结论：首轮零方差不是 `top_p=0.9` 截断造成；当前抽到的四类 train prompt 对 SFT1 均已饱和，直接
+  1-step GRPO 没有更新信号。停止重复扩大同分布采样。下一步应在 CPU 侧构建/筛选更接近决策边界的
+  RL prompt，并优先把 evidence fidelity 变成可追溯的分级信号；新 reward 必须先对 Base/SFT1/SFT5
+  历史轨迹重放、检查排序和 reward hacking，再允许新的 rollout-only 门禁。
