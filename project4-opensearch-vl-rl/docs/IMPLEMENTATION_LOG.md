@@ -774,3 +774,17 @@
 - Base dev20 报告 SHA256 `310a6cda8a850e531ff64fa6ff0018f99cc071c189f0c0478d0e2b696f89b7a0`；
   `exit_code=0`、无异常、cleanup 无 compute process；GPU1 轮询最高 63°C，GPU0/GPU5 未参与。现在只跑
   已预声明的 SFT5 dev20 对照，不改数据/参数/评分。
+- 完整 SFT5 Run `wit-boundary-v7-sftv7-step5-dev20-20260822`，commit `357efb3`：format/title 保持
+  `0.60/0.60`，evidence/full 从 Base `0.30/0.30` 升到 `0.55/0.55`，fatal/oracle 保持
+  `0.20/0.50`；evidence-v2 mean 从 `0.43318` 升到 `0.55717`。
+- 分层证据：rank3 full `0.50→1.00`、v2 `0.76084→1.00`；rank2 full `0.50→0.8333`、v2
+  `0.68309→0.85725`。但 transient 仍 0/4 full、4/4 fatal、v2=0；no-match 仍 0/4 full、0/4
+  format-valid、v2=0。SFT5 的收益是真实 held-out evidence 输出改善，但没有改善 retry 后的 turn-budget
+  决策或 NO_MATCH 两行格式，不能宣称 agent 全面提升。
+- SFT5 dev20 报告 SHA256 `be46dc0949ae6abd3e301fec96a094110927a7a6c35fcf4dcadc6c78acfa669a`；
+  adapter/data/tasks hash 固定，`exit_code=0`、无 traceback/OOM/NaN/Xid。GPU1 启动/结束 18 MiB、轮询
+  最高 65°C、cleanup 无 compute process；GPU0/GPU5 未参与，无网络/API。
+- 当前停点：SFT 双阶段中的小规模 v7 step5 已出现可复核更新，但 RL 仍未满足 format/variance 门禁。
+  下一合理动作是先做 recovery/no-match 定向且不泄漏 dev answer 的 train curriculum/采样审计，再考虑总
+  step20；安全规范要求 20 step 及以上在运行前重新说明并获得用户确认。现在不启动 step20、rollout 重跑
+  或 RL optimizer，等待用户审阅本次更新与下一阶段资源/停止条件。
