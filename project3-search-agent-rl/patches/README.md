@@ -34,3 +34,26 @@ Phase 4B.1 训练语义修正（保留 0007 审计历史；构建在 0001-0007 �
 - **改动文件**：`skyrl_gym/envs/search/env.py`、`env_package/search/envs.py`、`reward_manager/episode.py`、`verl/trainer/ppo/core_algos.py`（新函数）、`verl/trainer/ppo/ray_trainer.py`（GRPO 分支按 flag 分派 + 调用点透传）、`verl/trainer/main_ppo.py`（`algorithm.search_v1_trajectory_return` fail-closed 校验）
 - **配套（项目侧，不在 patch 内）**：`searchr1_repro/search_v1_reward.py`（token 边界 alias matcher 重写：`valid_aliases` 返回 word-lists，两字符 alias 只以完整 token 命中，多词 alias 为连续 token 短语）、`searchr1_repro/training_audit.py`（audit 增加 `trajectory_advantage`/`search_v1_group`）、`scripts/run_p3_grpo_search_aware_v1.sh`（`+algorithm.search_v1_trajectory_return=true`）、`tests/test_v1_trajectory_return.py`（T1-T5 构造测试 10 条）、`tests/test_v1_episode_traj_uid.py`（5 条）、`tests/test_v1_env_question_passthrough.py`（真实 env 路径 4 条）、`tests/test_search_v1_reward.py`（+6 条 token 边界）、`scripts/p3_v1_reward_replay.py`（trainer-exact 回放）
 - **验证**：patch 在 pre-0008 状态（20bd331 + 0001-0007）干净应用；reverse-check 通过；整树 diff 与 worktree 零差异；30+10 条 CPU 测试全绿
+
+## 0009-search-aware-config-schema.patch（2026-08-22，struct schema 修复）
+
+修复 0008 传播写入在 hydra struct 模式下的启动阻塞（首次真实配置加载暴露，
+见 `docs/P3_V1_GPU_SMOKE_STOP_REPORT_2026-08-19.md` §2）：
+
+- **错误**：`ConfigAttributeError: Key 'search_aware_step_reward' is not in
+  struct, full_key: env.search.search_aware_step_reward` ——
+  `env_package/search/envs.py`（0008）向 `env.search` 节点 deepcopy 写入
+  `search_aware_step_reward` 时，`env.search` schema 只有
+  `log_requests / search_url / topk / timeout` 且为 struct 模式，写未知键抛错。
+- **修复（显式 schema，用户拍板选项 B）**：`verl/trainer/config/ppo_trainer.yaml`
+  `env.search` 节点声明 `search_aware_step_reward: false`；**顶层
+  `env.search_aware_step_reward` 开关与向每个 SearchEnv 的传播逻辑不变**
+  （0008 的 `envs.py:87` 单行传播）。默认 false → official-loose 路径行为
+  不变（`skyrl env.py` 的 v1 分支仍按 `bool(getattr(cfg, ..., False))` 只读判断）。
+- **改动文件**：`verl/trainer/config/ppo_trainer.yaml`（1 键 + 注释，单 hunk）
+- **验证**：patch 在 pre-0009 状态（20bd331 + 0001-0008）干净应用；
+  0001→0009 完整重建链与 vendor 工作树全树 diff 零差异；新增真实 Hydra
+  compose 测试（`tests/test_v1_config_schema.py`：从正式 ppo_trainer.yaml
+  compose + wrapper 真实 overrides + 构造 SearchMultiProcessEnv，验证 struct
+  路径写入不报错、flag=true/false 均正确传播、默认 official-loose 路径
+  行为不变）。

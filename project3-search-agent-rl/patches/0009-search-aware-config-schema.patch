@@ -1,0 +1,17 @@
+diff --git a/verl/trainer/config/ppo_trainer.yaml b/verl/trainer/config/ppo_trainer.yaml
+index 0ae65d6..39e023d 100644
+--- a/verl/trainer/config/ppo_trainer.yaml
++++ b/verl/trainer/config/ppo_trainer.yaml
+@@ -312,6 +312,12 @@ env:
+     search_url: "http://127.0.0.1:8000/retrieve" # also support multiple urls: ["http://127.0.0.1:8000/retrieve", "http://127.0.0.1:8001/retrieve"]
+     topk: 3
+     timeout: 60
++    # P3 patch 0009: declared struct member so the per-env propagation write in
++    # env_package/search/envs.py (patch 0008) works under hydra struct mode.
++    # Top-level env.search_aware_step_reward remains the master switch; the
++    # per-env value is always overwritten from it at SearchMultiProcessEnv init.
++    # Default false -> official-loose path behavior is unchanged.
++    search_aware_step_reward: false
+   sokoban:
+     dim_room: [6, 6]
+     num_boxes: 1

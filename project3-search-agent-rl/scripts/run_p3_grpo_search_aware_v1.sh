@@ -10,7 +10,9 @@
 #       - 0.45*redundant_search_count - 0.20*new_answer_leak_in_query
 #   format_score=0.1 (unchanged), valid_retrieval coefficient alpha=0,
 #   use_invalid_action_penalty=false (config-only), adv_estimator=grpo
-#   (GiGPO deferred), starting model = Qwen2.5-3B Base (never from gs300).
+#   (GiGPO deferred). Starting model: default Qwen2.5-3B Base (never from
+#   gs300); the clean-upstream-aligned run passes PROJECT3_MODEL_PATH=Instruct
+#   so the starting point matches the clean GRPO10/GiGPO10 baseline.
 #
 # Step-attribution: R_answer (+ format + sce settled via episode metadata)
 # ONLY on the terminal answer step; evidence/invalid/redundant/answer-leak
@@ -51,7 +53,11 @@ fi
 data_root="${PROJECT3_DATA_ROOT:-/media/imc/data}"
 project_data="${data_root}/project3-search-agent-rl"
 python_bin="${project_data}/envs/searchr1-repro-cu124/bin/python"
-model_path="${project_data}/models/Qwen2.5-3B"
+# Model/tokenizer path. Default stays the Phase 4B Base path; the
+# clean-upstream-aligned Search-aware run (2026-08-22) explicitly passes the
+# verified Qwen2.5-3B-Instruct asset via PROJECT3_MODEL_PATH so the starting
+# point matches the clean GRPO10/GiGPO10 three-way baseline exactly.
+model_path="${PROJECT3_MODEL_PATH:-${project_data}/models/Qwen2.5-3B}"
 train_parquet="${project_data}/datasets/searchr1-upstream/train.parquet"
 val_dir="${PROJECT3_VAL_DIR:-${project_data}/datasets/searchr1-smoke}"
 retriever_url="${PROJECT3_RETRIEVER_URL:-http://127.0.0.1:18080/retrieve}"
@@ -92,6 +98,11 @@ official_kl="${PROJECT3_OFFICIAL_KL_COEF:-0.001}"
 official_warmup_ratio="${PROJECT3_OFFICIAL_WARMUP_RATIO:-0.285}"
 trainer_seed="${PROJECT3_TRAINER_SEED:-1234}"
 data_seed="${PROJECT3_DATA_SEED:-1234}"
+# Env horizon. Defaults stay the Phase 4B values; the clean-upstream-aligned
+# run (2026-08-22) passes max_steps=4 / history_length=4 so the environment
+# protocol matches the clean GRPO10/GiGPO10 three-way baseline exactly.
+env_max_steps="${PROJECT3_ENV_MAX_STEPS:-2}"
+env_history_length="${PROJECT3_ENV_HISTORY_LENGTH:-2}"
 
 if [[ "$profile" == "eng-smoke" ]]; then
   # 1-2 steps only; 1-2 step EM must never be read as an algorithm signal.
@@ -159,10 +170,11 @@ if [[ ! "$retriever_url" =~ ^http://127\.0\.0\.1:[0-9]{1,5}/retrieve$ ]]; then
 fi
 
 # Self-check: resolved experimental values on the first stdout line.
-echo "[V1_EXP] resolved: profile=${profile} train_batch_size=${train_batch_size} mini_batch_size=${mini_batch_size} total_training_steps=${total_training_steps} lr=${official_lr} lr_warmup_steps_ratio=${official_warmup_ratio} kl=${official_kl} gpu_mem=${gpu_memory_utilization} max_num_seqs=${max_num_seqs} offload_param=${offload_param} offload_optimizer=${offload_optimizer} offload_ref=${offload_ref} save_freq=${save_freq} seed=${trainer_seed}/${data_seed} resume_from=${resume_from:-<none>} search_aware_step_reward=true(env+reward_model) use_invalid_action_penalty=false adv_estimator=grpo"
+echo "[V1_EXP] resolved: profile=${profile} model_path=${model_path} train_batch_size=${train_batch_size} mini_batch_size=${mini_batch_size} total_training_steps=${total_training_steps} env_max_steps=${env_max_steps} env_history_length=${env_history_length} lr=${official_lr} lr_warmup_steps_ratio=${official_warmup_ratio} kl=${official_kl} gpu_mem=${gpu_memory_utilization} max_num_seqs=${max_num_seqs} offload_param=${offload_param} offload_optimizer=${offload_optimizer} offload_ref=${offload_ref} save_freq=${save_freq} seed=${trainer_seed}/${data_seed} resume_from=${resume_from:-<none>} search_aware_step_reward=true(env+reward_model) use_invalid_action_penalty=false adv_estimator=grpo gamma=1.0"
 
 overrides=(
   "algorithm.adv_estimator=grpo"
+  "algorithm.gamma=1.0"          # explicit: identical to the clean GRPO10 line
   "algorithm.norm_adv_by_std_in_grpo=true"
   "algorithm.use_kl_in_reward=false"
   "data.train_files=${train_parquet}"
@@ -199,6 +211,7 @@ overrides=(
   "actor_rollout_ref.rollout.enforce_eager=true"
   "actor_rollout_ref.rollout.free_cache_engine=true"
   "actor_rollout_ref.rollout.enable_chunked_prefill=false"
+  "actor_rollout_ref.rollout.max_num_seqs=${max_num_seqs}"
   "actor_rollout_ref.rollout.max_num_batched_tokens=2304"
   "actor_rollout_ref.rollout.max_model_len=2304"
   "actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1"
@@ -208,8 +221,8 @@ overrides=(
   "env.env_name=search"
   "env.projection=official"
   "env.seed=0"
-  "env.max_steps=2"
-  "env.history_length=2"
+  "env.max_steps=${env_max_steps}"
+  "env.history_length=${env_history_length}"
   "env.rollout.n=5"
   "env.search.search_url=${retriever_url}"
   "env.search.topk=3"
@@ -369,7 +382,7 @@ fi
 # A per-patch `git apply --reverse --check` is unsound for a CHAIN of patches:
 # later patches (0007/0008) edit the same files as earlier ones (0001/0002/0004)
 # and shift their hunks, so reverse-check fails although every patch IS applied.
-# Instead: rebuild upstream + 0001..0008 in a scratch tree and diff the final
+# Instead: rebuild upstream + 0001..0009 in a scratch tree and diff the final
 # state against the vendor worktree (excludes runtime caches only).
 verify_scratch="$(mktemp -d /tmp/p3patch.XXXXXX)"
 
@@ -391,6 +404,7 @@ patch_names=(
   0006-segment-stop-step-decoupled-schedule-horizon
   0007-search-aware-step-reward
   0008-v1-trajectory-return-and-traj-audit
+  0009-search-aware-config-schema
 )
 
 git -C "$vendor_dir" archive HEAD | tar -x -C "$verify_scratch" || {
@@ -422,7 +436,7 @@ if ! diff -qr \
   --exclude='.pytest_cache' \
   --exclude='*.egg-info' \
   "$verify_scratch" "$vendor_dir" >/dev/null; then
-  echo "vendor worktree does not match upstream + patches 0001..0008" >&2
+  echo "vendor worktree does not match upstream + patches 0001..0009" >&2
   diff -qr \
     --exclude='.git' \
     --exclude='__pycache__' \
