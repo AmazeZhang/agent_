@@ -87,16 +87,69 @@ if [[ "${CUDA_VISIBLE_DEVICES:-}" != "1" ]]; then
   exit 14
 fi
 
-for patch_file in \
-  "${project_dir}/patches/0001-search-retrieval-status-observability.patch" \
-  "${project_dir}/patches/0002-structured-rollout-audit.patch" \
-  "${project_dir}/patches/0003-graceful-ray-shutdown-and-atomic-rollout.patch" \
-  "${project_dir}/patches/0004-search-prompt-and-format-reward.patch"; do
-  if ! git -C "$vendor_dir" apply --reverse --check "$patch_file" 2>/dev/null; then
-    echo "required patch is not applied: $(basename -- "$patch_file")" >&2
-    exit 15
+# Patch set gate (final-state rebuild verification, same as the training
+# wrappers): per-patch `git apply --reverse --check` is unsound for a CHAIN
+# of patches (0007/0008 edit the same files as 0001/0002/0004 and shift their
+# hunks, so reverse-check misreports applied patches). Rebuild upstream +
+# 0001..0009 in a scratch tree and diff against the vendor worktree instead.
+verify_scratch="$(mktemp -d /tmp/p3patch.XXXXXX)"
+cleanup_patch_verify() {
+  if [[ -n "${verify_scratch:-}" &&
+        "$verify_scratch" == /tmp/p3patch.* &&
+        -d "$verify_scratch" ]]; then
+    rm -rf -- "$verify_scratch"
   fi
+}
+trap cleanup_patch_verify EXIT
+
+patch_names=(
+  0001-search-retrieval-status-observability
+  0002-structured-rollout-audit
+  0003-graceful-ray-shutdown-and-atomic-rollout
+  0004-search-prompt-and-format-reward
+  0005-search-env-loose-projection
+  0006-segment-stop-step-decoupled-schedule-horizon
+  0007-search-aware-step-reward
+  0008-v1-trajectory-return-and-traj-audit
+  0009-search-aware-config-schema
+)
+
+git -C "$vendor_dir" archive HEAD | tar -x -C "$verify_scratch" || {
+  echo "failed to reconstruct vendor upstream tree" >&2
+  exit 15
+}
+
+for patch_name in "${patch_names[@]}"; do
+  patch_file="$project_dir/patches/${patch_name}.patch"
+  [[ -f "$patch_file" ]] || {
+    echo "missing required patch: $patch_file" >&2
+    exit 15
+  }
+  (
+    cd "$verify_scratch"
+    git apply --check "$patch_file" &&
+    git apply "$patch_file"
+  ) || {
+    echo "failed to replay required patch: $patch_name" >&2
+    exit 15
+  }
 done
+
+if ! diff -qr \
+  --exclude='.git' \
+  --exclude='__pycache__' \
+  --exclude='*.pyc' \
+  --exclude='.pytest_cache' \
+  --exclude='*.egg-info' \
+  "$verify_scratch" "$vendor_dir" >/dev/null; then
+  echo "vendor worktree does not match upstream + patches 0001..0009" >&2
+  exit 15
+fi
+
+cleanup_patch_verify
+trap - EXIT
+unset verify_scratch
+# --- end patch set gate ---
 
 "$python_bin" - "$retriever_url" <<'PY'
 import json
