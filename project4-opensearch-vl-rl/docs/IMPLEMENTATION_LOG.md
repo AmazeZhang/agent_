@@ -757,3 +757,13 @@
   `6f3472e0b1f29439d13db4b867cadf4d345d3c0c27a2e456b579c676b46fa9b4`。`exit_code=0`，无
   traceback/OOM/NaN/Inf/Xid；GPU1 启动/结束 18 MiB、cleanup 无 compute process，GPU0/GPU5 未参与。
   下一步只跑同四题 held-out，不继续训练。
+- v7 SFT5 held-out Run `wit-boundary-v7-sftv7-step5-dev4-20260822`，commit `188e8d6`：rank3 保持
+  严格成功，rank2 从 Base/SFT1 的“标题对但证据多一句”变为严格成功；transient/no-match 轨迹与失败
+  保持不变。full/evidence exact 从 `0.25` 升到 `0.50`，但 format 仍 `0.50`、fatal `0.25`、oracle
+  path `0.50`。evidence-v2 mean 从 Base `0.37003` 升到 `0.48750`，仅由 rank2 `0.48013→0.95` 驱动。
+- 报告 SHA256 `f590b9941b0da9e796a7f26c268a37ffa76074376b8df1cefea5e50795e5836b`；adapter/data/tasks
+  hash 匹配，`exit_code=0`、无异常。GPU1 启动/结束 18 MiB、最高轮询 56°C、cleanup 无进程；GPU0/GPU5
+  未参与。该 4 条结果只支持“出现局部改善信号”，不足以声明 SFT 有效或重开 RL。
+- 下一步预声明扩大评测而非训练：在完整固定 v7 dev20 上分别跑 Base 与 SFT5 greedy，同一 evaluator、
+  max-new-tokens192、物理 GPU1；比较四类 strict/format/fatal/oracle 和 evidence-v2，不增训练 step、不运行
+  rollout/optimizer。若总体无改善或恢复类回归则停止；若 held-out 改善稳定，再回到 rollout-only 门禁。
