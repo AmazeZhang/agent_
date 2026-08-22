@@ -767,3 +767,10 @@
 - 下一步预声明扩大评测而非训练：在完整固定 v7 dev20 上分别跑 Base 与 SFT5 greedy，同一 evaluator、
   max-new-tokens192、物理 GPU1；比较四类 strict/format/fatal/oracle 和 evidence-v2，不增训练 step、不运行
   rollout/optimizer。若总体无改善或恢复类回归则停止；若 held-out 改善稳定，再回到 rollout-only 门禁。
+- 完整 Base Run `wit-boundary-v7-base-dev20-20260822`，commit `2b986d6`：format/title/evidence/full/
+  oracle/fatal 为 `0.60/0.60/0.30/0.30/0.50/0.20`，evidence-v2 mean `0.43318`。rank2/rank3
+  各 6 条且 full success 均 `0.50`，分层 v2 mean `0.68309/0.76084`；4 条 transient 全部
+  maximum-turn fatal、4 条 no-match 全部格式失败，两类 full/v2 均为 0。
+- Base dev20 报告 SHA256 `310a6cda8a850e531ff64fa6ff0018f99cc071c189f0c0478d0e2b696f89b7a0`；
+  `exit_code=0`、无异常、cleanup 无 compute process；GPU1 轮询最高 63°C，GPU0/GPU5 未参与。现在只跑
+  已预声明的 SFT5 dev20 对照，不改数据/参数/评分。
