@@ -825,3 +825,24 @@
   后续只允许 v8 的 1-step LoRA SFT smoke（GPU1、受管 tmux、无 GPU0/GPU5、无网络/API），再做固定 dev20
   对照；通过后才重新冻结 4-rollout gate。任何达到 20 step、扩卡、GPU5 使用或 RL optimizer 更新仍需在
   执行前重新说明并获得用户确认。
+
+### Step P4：v8 官方式本地协议 LoRA SFT 1-step smoke
+
+- Run：`wit-protocol-v8-sft-1step-20260822`，代码 commit `f6d06f3`；启动前 GPU1 预检通过（24,066 MiB
+  可用、47°C），数据盘可用 2,166 GiB。受管 tmux、独立进程组、代理净化、离线模型/数据均生效；GPU0/GPU5
+  未加入 `CUDA_VISIBLE_DEVICES`，未联网、未使用 API。
+- 配置：Qwen3-VL-8B 本地基座，v8 80 条 train、LoRA rank 8、视觉塔/projector 冻结、batch 1、cutoff 2048、
+  BF16/FlashAttention-2、seed 42、max_steps=1。训练日志实际展示 `image_search` 后 `text_search(q, top_k)`
+  与 `<response>` 监督 token，说明新协议进入训练，而非仅改 manifest。
+- 结果：global step=1，loss `0.3231127`、grad norm `0.7615781`、learning rate `1e-4`、epoch `0.0125`，均为
+  有限数；运行时 3.206 秒。checkpoint-1 包含 adapter、trainer state、optimizer、scheduler、RNG、tokenizer
+  与 training args，且无 `.partial`；adapter/config/provenance SHA256 分别为
+  `27249547f4c31af50fafc532c84bc080e5f806f82c2022203b6fee9e4571874a`、
+  `04eff499f824714069369f8f79e165f2281ecd85b0735ea251a3e73d95f9261d`、
+  `76387ffb995433c5ae0eb7204f92605f2c3398c2b29c12c5e846d1d472526267`。
+- 安全验收：`exit_code=0`，stdout/stderr 无 traceback/OOM/NaN/Inf/Xid/segfault；GPU1 峰值轮询约
+  21,239 MiB、50°C，cleanup 后仅 18 MiB 且 `compute_processes=none`。已仅关闭该 Run 的精确 tmux
+  会话，未触及其他会话或进程。
+- 声明边界：该 step 只证明新数据协议可被实际 SFT、保存和清理，不能证明质量提升。下一步是从同一固定
+  v8 dev20 运行 Base 与该 SFT1 的 greedy 对照；在生成 checkpoint 之前不进入 RL，也不把 1-step loss
+  当作效果证据。
