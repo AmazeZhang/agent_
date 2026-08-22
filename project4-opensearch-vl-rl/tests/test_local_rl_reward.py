@@ -1,6 +1,10 @@
 import unittest
 
-from local_rl import compute_group_advantages, score_trajectory
+from local_rl import (
+    compute_group_advantages,
+    score_evidence_fidelity_trajectory,
+    score_trajectory,
+)
 
 
 class LocalRlRewardTest(unittest.TestCase):
@@ -55,6 +59,113 @@ class LocalRlRewardTest(unittest.TestCase):
         advantages = compute_group_advantages([1.0, 0.0], [False, True])
         self.assertEqual(advantages["raw"], [0.5, -0.5])
         self.assertEqual(advantages["fatal_clamped"], [0.5, 0.0])
+
+    def test_evidence_fidelity_reward_grades_partial_answer(self) -> None:
+        task = {
+            "task_id": "boundary",
+            "task_type": "dual-clue-rank2",
+            "gold_entity_id": "q2",
+            "gold_title": "Target",
+            "gold_evidence_sentence": "Target evidence has alpha beta gamma.",
+            "oracle_steps": ["image_search", "text_lookup", "text_lookup", "final"],
+            "retrieval_results": [],
+            "image_search_failures_before_success": 0,
+        }
+        calls = [
+            {
+                "tool_call": {"name": "image_search", "arguments": {"image": "img_1"}},
+                "observation": "candidates",
+            },
+            {
+                "tool_call": {"name": "text_lookup", "arguments": {"entity_id": "q2"}},
+                "observation": "Target evidence has alpha beta gamma. More facts.",
+            },
+        ]
+        result = {
+            "task_id": "boundary",
+            "task_type": "dual-clue-rank2",
+            "fatal": None,
+            "final": "Title: Target\nEvidence: Target evidence has alpha beta.",
+            "score": {
+                "format_valid": True,
+                "title_exact": True,
+                "evidence_exact": False,
+                "full_success": False,
+            },
+            "turns": calls + [{}],
+        }
+        reward = score_evidence_fidelity_trajectory(result, task)
+        self.assertEqual(reward["r_title"], 1.0)
+        self.assertGreater(reward["r_evidence_f1"], 0.0)
+        self.assertLess(reward["r_answer"], 1.0)
+        self.assertEqual(reward["r_query"], 1.0)
+        self.assertGreater(reward["reward"], 0.2)
+        self.assertLess(reward["reward"], 1.0)
+
+    def test_query_reward_requires_gold_evidence_in_observation(self) -> None:
+        task = {
+            "task_id": "missing",
+            "task_type": "dual-clue-rank2",
+            "gold_entity_id": "q2",
+            "gold_title": "Target",
+            "gold_evidence_sentence": "Gold evidence.",
+            "oracle_steps": ["image_search", "text_lookup", "final"],
+            "retrieval_results": [],
+        }
+        result = {
+            "task_id": "missing",
+            "task_type": "dual-clue-rank2",
+            "fatal": None,
+            "final": "Title: Wrong\nEvidence: Wrong.",
+            "score": {
+                "format_valid": True,
+                "title_exact": False,
+                "evidence_exact": False,
+                "full_success": False,
+            },
+            "turns": [
+                {
+                    "tool_call": {"name": "text_lookup", "arguments": {"entity_id": "q2"}},
+                    "observation": "Unrelated evidence.",
+                },
+                {},
+            ],
+        }
+        reward = score_evidence_fidelity_trajectory(result, task)
+        self.assertFalse(reward["evidence_path_valid"])
+        self.assertEqual(reward["r_query"], 0.0)
+
+    def test_no_match_after_retry_requires_exact_oracle_tools(self) -> None:
+        task = {
+            "task_id": "no-retry",
+            "task_type": "no-match-after-retry",
+            "gold_entity_id": None,
+            "gold_title": "NO_MATCH",
+            "gold_evidence_sentence": "No local evidence found.",
+            "oracle_steps": ["image_search", "image_search", "final"],
+            "retrieval_results": [],
+        }
+        result = {
+            "task_id": "no-retry",
+            "task_type": "no-match-after-retry",
+            "fatal": None,
+            "final": "Title: NO_MATCH\nEvidence: No local evidence found.",
+            "score": {
+                "format_valid": True,
+                "title_exact": True,
+                "evidence_exact": True,
+                "full_success": True,
+            },
+            "turns": [
+                {
+                    "tool_call": {"name": "image_search", "arguments": {"image": "img_1"}}
+                },
+                {},
+            ],
+        }
+        reward = score_evidence_fidelity_trajectory(result, task)
+        self.assertEqual(reward["r_answer"], 1.0)
+        self.assertEqual(reward["r_query"], 0.0)
 
 
 if __name__ == "__main__":

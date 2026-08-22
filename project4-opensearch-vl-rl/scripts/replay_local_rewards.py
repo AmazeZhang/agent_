@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from local_retrieval.resnet50_encoder import sha256_file
-from local_rl import score_trajectory
+from local_rl import score_evidence_fidelity_trajectory, score_trajectory
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 
@@ -26,11 +26,17 @@ def parse_args() -> argparse.Namespace:
         "--evaluation", action="append", required=True, metavar="NAME=PATH"
     )
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--reward-version",
+        choices=("rules-v1", "evidence-fidelity-v2"),
+        default="rules-v1",
+    )
     return parser.parse_args()
 
 
-def mean_components(items: list[dict[str, Any]]) -> dict[str, float]:
-    fields = ("r_accuracy", "r_query", "r_format", "reward")
+def mean_components(
+    items: list[dict[str, Any]], fields: tuple[str, ...]
+) -> dict[str, float]:
     return {
         field: sum(float(item[field]) for item in items) / len(items)
         for field in fields
@@ -51,6 +57,20 @@ def main() -> int:
             if line.strip() and (item := json.loads(line))
         }
     reports = {}
+    if args.reward_version == "rules-v1":
+        scorer = score_trajectory
+        fields = ("r_accuracy", "r_query", "r_format", "reward")
+    else:
+        scorer = score_evidence_fidelity_trajectory
+        fields = (
+            "r_exact_success",
+            "r_title",
+            "r_evidence_f1",
+            "r_answer",
+            "r_query",
+            "r_format",
+            "reward",
+        )
     for spec in args.evaluation:
         name, separator, raw_path = spec.partition("=")
         if not separator or not name or name in reports:
@@ -64,7 +84,7 @@ def main() -> int:
         by_type: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for result in evaluation["results"]:
             task = tasks[result["task_id"]]
-            reward = score_trajectory(result, task)
+            reward = scorer(result, task)
             item = {
                 "task_id": result["task_id"],
                 "task_type": result["task_type"],
@@ -77,18 +97,37 @@ def main() -> int:
             "evaluation_sha256": sha256_file(path),
             "adapter_sha256": evaluation["adapter_sha256"],
             "task_count": len(scored),
-            "mean": mean_components(scored),
+            "mean": mean_components(scored, fields),
             "mean_by_task_type": {
-                key: mean_components(value) for key, value in sorted(by_type.items())
+                key: mean_components(value, fields)
+                for key, value in sorted(by_type.items())
             },
             "fatal_count": sum(item["is_fatal"] for item in scored),
             "trajectories": scored,
         }
     payload = {
-        "schema_version": 1,
-        "mode": "deterministic-rules-only-no-api",
-        "weights": {"accuracy": 0.8, "query": 0.2, "format_gate": "multiplicative"},
-        "query_reward": "gold-evidence-acquired-times-oracle-tool-efficiency",
+        "schema_version": 1 if args.reward_version == "rules-v1" else 2,
+        "mode": f"deterministic-{args.reward_version}-no-api",
+        "reward_version": args.reward_version,
+        "weights": (
+            {"accuracy": 0.8, "query": 0.2, "format_gate": "multiplicative"}
+            if args.reward_version == "rules-v1"
+            else {
+                "answer": 0.8,
+                "query": 0.2,
+                "format_gate": "multiplicative",
+                "answer_components": {
+                    "strict_success": 0.5,
+                    "title_exact": 0.2,
+                    "evidence_token_f1": 0.3,
+                },
+            }
+        ),
+        "query_reward": (
+            "gold-evidence-acquired-times-oracle-tool-efficiency"
+            if args.reward_version == "rules-v1"
+            else "gold-evidence-present-in-target-tool-observation-times-oracle-tool-efficiency"
+        ),
         "fatal_policy": "mask-after-fatal-and-one-sided-nonnegative-advantage-clamp",
         "tasks": str(args.tasks.resolve()),
         "tasks_sha256": sha256_file(args.tasks),
