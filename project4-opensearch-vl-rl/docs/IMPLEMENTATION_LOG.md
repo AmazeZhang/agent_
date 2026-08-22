@@ -747,3 +747,13 @@
 - 下一晋级固定为从 v7 checkpoint-1 resume 到总 step5（只新增 4 step），保持 dataset/hash、LoRA、batch、
   lr、seed、cutoff 和 GPU1 不变；resume 同数据集门必须通过。step5 后仍先跑同四题 held-out，若仍无变化
   或出现回归就停止扩大；不启动 RL，不把训练 loss 下降当作质量提升。
+- v7 SFT resume Run `wit-boundary-v7-sft-resume-step5-20260822`，commit `7f38793`，同数据集 provenance
+  门通过并从 step1 连续到 global step5；trainer state 明确含 step1–5。新增 step2–5 loss 为
+  `0.01987/0.06864/0.08103/0.00005953`，grad norm `1.123/0.6083/0.581/0.008457`，均有限；
+  总 train loss `0.03392`。这些只用于数值健康验收，不作质量结论。
+- checkpoint-5 完整且无 `.partial`，adapter/config/provenance SHA256 分别为
+  `fc8c922fd1e233fd30833dcb03454fe2c2afe3d31c32dd1f0ba4be655fb6ce97`、
+  `63a38f2868b02489d9ffcb6188a0c947b20d2baf25512915d6ecea781abd9213`、
+  `6f3472e0b1f29439d13db4b867cadf4d345d3c0c27a2e456b579c676b46fa9b4`。`exit_code=0`，无
+  traceback/OOM/NaN/Inf/Xid；GPU1 启动/结束 18 MiB、cleanup 无 compute process，GPU0/GPU5 未参与。
+  下一步只跑同四题 held-out，不继续训练。
