@@ -1,0 +1,8 @@
+{
+  "kind": "p3-ten-step-gpu-peaks",
+  "run_id": "p3-search-aware-clean-v2-grpo10-fsdp6-b66-n5-s0-20260823a",
+  "samples": 7003,
+  "peak_used_mib_by_index": {
+"0": 436, "1": 23871, "2": 23965, "3": 23977, "4": 23565, "5": 18, "6": 23853, "7": 23771
+  }
+}

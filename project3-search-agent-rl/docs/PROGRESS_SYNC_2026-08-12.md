@@ -1261,3 +1261,44 @@ LR 调度分段问题：300 步总调度长度 vs 50/100/300 段停止点拆分�
   v2 Step5 完全一致（指纹 `d727b64f…`，ten-step profile 门禁 exit 30-35 全部
   通过）、warmup 0.285、GPU 1,2,3,4,6,7、tmux + run_managed；训练中，10 项
   中止条件监控中。
+
+## 2026-08-24 追加：fresh v2 10-step 训练完成 + gs5/gs10 评测 + 五路对比（闭环）
+
+- **训练完成**：`p3-search-aware-clean-v2-grpo10-fsdp6-b66-n5-s0-20260823a`
+  10/10 步，10 项中止条件（C1–C10）全部 PASS，`any_violation=False`，exit 0，
+  时长 **4:02:03**（1447.9 s/it）。每步 330 轨迹；Step10 搜索率 0.915、
+  useful 0.511、invalid 0.2%、redundant 0.121、作答提交 0.309；Step10 奖励
+  分量 answer 主导（+102.00c），true-redundant 惩罚未再成为最大分量；
+  duplicate identity 恒 0；无 OOM/NaN/Xid/掉卡/NCCL；config 指纹全程
+  `d727b64f…`；GPU 固定 1,2,3,4,6,7。完整分步表见
+  `docs/P3_V2_TEN_STEP_REPORT_2026-08-24.md`。
+- **Merge + verify**：`p3-v2-tenstep-gs5-merged-20260823a` /
+  `p3-v2-tenstep-gs10-merged-20260823a`，两者 VERIFY_MERGED: PASS。
+- **评测（greedy official-confirm256-v1，GPU1-only）**：merged gs5 EM **68**、
+  merged gs10 EM **73**；Step5→Step10 净 +5（gained 21/lost 16，p=0.511），
+  无行为 collapse（搜索率 88.7%→93.4%，s2a 0.912→0.962，sc_abs 57→65，
+  真冗余 112→61，invalid 2→3）。Step10 dev64 sampling 诊断（temp=1.0×5，
+  仅诊断）：80/320=25.0%，compliance 311/320。
+- **五路对比**（`gates/p3_v2_five_way_stats_20260823.json`，逐题配对）：
+  gs10 vs GRPO10 净 −1 (p=1.0)、vs GiGPO10 +4 (p=0.708)、vs Step0 +8
+  (p=0.332)、vs gs5 +5 (p=0.511)——全部不显著，"fresh v2 gs10 第一名"维持
+  方向性正面。Step10 成功建议 7 项中 6 项达成，唯一未达成：EM ≥74 差 1
+  （73/256）。
+- **显存（三口径分开，聚合值不得作 per-GPU 物理峰值）**：nvidia-smi 权威
+  per-GPU 物理峰值 GPU1 24061/GPU2 23881/GPU3 23977/GPU4 23565/GPU6
+  23853/GPU7 23771 MiB（run 内嵌 2s 采样器，`peak_memory_nvidia_smi.json`）；
+  torch `max_memory_allocated` **24.903 GB**、`max_memory_reserved`
+  **36.645 GB**（verl 日志 worker 聚合 allocator 视图，非物理峰值）。
+- **运行间方差**：相同 gs5 checkpoint 两次独立 greedy 评测 78 vs 68
+  （net +10，p=0.11）→ 单次运行 EM ±10 量级在噪声内，跨 run 结论一律以
+  配对检验为准。
+- **问题与解决**：(1) 训练结束后的 tmux session 残留（pane dead、session
+  lingering）→ 本轮清理（非 13 个旧 8/19–8/21 会话）；(2) dev64 sampling
+  results.json 写入先于 session 退出 → 以 session exit status 0 + prompt_check
+  300/300 作为完成判据；(3) 反事实评测未在 fresh gs10 重跑（Phase 6 协议
+  未包含）→ 机制结论沿用 Phase 3 对旧 gs5 的证据并如实标注，不静默扩展。
+- **收尾**：本轮 tmux（训练 + 3 evals）与 watcher 已清理；13 个旧 empty
+  tmux 未动；无 Ray/vLLM/main_ppo 残留；GPU 回 18 MiB baseline（GPU0 407
+  MiB 为启动前存在的外部进程）；retriever healthy（21,015,324 向量）。
+  未启动 50 步/GiGPO/final-confirm512；未修改 reward/Prompt/projection；
+  不因结果不理想调参。

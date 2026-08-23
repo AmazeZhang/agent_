@@ -30,12 +30,18 @@
 
 ## 2. 行为分解（题级，n=256）
 
-| 运行 | EM | 搜索 | 作答(offline) | 作答(env提交) | 搜索且对 | 未搜索且对 | 搜索但无作答(offline) | 步/题 | invalid |
+| 运行 | EM | 搜索 | 作答(offline) | 作答(env提交) | 搜索且对 | 未搜索且对 | 搜索但无作答(offline) | 步/题 | invalid\* |
 |---|---|---|---|---|---|---|---|---|---|
-| v2 Step5 | 78 | 233 | 232 | 189 | 69 | 9 | 24 | 2.80 | 0 |
-| Step0 | 65 | 154 | 254 | 219 | 45 | 20 | 2 | 2.32 | 0 |
-| GRPO10 | 74 | 161 | 224 | 191 | 46 | 28 | 32 | 2.13 | 0 |
-| GiGPO10 | 69 | 153 | 233 | 188 | 42 | 27 | 20 | 1.95 | 0 |
+| v2 Step5 | 78 | 233 | 232 | 189 | 69 | 9 | 24 | 2.80 | 2 |
+| Step0 | 65 | 180 | 254 | 211 | 41 | 24 | 2 | 2.32 | 0 |
+| GRPO10 | 74 | 161 | 224 | 224 | 46 | 28 | 32 | 2.13 | 0 |
+| GiGPO10 | 69 | 140 | 233 | 233 | 32 | 37 | 23 | 1.95 | 0 |
+
+\* invalid = episodes 级 `invalid_query`（检索失败/api 错误，`episodes.jsonl` 判定）；
+v2 Step5 的 2 题（q5、q206）均已有作答，不在 §4 的 24 个未作答题内；
+`results.json` 的 `invalid_search_calls` 是更窄的计数口径，与这里不同。
+上表全部数值与 `gates/p3_v2_paired_stats_20260823.json` 逐项一致
+（`scripts/p3_v2_paired_stats.py` 可复算）。
 
 - **双作答口径**：`answered_offline`（results.json 合规口径，从拼接 raw
   action 抽取 `<answer>`——含混合回合中的草稿）与 `answered_env_committed`
@@ -66,9 +72,12 @@ triviaqa（+3）、popqa（+5）为正，nq（−2）、hotpotqa（−2）为负
 ## 4. v2 Step5 未作答题（24/256）终止原因分类
 
 - 24 题全部为 **max_steps_exhausted**（4 步用尽未提交 `<answer>`），
-  **invalid_query = 0**（无检索失败/api 错误/空查询导致的失败）。
-- 其中 19 题 offline 有 `<answer>` 草稿但从未提交（`drafted_never_committed`），
-  5 题连草稿都没有。
+  **invalid_query = 0**（无检索失败/api 错误/空查询导致的失败；运行内 2 个
+  invalid 题 q5/q206 均已作答，不在此列）。
+- 24 题的 raw action 中 **0 题含 `<answer>` 草稿**（`<answer>` 出现即被
+  offline 口径计入），全部 4 步都在搜索/思考，最终未收敛到提交。
+- 另注意：运行内另有 43 题 offline 有 `<answer>` 草稿但从未提交
+  （`drafted_never_committed`，env 提交 189 = 232 − 43）—— 与这 24 题不同集。
 - 搜索侧：24 题全部执行过搜索；未作答与"搜索后未能收敛到提交"对应，
   是行为变化（搜索更积极、部分轨迹未收敛），不是环境故障。
 
