@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Managed pure-evaluation wrapper for the P3 Search-aware clean v2 line
-# (pristine 20bd331b + ONLY patches/v2/v2-0001..0006; vLLM-native backend).
+# (pristine 20bd331b + ONLY patches/v2/v2-0001..0007; vLLM-native backend).
 # Independent script on purpose: the clean/official-line wrappers must never
 # grow switches (line-split convention).
 #
@@ -103,7 +103,7 @@ if [[ "${CUDA_VISIBLE_DEVICES:-}" != "1" ]]; then
   exit 14
 fi
 
-# --- v2 tree gate: rebuild pristine + patches/v2/v2-0001..0006 and diff the
+# --- v2 tree gate: rebuild pristine + patches/v2/v2-0001..0007 and diff the
 # final state against the vendor worktree (deterministic rebuild proof).
 verify_scratch="$(mktemp -d /tmp/p3v2evalpatch.XXXXXX)"
 cleanup_patch_verify() {
@@ -122,6 +122,7 @@ patch_names=(
   v2-0004-search-aware-clean-v2-step-reward
   v2-0005-v2-trajectory-return-and-question-passthrough
   v2-0006-v2-config-schema
+  v2-0007-duplicate-record-source-fix
 )
 
 git -C "$vendor_dir" archive HEAD | tar -x -C "$verify_scratch" || {
@@ -152,7 +153,7 @@ if ! diff -qr \
   --exclude='.pytest_cache' \
   --exclude='*.egg-info' \
   "$verify_scratch" "$vendor_dir" >/dev/null; then
-  echo "v2 vendor worktree does not match pristine 20bd331b + patches/v2/v2-0001..0006" >&2
+  echo "v2 vendor worktree does not match pristine 20bd331b + patches/v2/v2-0001..0007" >&2
   diff -qr \
     --exclude='.git' \
     --exclude='__pycache__' \

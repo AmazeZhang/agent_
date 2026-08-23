@@ -1194,3 +1194,31 @@ LR 调度分段问题：300 步总调度长度 vs 50/100/300 段停止点拆分�
 - **收尾**：监控 cron 与本轮 tmux 会话已清除，GPU 回基线，不启动 50 步/GiGPO，不修改
   final-confirm512。完整数字见
   `docs/P3_SEARCH_AWARE_GRPO10_RESULT_REPORT_2026-08-22.md`。
+
+---
+
+## 2026-08-23 追加：Search-aware clean v2 五步行为实验 + Step5 评测（闭环）
+
+- **死锁根因修复 + smoke 11/11**：见
+  `docs/P3_V2_DEADLOCK_ROOTCAUSE_FIX_2026-08-23.md`（per-rank `continue` 跳过 →
+  collective-uniform 零损失前向+反向；v2-0007；D13；回放门禁；REBUILD_IDENTICAL）。
+- **5 步行为训练完成**：`p3-search-aware-clean-v2-behavior-fsdp6-b66-n5-s5-20260823d`，
+  5/5 at 2:02:15，exit 0，每步 audit 健康（records 781-829，adv 严格对称
+  ±1.789），checkpoints gs1-5，graceful shutdown。
+- **Step5 merge + verify**：`p3-v2-behavior-gs5-merged-20260823d`，MERGE_EXIT=0，
+  VERIFY_MERGED: PASS。
+- **主评测（greedy official-confirm256-v1，GPU1-only）**：EM **78/256 = 30.5%**，
+  该评测集当前所有对比线第一（Step0 65/25.4%、GRPO10 74/28.9%、GiGPO10 69/27.0%、
+  upstream 7/2.7%）；Wilson 95% 区间与第二名重叠 → 方向性正面、非显著性；
+  搜索积极（2.80 步/题，233/256 搜索），search→correct 0.296（GRPO10 的
+  search→correct=0 问题未复现）。
+- **dev64 sampling 诊断（GPU1-only）**：temperature=1.0 × 5 rollouts，题级正确
+  27/64 = 42.2%，64/64 作答。
+- **问题与解决**：(1) eval wrapper v2 树门禁/标签停留在 0001..0006（首次启动
+  exit 15）→ 统一为 0001..0007 并重建验证后重跑；(2) `decoding_backend` 静态
+  标签 → 按 temperature 派生；两 run 的归档 results.json 受影响字段已就地修正；
+  (3) musique 双评测 0、greedy 24/256 未作答 —— 行为诊断项，未自动调参。
+- **收尾**：本轮 6 个 tmux 会话（smoke b/c/d、behavior、2×eval）已清除；
+  13 个旧 8/19–8/21 会话未动；GPU 回基线；不启动 Step10/50、GiGPO、
+  final-confirm512。完整数字与边界见
+  `docs/P3_V2_BEHAVIOR_EVAL_REPORT_2026-08-23.md`。

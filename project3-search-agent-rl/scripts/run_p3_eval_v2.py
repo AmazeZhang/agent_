@@ -739,7 +739,7 @@ def jsonable(value: Any) -> Any:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--v2-dir", type=Path, required=True, help="v2 tree (vendor/verl-agent-v2): pristine 20bd331b + patches/v2/v2-0001..0006, must be FIRST on PYTHONPATH")
+    parser.add_argument("--v2-dir", type=Path, required=True, help="v2 tree (vendor/verl-agent-v2): pristine 20bd331b + patches/v2/v2-0001..0007, must be FIRST on PYTHONPATH")
     parser.add_argument("--pristine-dir", type=Path, required=True, help="pristine reference tree (vendor/upstream-20bd331b) for the protocol byte-equality gate")
     parser.add_argument("--model", type=Path, required=True, help="full HF model directory (official merged GRPO checkpoint)")
     parser.add_argument("--tokenizer", type=Path, default=None, help="tokenizer directory for input rendering (defaults to --model)")
@@ -964,11 +964,13 @@ def main() -> int:
     result = {
         "schema_version": 1,
         "kind": "p3-search-aware-clean-v2-evaluation",
-        "line": "v2 line: pristine 20bd331b + patches/v2/v2-0001..0006 (clean protocol restored)",
+        "line": "v2 line: pristine 20bd331b + patches/v2/v2-0001..0007 (clean protocol restored)",
         "runtime_script_sha256": sha256_file(Path(__file__).resolve()),
         "training": False,
         "training_operations": "none by construction: no optimizer, no scheduler, no backward, no Ray",
-        "decoding_backend": "vllm-native-greedy",
+        # truthful label: greedy main eval vs sampling diagnosis (the
+        # authoritative decoding parameters live in the `parameters` block)
+        "decoding_backend": "vllm-native-greedy" if temperature == 0.0 else "vllm-native-sampling",
         "engine": {
             **engine_info,
             "dtype": VLLM_DTYPE,
