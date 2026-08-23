@@ -92,9 +92,15 @@ verify_p3_merged_model.py --merged-dir …/p3-v2-behavior-gs5-merged-20260823d
 | **合计** | **256** | **78** | **30.5%** |
 
 - 行为侧：233/256 搜索（91.0%），232/256 作答（90.6%），平均 2.80 步/题
-  （716 步）。与 GRPO10（2.13 步）和 GiGPO10（1.95 步）相比，v2 Step5
-  **搜索更积极**且 search→correct 0.296（GRPO10 为 0/62 即 0.0 —— 2026-08-22
-  报告 §4 的关键问题在本线上未复现）。
+  （716 步）。**v2 Step5 优势的准确表述**：overall EM 比 clean GRPO10 多 4 题
+  （78 vs 74），搜索率和 searched-and-correct 绝对数量更高（233 vs 161 题搜索、
+  searched-and-correct 69 vs 46），但未证明统计显著（Wilson 95% 区间重叠，
+  见 §6）；**"执行过搜索并答对"不等于"因检索证据而答对"** —— 证据因果性由
+  反事实检索评测（`docs/P3_V2_COUNTERFACTUAL_RETRIEVAL_2026-08-23.md`）检验。
+  （对照澄清：clean GRPO10 的 search→correct = 0.286（46/161），并非 0；
+  "search→correct = 0/62" 属于失败的 **Search-aware patched v1 GRPO10**
+  （2026-08-22 报告，EM 11.7%/搜索率 24.2%），与 clean 线是不同协议，
+  不构成 v2 Step5 的对比基线。）
 - 24/256 未作答：行为诊断项（见 §6）。
 
 ## 4. dev64 sampling 诊断（GPU1-only）

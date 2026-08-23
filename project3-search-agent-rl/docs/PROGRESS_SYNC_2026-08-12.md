@@ -1210,8 +1210,12 @@ LR 调度分段问题：300 步总调度长度 vs 50/100/300 段停止点拆分�
 - **主评测（greedy official-confirm256-v1，GPU1-only）**：EM **78/256 = 30.5%**，
   该评测集当前所有对比线第一（Step0 65/25.4%、GRPO10 74/28.9%、GiGPO10 69/27.0%、
   upstream 7/2.7%）；Wilson 95% 区间与第二名重叠 → 方向性正面、非显著性；
-  搜索积极（2.80 步/题，233/256 搜索），search→correct 0.296（GRPO10 的
-  search→correct=0 问题未复现）。
+  搜索积极（2.80 步/题，233/256 搜索），search→correct 0.296；与 clean GRPO10
+  相比 EM 多 4 题、搜索率和 searched-and-correct 绝对数量更高（233 vs 161 题、
+  69 vs 46）。（对照澄清：clean GRPO10 search→correct = 0.286 并非 0；
+  "search→correct=0/62" 属于失败的 Search-aware patched v1 GRPO10，
+  与 clean 线不同协议，不构成 v2 的对比基线；"搜索并答对"≠"因证据答对"，
+  因果性由反事实检索评测检验。）
 - **dev64 sampling 诊断（GPU1-only）**：temperature=1.0 × 5 rollouts，题级正确
   27/64 = 42.2%，64/64 作答。
 - **问题与解决**：(1) eval wrapper v2 树门禁/标签停留在 0001..0006（首次启动
@@ -1222,3 +1226,38 @@ LR 调度分段问题：300 步总调度长度 vs 50/100/300 段停止点拆分�
   13 个旧 8/19–8/21 会话未动；GPU 回基线；不启动 Step10/50、GiGPO、
   final-confirm512。完整数字与边界见
   `docs/P3_V2_BEHAVIOR_EVAL_REPORT_2026-08-23.md`。
+
+## 2026-08-23 追加（二）：配对统计 + 证据反事实评测（门禁通过 → fresh 10-step 已启动）
+
+- **文档事实修正**：clean GRPO10 的 search→correct = 0.286（46/161），
+  "search→correct=0/62" 仅属于失败的 Search-aware patched v1 GRPO10 ——
+  报告中两处误引已修正（行为报告 §3 与 PROGRESS_SYNC 上节），历史 v1 报告未动。
+- **严格逐题配对统计**（`gates/p3_v2_paired_stats_20260823.json`）：四组配对
+  精确双侧 McNemar p 全部 >0.05 —— v2 Step5 vs Step0 净 +13 (p=0.066)、vs
+  GRPO10 净 +4 (p=0.659)、vs GiGPO10 净 +9 (p=0.272)、GRPO10 vs Step0 净 +9
+  (p=0.243)。**"当前第一名"维持方向性正面、非显著性**；双作答口径
+  （offline 合规 232 vs env 提交 189 → 43 题起草未提交）与混合回合模式
+  （169 回合/164 题）为行为信号。
+- **证据反事实评测（门禁 5/5 通过）**：同 merged v2 Step5、同 confirm256、
+  greedy、GPU1-only，仅改证据内容（vendor 零改动、运行时补丁、预注册映射
+  `(i+17) mod 256` + SHA）。real 78 vs shuffled 10 vs no-evidence 15；配对
+  McNemar real-vs-shuffled 68:0、real-vs-no-evidence 67:4（p≈0）；real 的 69
+  个搜索且正确在 shuffled/no-evidence 下翻转 68/67 个；未搜索 23 题三条件全
+  部 9/9 相同（内部对照完美）；搜索率三条件逐字节相同（233/256）、0 环境错误；
+  文档级证据内容独立核对 31/31 匹配。结论：**"搜索并答对"几乎全部"因证据
+  答对"，证据因果性成立**。详见
+  `docs/P3_V2_COUNTERFACTUAL_RETRIEVAL_2026-08-23.md`、
+  `docs/P3_V2_PAIRED_STATS_REPORT_2026-08-23.md`。
+- **问题与解决**：(1) 首启 shuffled 时补丁破坏了 `@tool` 描述符注册 →
+  "Tool 'search' not found"（所有搜索变 tool_exception）→ 立即终止、删除污染
+  run；修复为保留原始未装饰函数 + 以 `tool()` 重包装 + 函数名保持 "search"
+  （描述符以 func.__name__ 注册），冒烟 29/29 PASS（含真实注册路径）后重跑；
+  (2) 修复 eval 脚本潜在 NameError（`temperature` 未定义，先前脚本改动的
+  遗留）。(3) 反事实仅限 confirm256 主模式（wrapper exit 20 门禁 + python
+  双重门禁）。
+- **fresh v2 10-step 已启动**（门禁通过后授权）：Run ID
+  `p3-search-aware-clean-v2-grpo10-fsdp6-b66-n5-s0-20260823a`，
+  Qwen2.5-3B-Instruct Step0 从头、total=10、save_freq=5（gs5+gs10）、配置与
+  v2 Step5 完全一致（指纹 `d727b64f…`，ten-step profile 门禁 exit 30-35 全部
+  通过）、warmup 0.285、GPU 1,2,3,4,6,7、tmux + run_managed；训练中，10 项
+  中止条件监控中。

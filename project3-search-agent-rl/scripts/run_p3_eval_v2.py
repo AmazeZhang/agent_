@@ -359,6 +359,174 @@ def step_search_query(step: dict[str, Any]) -> str | None:
     return query if query else None
 
 
+NO_EVIDENCE_TEXT = (
+    "No relevant documents were found for this query. "
+    "The knowledge base returned no evidence about this question."
+)
+RETRIEVAL_CONDITIONS = ("real", "shuffled", "no-evidence")
+
+
+def install_retrieval_condition(
+    condition: str,
+    shuffle_step: int,
+    no_evidence_docs: int,
+    question_texts: list[str],
+):
+    """Runtime-only counterfactual retrieval conditions (vendor tree untouched).
+
+    The v2-tree gate verifies the vendor directory byte-for-byte; this patch
+    exists only in this process and only changes the EVIDENCE CONTENT, never
+    the model's prompts, projection, decoding or step budget.
+
+      - real:        no patch (baseline run).
+      - shuffled:    the model's real query is still retrieved for real first
+                     (status truthfulness: errors / empty / no-results are kept
+                     verbatim and never remapped). On success, the returned
+                     evidence is replaced by the REAL docs of the fixed-mapped
+                     other question ((i + shuffle_step) mod N), fetched with
+                     that question's text as the query -- deterministic mapping,
+                     real counts/format/status, never fabricated errors.
+      - no-evidence: every successful search returns the fixed neutral envelope
+                     (fixed cached content, no retriever call, no
+                     invalid_query/api_error); a genuinely invalid query (None)
+                     keeps its original invalid path.
+
+    Each env's SearchToolGroup carries _p3_question_index (stamped by the
+    returned callable before use) so the mapping keys on the QUESTION index,
+    not on the model-generated query text.
+    """
+    if condition == "real":
+
+        def noop_stamp(envs, batch_records):  # type: ignore[return-value]
+            return {}
+
+        noop_stamp.counters = {}  # type: ignore[attr-defined]
+        return noop_stamp
+
+    import json as _json
+
+    from agent_system.environments.env_package.search.third_party.skyrl_gym.tools.core import tool  # noqa: E402
+    from agent_system.environments.env_package.search.third_party.skyrl_gym.tools.search import (  # noqa: E402
+        SearchToolGroup,
+        _passages2string,
+        call_search_api,
+    )
+
+    n_questions = len(question_texts)
+    counters = {
+        "shuffled_served": 0,
+        "shuffled_fallback_to_real": 0,
+        "real_failure_kept": 0,
+        "no_evidence_served": 0,
+    }
+    # SearchToolGroup.search is a @tool DESCRIPTOR (tools/core.py): instances
+    # register tools at __init__ time by scanning class attributes for `tool`
+    # instances, and execute_tool() dispatches through the registry. The patch
+    # must therefore (a) keep the original UNDECORATED function as the real
+    # retrieval path, and (b) re-wrap the replacement as a `tool` descriptor,
+    # or every new env's _register_tools() misses "search" and every search
+    # step dies with "Tool 'search' not found".
+    orig_search = SearchToolGroup.search.func
+
+    def patched_search(self, query):
+        qidx = getattr(self, "_p3_question_index", None)
+        if query is None or qidx is None:
+            return orig_search(self, query)
+        qidx = int(qidx)
+        if condition == "shuffled":
+            # 1) real retrieval of the model's own query (real status recorded)
+            real_result = orig_search(self, query)
+            if self.last_call_metadata.get("status") != "success":
+                counters["real_failure_kept"] += 1
+                return real_result  # never remap errors/empty/no-results
+            # 2) fixed mapping: real docs of the other question (its text as query)
+            other_idx = (qidx + shuffle_step) % n_questions
+            api_response, err = call_search_api(
+                self.search_url,
+                question_texts[other_idx],
+                topk=self.topk,
+                timeout=self.timeout,
+                log_requests=False,
+                session=self.session,
+            )
+            if err is not None or api_response is None:
+                counters["shuffled_fallback_to_real"] += 1
+                return real_result  # honest fallback: real docs for THIS question
+            raw = api_response.get("result", [])
+            pretty = [_passages2string(r) for r in raw]
+            final_result = "\n---\n".join(pretty)
+            total = sum(len(r) if isinstance(r, list) else 1 for r in raw)
+            doc_ids = [
+                str(item.get("document", {}).get("id"))
+                for r in raw
+                if isinstance(r, list)
+                for item in r
+                if item.get("document", {}).get("id") is not None
+            ]
+            # keep "query" = the model's actual query; evidence fields = the
+            # other question's REAL retrieval, including its real outcome
+            # (genuinely empty result -> faithful no_results envelope, same
+            # as the original search's no_results branch)
+            if not raw:
+                self.last_call_metadata.update(
+                    {
+                        "api_response": api_response,
+                        "status": "no_results",
+                        "total_results": 0,
+                        "document_ids": [],
+                        "formatted_result": None,
+                    }
+                )
+                counters["shuffled_served"] += 1
+                return _json.dumps({"result": "No search results found."})
+            self.last_call_metadata.update(
+                {
+                    "api_response": api_response,
+                    "status": "success",
+                    "total_results": total,
+                    "document_ids": doc_ids,
+                    "formatted_result": final_result,
+                }
+            )
+            counters["shuffled_served"] += 1
+            return _json.dumps({"result": final_result})
+        # no-evidence: fixed neutral cache, legal success envelope. Build a
+        # fresh metadata dict: on a fresh env's FIRST search last_call_metadata
+        # is None (vendor __init__), so update() on it would crash.
+        neutral = "\n---\n".join(
+            f"Doc {k + 1}: {NO_EVIDENCE_TEXT}" for k in range(no_evidence_docs)
+        )
+        self.last_call_metadata = {
+            "query": query,
+            "api_request_error": None,
+            "api_response": None,
+            "status": "success",
+            "total_results": no_evidence_docs,
+            "document_ids": [f"noev-{k}" for k in range(no_evidence_docs)],
+            "formatted_result": neutral,
+        }
+        counters["no_evidence_served"] += 1
+        return _json.dumps({"result": neutral})
+
+    # the tool descriptor registers under func.__name__ -- it must stay
+    # "search" or execute_tool("search", ...) misses the registry
+    patched_search.__name__ = "search"
+    SearchToolGroup.search = tool(patched_search)
+
+    def stamp(envs, batch_records):
+        stamped = {}
+        for local_index, env in enumerate(envs.envs):
+            tool_group = getattr(env, "tool_group", None)
+            if tool_group is not None:
+                qidx = batch_records[local_index].get("question_id")
+                tool_group._p3_question_index = qidx
+                stamped[local_index] = qidx
+        return stamped
+
+    stamp.counters = counters  # type: ignore[attr-defined]
+    return stamp
+
+
 def step_search_succeeded(step: dict[str, Any]) -> bool:
     observation = step.get("observation") or ""
     return "<information>" in observation and bool(step.get("information_returned"))
@@ -774,6 +942,29 @@ def parse_args() -> argparse.Namespace:
         help="rollouts per question (main mode: 1; behaviour diagnosis: 5). "
         "Each rollout i uses seed = --seed + i for reproducibility.",
     )
+    parser.add_argument(
+        "--retrieval-condition",
+        choices=RETRIEVAL_CONDITIONS,
+        default="real",
+        help="evidence condition: real (baseline); shuffled (real retrieval "
+        "first, then evidence replaced by the fixed-mapped other question's "
+        "real docs via (i + --shuffle-step) mod N); no-evidence (legal "
+        "success envelope with fixed neutral content). Only in main mode "
+        "(greedy, num_rollouts=1).",
+    )
+    parser.add_argument(
+        "--shuffle-step",
+        type=int,
+        default=17,
+        help="fixed mapping offset for the shuffled condition: evidence of "
+        "question i is replaced by question (i + shuffle_step) mod N.",
+    )
+    parser.add_argument(
+        "--no-evidence-docs",
+        type=int,
+        default=3,
+        help="number of neutral docs returned by the no-evidence envelope.",
+    )
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
@@ -798,6 +989,12 @@ def main() -> int:
     if args.num_rollouts < 1:
         raise ValueError(f"--num-rollouts must be >= 1, got {args.num_rollouts}")
     main_mode = args.temperature == 0.0 and args.num_rollouts == 1
+    if args.retrieval_condition != "real" and not main_mode:
+        raise ValueError(
+            f"--retrieval-condition={args.retrieval_condition} requires main mode "
+            "(temperature=0.0, num_rollouts=1): counterfactual evidence conditions "
+            "are only defined for the single greedy pass per question"
+        )
     # Behaviour diagnosis (num_rollouts>1): replicate each question, tagging
     # the rollout index; each rollout i is seeded with --seed + i so the whole
     # run is reproducible. Main mode (greedy, 1 rollout): no replication.
@@ -806,6 +1003,46 @@ def main() -> int:
         for rollout_index in range(args.num_rollouts):
             expanded.append({**record, "question_id": question_index, "rollout_index": rollout_index})
     records = expanded
+    # Counterfactual conditions key on the QUESTION index (0..N-1, file order,
+    # identical to the real run: same loader, same data file -> same order).
+    # The mapping is FIXED and pre-registered before any episode runs.
+    question_texts = [record["question"] for record in records]
+    stamp_question_index = install_retrieval_condition(
+        args.retrieval_condition, args.shuffle_step, args.no_evidence_docs, question_texts
+    )
+    if args.retrieval_condition != "real":
+        mapping = {
+            qidx: (qidx + args.shuffle_step) % len(question_texts)
+            for qidx in range(len(question_texts))
+        }
+        prereg = {
+            "kind": "p3-counterfactual-preregistration",
+            "condition": args.retrieval_condition,
+            "shuffle_step": args.shuffle_step,
+            "no_evidence_docs": args.no_evidence_docs,
+            "n_questions": len(question_texts),
+            "mapping_spec": "shuffled: evidence of question i replaced by the REAL "
+            "docs of question (i + shuffle_step) mod N, fetched with that question's "
+            "text as the query; real retrieval of the model's own query executes "
+            "first and non-success statuses are kept verbatim",
+            "mapping": mapping,
+            "mapping_sha256": hashlib.sha256(
+                json.dumps(mapping, sort_keys=True).encode()
+            ).hexdigest(),
+            "data_sha256": data_hash["sha256"],
+            "model_path": str(args.model.resolve()),
+            "seed": args.seed,
+            "temperature": args.temperature,
+            "max_steps": args.max_steps,
+            "topk": args.topk,
+            "created_before_episode_loop": True,
+        }
+        prereg_path = run_dir / "retrieval_condition_preregistration.json"
+        prereg_path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_json(prereg_path, prereg)
+        print(f"preregistration={json.dumps({k: v for k, v in prereg.items() if k != 'mapping'}, ensure_ascii=False)}")
+        print(f"preregistration_mapping_sha256={prereg['mapping_sha256']}")
+        print(f"preregistration_file={prereg_path}")
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     torch.backends.cuda.matmul.allow_tf32 = False
@@ -865,6 +1102,11 @@ def main() -> int:
                 is_train=False,
                 env_config=env_config,
             )
+            stamped = stamp_question_index(envs, batch_records)
+            if args.retrieval_condition != "real":
+                assert len(stamped) == len(batch_records), (
+                    f"question-index stamping incomplete: {len(stamped)}/{len(batch_records)}"
+                )
             manager = SearchEnvironmentManager(envs, partial(search_projection), config)
             kwargs = [
                 {
@@ -970,7 +1212,7 @@ def main() -> int:
         "training_operations": "none by construction: no optimizer, no scheduler, no backward, no Ray",
         # truthful label: greedy main eval vs sampling diagnosis (the
         # authoritative decoding parameters live in the `parameters` block)
-        "decoding_backend": "vllm-native-greedy" if temperature == 0.0 else "vllm-native-sampling",
+        "decoding_backend": "vllm-native-greedy" if args.temperature == 0.0 else "vllm-native-sampling",
         "engine": {
             **engine_info,
             "dtype": VLLM_DTYPE,
@@ -1016,6 +1258,28 @@ def main() -> int:
             "max_input_tokens": args.max_input_tokens,
             "max_new_tokens": args.max_new_tokens,
             "main_mode": main_mode,
+            "retrieval_condition": args.retrieval_condition,
+            "shuffle_step": args.shuffle_step,
+            "no_evidence_docs": args.no_evidence_docs,
+        },
+        "retrieval_condition": {
+            "condition": args.retrieval_condition,
+            "shuffle_step": args.shuffle_step,
+            "no_evidence_docs": args.no_evidence_docs,
+            "counters": stamp_question_index.counters,
+            "preregistration": (
+                {
+                    "file": str((run_dir / "retrieval_condition_preregistration.json").resolve()),
+                    "mapping_sha256": prereg["mapping_sha256"] if args.retrieval_condition != "real" else None,
+                }
+                if args.retrieval_condition != "real"
+                else None
+            ),
+            "note": (
+                "vendor tree byte-identical (v2-tree gate); this patch is runtime-only, "
+                "changes EVIDENCE CONTENT only, never prompt/projection/decoding/step budget; "
+                "real condition = no patch"
+            ),
         },
         "metrics": metrics,
         "prompt_check": prompt_check,

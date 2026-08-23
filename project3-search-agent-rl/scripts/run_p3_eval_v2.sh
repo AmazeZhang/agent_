@@ -26,11 +26,24 @@
 #   PROJECT3_EVAL_TOKENIZER=<absolute path to tokenizer>  (default Qwen2.5-3B BASE)
 #   PROJECT3_EVAL_TEMPERATURE=<0.0 greedy main | >0 diagnosis>  (default 0.0)
 #   PROJECT3_EVAL_NUM_ROLLOUTS=<1 main | 5 diagnosis>           (default 1)
+#   PROJECT3_EVAL_RETRIEVAL_CONDITION=<real|shuffled|no-evidence>  (default real)
+#       Counterfactual evidence conditions (main mode only, confirm256 only):
+#         shuffled    -- model's own query retrieved for real first; on success
+#                        the evidence is replaced by the REAL docs of the fixed
+#                        mapping (i + PROJECT3_EVAL_SHUFFLE_STEP) mod 256.
+#                        Errors/empty/no-results of the real call are kept
+#                        verbatim (never remapped); the run is pre-registered
+#                        with the fixed mapping + SHA before any episode runs.
+#         no-evidence -- every successful search returns the fixed neutral
+#                        envelope; no retriever call; no invalid/error.
+#   PROJECT3_EVAL_SHUFFLE_STEP=<int>    (default 17, fixed mapping offset)
+#   PROJECT3_EVAL_NO_EVIDENCE_DOCS=<int> (default 3, neutral docs in envelope)
 #   bash scripts/run_p3_eval_v2.sh
 #
 # Exit codes: 10 v2-tree commit mismatch, 11 missing paths, 12 retriever URL,
 # 13 not managed, 14 GPU mapping, 15 v2 tree dirty / rebuild mismatch,
-# 16 merged-model verification failed, 19 unknown eval data.
+# 16 merged-model verification failed, 19 unknown eval data,
+# 20 counterfactual condition outside its allowed scope (confirm256 main mode).
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,6 +68,9 @@ tokenizer_path="${PROJECT3_EVAL_TOKENIZER:-${project_data}/models/Qwen2.5-3B}"
 eval_data="${PROJECT3_EVAL_DATA:-smoke}"
 eval_temperature="${PROJECT3_EVAL_TEMPERATURE:-0.0}"
 eval_num_rollouts="${PROJECT3_EVAL_NUM_ROLLOUTS:-1}"
+eval_retrieval_condition="${PROJECT3_EVAL_RETRIEVAL_CONDITION:-real}"
+eval_shuffle_step="${PROJECT3_EVAL_SHUFFLE_STEP:-17}"
+eval_no_evidence_docs="${PROJECT3_EVAL_NO_EVIDENCE_DOCS:-3}"
 retriever_url="${PROJECT3_RETRIEVER_URL:-http://127.0.0.1:18080/retrieve}"
 run_dir="${PROJECT3_RUN_DIR:-${project_data}/dry-run/p3-eval-v2}"
 
@@ -79,6 +95,28 @@ case "$eval_data" in
     exit 19
     ;;
 esac
+
+# Counterfactual conditions are defined ONLY for the confirm-256 greedy main
+# pass (same question set, same model, strict pairing). Fail closed anywhere
+# else; the python side independently re-checks main mode.
+case "${eval_retrieval_condition}" in
+  real|shuffled|no-evidence) ;;
+  *)
+    echo "PROJECT3_EVAL_RETRIEVAL_CONDITION must be real, shuffled or no-evidence, got: ${eval_retrieval_condition}" >&2
+    exit 20
+    ;;
+esac
+if [[ "${eval_retrieval_condition}" != "real" ]]; then
+  if [[ "${eval_data}" != "official-confirm256-v1" ]]; then
+    echo "counterfactual condition ${eval_retrieval_condition} requires PROJECT3_EVAL_DATA=official-confirm256-v1 (got ${eval_data})" >&2
+    exit 20
+  fi
+  if [[ "${eval_temperature}" != "0.0" || "${eval_num_rollouts}" != "1" ]]; then
+    echo "counterfactual condition ${eval_retrieval_condition} requires greedy main mode (temperature=0.0, num_rollouts=1), got ${eval_temperature}/${eval_num_rollouts}" >&2
+    exit 20
+  fi
+fi
+
 leakage_reference="${project_data}/datasets/searchr1-smoke/train.parquet"
 
 for required_path in "$python_bin" "$model_path" "$tokenizer_path" "$data_files" "$manifest_path" "$leakage_reference"; do
@@ -269,6 +307,8 @@ sampler_pid=$!
   --max-steps 4 --history-length 4 --topk 3 --timeout 180 \
   --max-input-tokens 3072 --max-new-tokens 256 --seed 0 \
   --temperature "$eval_temperature" --num-rollouts "$eval_num_rollouts" \
+  --retrieval-condition "$eval_retrieval_condition" \
+  --shuffle-step "$eval_shuffle_step" --no-evidence-docs "$eval_no_evidence_docs" \
   --max-envs-per-batch 24
 status=$?
 

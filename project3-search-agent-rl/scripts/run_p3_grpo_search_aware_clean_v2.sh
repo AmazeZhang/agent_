@@ -38,6 +38,13 @@
 #   behavior: exactly 5 steps (the v2 5-step behavior experiment), save_freq=1
 #     so every step's checkpoint + rollout audit are preserved. Fresh start
 #     from Step0 -- must NOT resume from the eng-smoke run.
+#   ten-step: exactly 10 steps (the v2 GRPO10 continuation, 2026-08-23
+#     directive, gated on the counterfactual evidence-usage gate PASS).
+#     save_freq=5 (checkpoints at gs5 + gs10), fresh from Qwen2.5-3B-Instruct
+#     Step0 (resume forbidden), config fingerprint fixed to the v2 Step5
+#     reference (same optimizer/env/reward/v2 switches), warmup ratio 0.285
+#     (actual warmup steps recorded per step in the rollout audit). Requires
+#     PROJECT3_TEN_STEP_APPROVED=yes (fail-closed approval env).
 #
 # Every GPU launch must go through scripts/run_managed.sh (PROJECT3_RUN_ID /
 # PROJECT3_RUN_DIR required below); physical GPUs 1,2,3,4,6,7 only.
@@ -71,8 +78,8 @@ resume_from="${PROJECT3_RESUME_FROM:-}"
 
 profile="${PROJECT3_TRAIN_PROFILE:-eng-smoke}"
 case "$profile" in
-  eng-smoke|behavior) ;;
-  *) echo "unknown PROJECT3_TRAIN_PROFILE: ${profile} (eng-smoke|behavior)" >&2; exit 20 ;;
+  eng-smoke|behavior|ten-step) ;;
+  *) echo "unknown PROJECT3_TRAIN_PROFILE: ${profile} (eng-smoke|behavior|ten-step)" >&2; exit 20 ;;
 esac
 
 mode="run"
@@ -124,6 +131,42 @@ if [[ "$profile" == "behavior" ]]; then
     exit 27
   fi
   save_freq="1"  # keep every step's checkpoint + rollout audit
+fi
+if [[ "$profile" == "ten-step" ]]; then
+  if [[ "$total_training_steps" != "10" ]]; then
+    echo "fail-closed: ten-step (v2 GRPO10) total_training_steps must be 10 (got: ${total_training_steps})" >&2
+    exit 31
+  fi
+  if [[ "${PROJECT3_TEN_STEP_APPROVED:-}" != "yes" ]]; then
+    echo "fail-closed: ten-step profile requires PROJECT3_TEN_STEP_APPROVED=yes (counterfactual evidence-usage gate must PASS and the user must approve the 10-step GPU action)" >&2
+    exit 30
+  fi
+  if [[ "$save_freq" != "5" ]]; then
+    echo "fail-closed: ten-step save_freq must be 5 (checkpoints at gs5 + gs10), got: ${save_freq}" >&2
+    exit 33
+  fi
+  if [[ "$resume_from" != "" ]]; then
+    echo "fail-closed: ten-step starts FRESH from Step0 (resume forbidden), got: ${resume_from}" >&2
+    exit 32
+  fi
+  # model fixed to the clean Step0 start (the SAME model the 5-step run and
+  # the clean GRPO10 line started from); the scheduler horizon differs from
+  # the behavior run's, so resuming from a behavior checkpoint is out.
+  reference_model="${project_data}/models/Qwen2.5-3B-Instruct"
+  if [[ "$(readlink -f "$model_path")" != "$(readlink -f "$reference_model")" ]]; then
+    echo "fail-closed: ten-step must start from Qwen2.5-3B-Instruct Step0 (got: ${model_path})" >&2
+    exit 34
+  fi
+  # config fingerprint fixed to the v2 Step5 reference values: identical
+  # optimizer / env / reward / v2 switches; any deviation aborts.
+  if [[ "$train_batch_size" != "66" || "$gpu_memory_utilization" != "0.60" \
+        || "$max_num_seqs" != "64" || "$official_lr" != "1e-6" \
+        || "$official_kl" != "0.001" || "$official_warmup_ratio" != "0.285" \
+        || "$env_max_steps" != "4" || "$env_history_length" != "4" \
+        || "$trainer_seed" != "1234" || "$data_seed" != "1234" ]]; then
+    echo "fail-closed: ten-step config must equal the v2 Step5 reference (train_batch_size=66, gpu_mem=0.60, max_num_seqs=64, lr=1e-6, kl=0.001, warmup=0.285, max_steps=4, history=4, seed=1234/1234)" >&2
+    exit 35
+  fi
 fi
 
 for required_path in "$python_bin" "$model_path" "$train_parquet" "$val_dir/test.parquet"; do
