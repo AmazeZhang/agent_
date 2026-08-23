@@ -1,0 +1,35 @@
+diff --git a/agent_system/multi_turn_rollout/rollout_loop.py b/agent_system/multi_turn_rollout/rollout_loop.py
+--- a/agent_system/multi_turn_rollout/rollout_loop.py
++++ b/agent_system/multi_turn_rollout/rollout_loop.py
+@@ -375,6 +375,12 @@ class TrajectoryCollector:
+             else:
+                 batch.non_tensor_batch['is_action_valid'] = np.ones(batch_size, dtype=bool)
+ 
++            batch.non_tensor_batch['env_step'] = np.full(batch_size, _step, dtype=np.int64)
++            batch.non_tensor_batch['retrieval'] = np.array([info.get('retrieval') for info in infos], dtype=object)
++            batch.non_tensor_batch['retrieval_failed'] = np.array(
++                [bool(info.get('retrieval_failed', False)) for info in infos], dtype=bool
++            )
++
+             if 'tool_calling' in infos[0]:
+                 tool_callings[active_masks] += np.array([info['tool_calling'] for info in infos], dtype=np.float32)[active_masks]
+             # Create reward tensor, only assign rewards for active environments
+diff --git a/verl/trainer/ppo/ray_trainer.py b/verl/trainer/ppo/ray_trainer.py
+--- a/verl/trainer/ppo/ray_trainer.py
++++ b/verl/trainer/ppo/ray_trainer.py
+@@ -1266,6 +1266,15 @@ class RayPPOTrainer:
+                                 reward_extra_infos_dict=reward_extra_infos_dict,
+                                 dump_path=rollout_data_dir,
+                             )
++                            from searchr1_repro.training_audit import dump_rollout_audit
++
++                            audit_path = os.path.join(rollout_data_dir, f"{self.global_steps}.audit.jsonl")
++                            dump_rollout_audit(
++                                batch,
++                                audit_path,
++                                multi_turn=batch.meta_info.get("multi_turn", False),
++                            )
++                            print(f"Dumped rollout audit to {audit_path}")
+ 
+                     # validate
+                     if self.val_reward_fn is not None and self.config.trainer.test_freq > 0 and (is_last_step or self.global_steps % self.config.trainer.test_freq == 0):

@@ -1,0 +1,35 @@
+diff --git a/verl/trainer/config/ppo_trainer.yaml b/verl/trainer/config/ppo_trainer.yaml
+index d0f68ba..19bb87c 100644
+--- a/verl/trainer/config/ppo_trainer.yaml
++++ b/verl/trainer/config/ppo_trainer.yaml
+@@ -223,6 +223,10 @@ reward_model:
+   use_dynamic_bsz: ${critic.use_dynamic_bsz}
+   forward_max_token_len_per_gpu: ${critic.forward_max_token_len_per_gpu}
+   reward_manager: episode
++  # P3 patch v2-0004: search-aware clean-v2 step-attributed rewards
++  # (off by default -- the clean baseline keeps byte-identical behavior; must
++  # match env.search.search_aware_step_reward=true on v2 runs).
++  search_aware_step_reward: false
+   launch_reward_fn_async: False # custom reward function executed async on CPU, during log_prob
+   sandbox_fusion:
+     url: null # faas url to run code in cloud sandbox
+@@ -236,6 +240,9 @@ algorithm:
+   lam: 1.0
+   adv_estimator: gae
+   norm_adv_by_std_in_grpo: True
++  # P3 patch v2-0005: v2 trajectory-return GRPO normalization (off by default;
++  # requires reward_model.search_aware_step_reward=true -- main_ppo fails closed).
++  search_v1_trajectory_return: false
+   use_kl_in_reward: False
+   kl_penalty: kl  # how to estimate kl divergence
+   kl_ctrl:
+@@ -306,6 +313,9 @@ env:
+     search_url: "http://127.0.0.1:8000/retrieve" # also support multiple urls: ["http://127.0.0.1:8000/retrieve", "http://127.0.0.1:8001/retrieve"]
+     topk: 3
+     timeout: 60
++    # P3 patch v2-0006: search-aware clean-v2 step-attributed rewards
++    # (off by default -- the clean baseline keeps byte-identical behavior).
++    search_aware_step_reward: false
+   sokoban:
+     dim_room: [6, 6]
+     num_boxes: 1

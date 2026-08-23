@@ -2,3 +2,5 @@
 # clean-upstream evaluation line. Content is byte-identical to vendor/verl-agent
 # at commit 20bd331b with NO patches applied; never committed.
 vendor/upstream-20bd331b/
+# P3 Search-aware clean v2 worktree (20bd331b + v2 patches; never committed).
+vendor/verl-agent-v2/

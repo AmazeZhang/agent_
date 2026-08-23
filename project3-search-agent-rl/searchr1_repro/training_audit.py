@@ -78,9 +78,15 @@ def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, mult
         # component totals, for offline replay verification and sum-consistency
         # checks. search_v1_group (patch 0008) is the informational per-uid rollup.
         "search_v1", "search_v1_episode", "search_v1_group",
+        # P3 v2 (2026-08-23): synthetic padding rows (adjust_batch) are not
+        # training records; they are skipped from the audit output and real
+        # records carry is_padding=False.
+        "is_padding",
     )
     records = []
     for index in range(input_ids.shape[0]):
+        if non_tensor_batch.get("is_padding") is not None and bool(non_tensor_batch["is_padding"][index]):
+            continue
         full_policy_mask = torch.cat(
             (torch.zeros(prompt_width, dtype=response_policy_mask.dtype), response_policy_mask[index]), dim=0
         )
@@ -93,6 +99,19 @@ def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, mult
         for key in selected_metadata:
             if key in non_tensor_batch:
                 metadata[key] = _jsonable(non_tensor_batch[key][index])
+        # P3 v2 (2026-08-23): the trajectory advantage is broadcast to every
+        # ACTIVE policy token of the record; padded/masked positions are 0.
+        # max() over the full row let padded zeros (-0.0) beat a genuinely
+        # negative trajectory advantage, so take the max over active positions
+        # only (trajectory advantage is constant across active tokens).
+        if advantages is not None:
+            active_policy = response_policy_mask[index].bool()
+            if torch.any(active_policy):
+                trajectory_advantage = float(advantages[index][active_policy].max())
+            else:
+                trajectory_advantage = None
+        else:
+            trajectory_advantage = None
         records.append(
             {
                 "record_index": index,
@@ -109,9 +128,7 @@ def build_rollout_audit_records(batch, non_tensor_batch: dict[str, Any], *, mult
                 "record_score": (
                     float(token_level_scores[index].sum()) if token_level_scores is not None else None
                 ),
-                "trajectory_advantage": (
-                    float(advantages[index].max()) if advantages is not None else None
-                ),
+                "trajectory_advantage": trajectory_advantage,
                 "metadata": metadata,
             }
         )

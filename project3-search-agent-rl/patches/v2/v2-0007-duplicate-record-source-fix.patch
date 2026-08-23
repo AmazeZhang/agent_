@@ -1,0 +1,316 @@
+P3 Search-aware clean v2: duplicate-record source fix + collective-safe padding
+guard (2026-08-23).
+
+Part 1 -- duplicate-record source fix. The 2026-08-22 engineering smoke
+(fsdp6-b66-n5-s0-20260822a) showed 4 duplicate (uid, traj_uid, env_step)
+identities in the training batch (804 audit records for 800 real rollout
+records). Root cause: adjust_batch(..., mode="copy") copy-padded random REAL
+rows to reach the DP-divisible batch size (800 % 6 = 2 -> 4 copies),
+double-counting those 4 trajectories' rewards and policy gradients and
+breaking S6 state threading.
+
+Fix (at the earliest assembly point, adjust_batch):
+  - "copy" mode now appends SYNTHETIC padding rows: is_padding=True, unique
+    uid/traj_uid "__pad__{k}", env_step=-1, search_v1=None (v2 reward manager
+    skips them; a real record missing search_v1 still raises), zero rewards ->
+    each padding row is its own size-1 GRPO group -> advantage exactly 0.0.
+  - The padding rows keep ONE attended token at prompt position 0: the actor's
+    unpad (attention_mask.nonzero()) must not produce an empty sequence - an
+    all-zero row crashes the HF forward ("cannot reshape tensor of 0 elements
+    into shape [1, 0, -1, 128]"; observed in actor_rollout_compute_log_prob on
+    the 2026-08-23a smoke). The response part stays all-zero -> response_mask
+    all-zero -> zero policy loss; loss_mask (multi-turn batches) is zeroed so
+    copied row-0 masks cannot leak a real gradient.
+  - dp_actor.update_policy handles micro-batches whose response_mask sums to 0
+    (token-mean aggregation 0/0 would be NaN; contribution is exactly 0).
+  - assert_unique_training_records() fail-closed invariant: (uid, traj_uid,
+    env_step) uniquely identifies a training record (each env step emits
+    exactly one record type); enforced in ray_trainer AFTER adjust_batch and
+    BEFORE reward placement and advantage computation; raises with both record
+    indices on any duplicate identity.
+  - the v2 reward manager (episode.py) skips is_padding rows (no reward
+    placement, no accounting), stamps "version": "v2" into the
+    search_v1_episode / search_v1_group aggregates, and its traj accounting
+    sanity counts only non-padding records.
+
+Part 2 -- collective-safe padding guard (deadlock root cause, 2026-08-23).
+The first guard version SKIPPED padding micro-batches with `continue`. That is
+per-rank divergent: _balance_batch dispatches the batch to DP ranks via
+get_seqlen_balanced_partitions (Karmarkar-Karp), so the 1-token padding rows
+land in DIFFERENT ranks' partitions and ranks execute DIFFERENT numbers of
+FSDP forwards/backwards. Their NCCL collective sequences diverge and deadlock
+at the mini-batch boundary: ranks that finish their mini-batch first enter
+_optimizer_step's grad-norm ALLREDUCE while ranks still in the loop issue the
+next forward's embedding ALLGATHER. Observed as a DETERMINISTIC hang on runs
+20260823b and 20260823c (identical watchdog SIGABRT ~30 min after onset; 4
+ranks hung on ALLREDUCE, 2 ranks on _ALLGATHER_BASE). The 20260822a night run
+was unaffected: its 804-row batch was divisible by 6, so adjust_batch never
+padded and no rank skipped anything.
+
+Fix: every rank runs the SAME forward+backward for a padding micro-batch, with
+a loss that is connected to the model (FSDP post-backward hooks fire uniformly,
+so all-gather/reduce-scatter sequences stay identical across ranks) but exactly
+zero: log_prob.masked_fill(all-True mask, 0.0).sum() == 0.0 for ANY log_prob
+content (even -inf), so the padding rows contribute no gradient at all. The
+1-token forward is the same path the log_prob/ref phases already ran on these
+rows (proven safe on runs b/c).
+
+Covered by tests/test_p3_v2_duplicate_fix.py (D1..D12 + zero-loss guard tests)
+and the updated scripts/check_p3_v2_smoke.py (S5 version key, S6 leak not
+recomputable, S7 active-token advantage representation).
+
+diff --git a/agent_system/multi_turn_rollout/__init__.py b/agent_system/multi_turn_rollout/__init__.py
+index c68646b..11c98bc 100644
+--- a/agent_system/multi_turn_rollout/__init__.py
++++ b/agent_system/multi_turn_rollout/__init__.py
+@@ -14,4 +14,4 @@
+ # limitations under the License.
+ 
+ from .rollout_loop import TrajectoryCollector
+-from .utils import adjust_batch
+\ No newline at end of file
++from .utils import adjust_batch, assert_unique_training_records
+\ No newline at end of file
+diff --git a/agent_system/multi_turn_rollout/utils.py b/agent_system/multi_turn_rollout/utils.py
+index 6ce6000..4141a5a 100644
+--- a/agent_system/multi_turn_rollout/utils.py
++++ b/agent_system/multi_turn_rollout/utils.py
+@@ -83,6 +83,91 @@ def process_image(image, max_pixels: int = 2048 * 2048, min_pixels: int = 256 *
+     return image
+ 
+ 
++def _build_padding_rows(data: DataProto, to_add: int) -> DataProto:
++    """Build `to_add` synthetic rows that complete the batch to a DP-divisible size.
++
++    Copy-padding real rows would duplicate training records -- a training record
++    is identified by (uid, traj_uid, env_step), and each env step emits exactly
++    ONE record type -- duplicating a row would double-count that step's reward
++    and policy gradient. The padding rows are instead schema-complete copies
++    that are inert by construction:
++
++      - attention_mask keeps ONE attended token at position 0 (a PROMPT
++        position): the FSDP actor's unpad (`attention_mask.nonzero()`) must not
++        produce an empty sequence -- an all-zero row crashes the HF forward
++        with "cannot reshape tensor of 0 elements" (observed 2026-08-23a
++        smoke, actor_rollout_compute_log_prob). The response part stays
++        all-zero -> response_mask all-zero -> zero policy loss and zero
++        global-token accounting (nothing placed on the reward tensor); the
++        attended prompt token is masked out of every loss by the response
++        mask, so its computed log probs are inert.
++      - loss_mask (multi-turn batches) zeroed: copies of row 0 would otherwise
++        carry row 0's loss_mask and contribute a real policy gradient.
++      - unique synthetic uid/traj_uid "__pad__{k}", env_step=-1, is_padding=True
++        -> each padding row forms its own size-1 GRPO group (mean 0 / std 1
++        convention) with reward 0 -> advantage exactly 0.0
++      - search_v1=None -> the v2 reward manager skips them; a REAL record
++        missing search_v1 still raises (fail-closed)
++
++    DataProto.concat requires identical key sets, so the caller must mark
++    `is_padding` on `data` itself (this function adds it if absent).
++    """
++    if to_add <= 0:
++        raise ValueError(f"to_add must be positive, got {to_add}")
++    # schema snapshot (advanced indexing -> fresh tensors/arrays, no aliasing)
++    proto = data.select_idxs([0] * to_add)
++    if "is_padding" not in data.non_tensor_batch:
++        data.non_tensor_batch["is_padding"] = np.zeros(len(data), dtype=bool)
++    proto.non_tensor_batch["is_padding"] = np.ones(to_add, dtype=bool)
++    for k in range(to_add):
++        proto.non_tensor_batch["uid"][k] = f"__pad__{k}"
++        proto.non_tensor_batch["traj_uid"][k] = f"__pad__{k}"
++    proto.non_tensor_batch["env_step"] = np.full(to_add, -1, dtype=np.int64)
++    if "search_v1" in proto.non_tensor_batch:
++        proto.non_tensor_batch["search_v1"][:] = None
++    # Single attended token at position 0 (prompt region): keeps the actor
++    # unpad from producing an empty sequence, response part stays all-zero.
++    proto.batch["attention_mask"].zero_()
++    proto.batch["attention_mask"][:, 0] = 1
++    if "loss_mask" in proto.batch:
++        # multi-turn batches carry row-0's copied loss_mask -> zero it, else
++        # padding rows would contribute a real policy gradient.
++        proto.batch["loss_mask"].zero_()
++    return proto
++
++
++def assert_unique_training_records(data: DataProto) -> None:
++    """Fail-closed invariant: no two TRAINING records share (uid, traj_uid, env_step).
++
++    A training record is the batch row produced by one model action at one env
++    step of one trajectory. Each env step emits exactly one record type, so
++    (uid, traj_uid, env_step) is the complete identity of a training record; a
++    duplicate identity means batch assembly appended the same step twice
++    (copy-padding or a double append), which double-counts that step's reward
++    and policy gradient. Synthetic padding rows (is_padding=True) are inert and
++    excluded. Must be called AFTER batch assembly and BEFORE reward placement
++    and advantage computation.
++    """
++    if len(data) == 0:
++        return
++    uids = data.non_tensor_batch["uid"]
++    trajs = data.non_tensor_batch["traj_uid"]
++    steps = data.non_tensor_batch["env_step"]
++    padding = data.non_tensor_batch.get("is_padding")
++    first_index: dict = {}
++    for i in range(len(data)):
++        if padding is not None and bool(padding[i]):
++            continue
++        key = (uids[i], trajs[i], int(steps[i]))
++        if key in first_index:
++            raise RuntimeError(
++                f"duplicate training record identity (uid={key[0]}, traj_uid={key[1]}, "
++                f"env_step={key[2]}): records {first_index[key]} and {i} are the same "
++                "trajectory step; batch assembly must append each env step exactly once"
++            )
++        first_index[key] = i
++
++
+ def adjust_batch(config, data: DataProto, mode="copy") -> DataProto:
+     world_size = config.trainer.n_gpus_per_node * config.trainer.nnodes
+     size_divisor_rollout = config.actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu * world_size
+@@ -96,18 +181,19 @@ def adjust_batch(config, data: DataProto, mode="copy") -> DataProto:
+         size_divisor_actor = config.actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu * world_size
+     size_divisor = np.lcm.reduce(np.array([size_divisor_ref, size_divisor_rollout, size_divisor_actor])).item()
+ 
+-    # check if the batch size is divisible by the dp size, if not, delete the last few samples to make it divisible
++    # check if the batch size is divisible by the dp size, if not, pad it to a
++    # divisible size with inert synthetic rows (never duplicate real records)
+     bs = len(data)
+     remainder = bs % size_divisor
+     if remainder == 0:
+         return data
+-    
++
+     if mode == "delete":
+         # Generate indices to remove, rather than indices to keep
+         remove_indices = np.random.choice(bs, remainder, replace=False)
+         # Sort remove_indices to maintain stability when deleting
+         remove_indices = np.sort(remove_indices)
+-        
++
+         # Create a boolean mask for elements to keep
+         keep_mask = np.ones(bs, dtype=bool)
+         keep_mask[remove_indices] = False
+@@ -120,10 +206,8 @@ def adjust_batch(config, data: DataProto, mode="copy") -> DataProto:
+         del data
+     elif mode == "copy":
+         to_add = size_divisor - remainder
+-        dup_indices = np.random.choice(bs, to_add, replace=False)
+-        dup_proto = data.select_idxs(dup_indices)
+-
+-        adjusted_batch = DataProto.concat([data, dup_proto])
++        pad_proto = _build_padding_rows(data, to_add)
++        adjusted_batch = DataProto.concat([data, pad_proto])
+     else:
+         raise ValueError(f"Unsupported mode: {mode}")
+ 
+diff --git a/agent_system/reward_manager/episode.py b/agent_system/reward_manager/episode.py
+index bc35411..ed3a8e6 100644
+--- a/agent_system/reward_manager/episode.py
++++ b/agent_system/reward_manager/episode.py
+@@ -165,6 +165,10 @@ class EpisodeRewardManager:
+ 
+         for i in range(len(data)):
+             data_item = data[i]
++            if data_item.non_tensor_batch.get('is_padding', False):
++                # synthetic padding rows (adjust_batch): not training records,
++                # carry no env metadata; never place reward, never audit
++                continue
+             sv = data_item.non_tensor_batch.get('search_v1')
+             if sv is None:
+                 raise RuntimeError(
+@@ -229,6 +233,7 @@ class EpisodeRewardManager:
+                     f"placed {bucket['placed_cents']}"
+                 )
+             episode = dict(comps)
++            episode["version"] = "v2"
+             episode["total_reward_c"] = comp_sum
+             episode["n_records"] = len(bucket["records"])
+             episode["uid"] = bucket["uid"]
+@@ -252,6 +257,7 @@ class EpisodeRewardManager:
+             g["traj_uids"].append(traj_uid)
+         for uid, g in group_acc.items():
+             group = dict(g["components"])
++            group["version"] = "v2"
+             group["total_reward_c"] = sum(g["components"].values())
+             group["uid"] = uid
+             group["n_trajectories"] = g["n_trajectories"]
+@@ -259,6 +265,9 @@ class EpisodeRewardManager:
+             for ridx in uid_records.get(uid, []):
+                 data.non_tensor_batch['search_v1_group'][ridx] = group
+ 
+-        # sanity: every batch record belongs to exactly one traj accumulation
+-        if sum(len(b["records"]) for b in acc.values()) != len(data):
++        # sanity: every non-padding record belongs to exactly one traj
++        # accumulation (padding rows are excluded from accounting)
++        pad = data.non_tensor_batch.get("is_padding")
++        n_real = int(sum(not bool(p) for p in pad)) if pad is not None else len(data)
++        if sum(len(b["records"]) for b in acc.values()) != n_real:
+             raise RuntimeError("v2 step reward traj_uid accounting mismatch")
+diff --git a/verl/trainer/ppo/ray_trainer.py b/verl/trainer/ppo/ray_trainer.py
+index 8c2dbe0..1781aa4 100644
+--- a/verl/trainer/ppo/ray_trainer.py
++++ b/verl/trainer/ppo/ray_trainer.py
+@@ -61,7 +61,7 @@ from verl.utils.tracking import ValidationGenerationsLogger
+ from verl.workers.rollout.async_server import AsyncLLMServerManager
+ from gigpo import core_gigpo
+ 
+-from agent_system.multi_turn_rollout import TrajectoryCollector, adjust_batch
++from agent_system.multi_turn_rollout import TrajectoryCollector, adjust_batch, assert_unique_training_records
+ 
+ WorkerType = Type[Worker]
+ 
+@@ -1151,6 +1151,12 @@ class RayPPOTrainer:
+                         batch.batch['step_rewards'] = step_rewards_tensor
+                     
+                     batch = adjust_batch(self.config, batch)
++                    # P3 v2 (2026-08-23): fail-closed invariant. A training
++                    # record is identified by (uid, traj_uid, env_step); each
++                    # env step emits exactly one record type, so a duplicate
++                    # identity is a batch-assembly bug. Checked AFTER assembly
++                    # and BEFORE reward placement and advantage computation.
++                    assert_unique_training_records(batch)
+ 
+                     batch.batch["response_mask"] = compute_response_mask(batch)
+                     # balance the number of valid tokens on each dp rank.
+diff --git a/verl/workers/actor/dp_actor.py b/verl/workers/actor/dp_actor.py
+index 853b45e..12cf118 100644
+--- a/verl/workers/actor/dp_actor.py
++++ b/verl/workers/actor/dp_actor.py
+@@ -371,6 +371,37 @@ class DataParallelPPOActor(BasePPOActor):
+                     else:
+                         response_mask = attention_mask[:, -response_length:]
+ 
++                    # P3 v2 (2026-08-23): adjust_batch appends synthetic padding
++                    # rows to reach DP-divisible batch sizes. They carry a single
++                    # attended PROMPT token, so their response_mask is all-zero:
++                    # token-mean aggregation over this micro-batch would be 0/0
++                    # (NaN loss corrupts the model). Their contribution is
++                    # exactly 0.
++                    #
++                    # NEVER skip such a micro-batch with `continue`: the batch
++                    # is dispatched to DP ranks via _balance_batch's balanced
++                    # partitions (get_seqlen_balanced_partitions), so padding
++                    # rows land in DIFFERENT ranks' partitions and ranks would
++                    # execute DIFFERENT numbers of FSDP forwards/backwards.
++                    # Diverged collective sequences then deadlock at the
++                    # mini-batch boundary: ranks that finished early enter
++                    # _optimizer_step's grad-norm ALLREDUCE while ranks still in
++                    # the loop issue the next forward's embedding ALLGATHER.
++                    # Observed twice as a deterministic NCCL hang (runs
++                    # 20260823b/c, 30-min watchdog SIGABRT, 4 ranks at
++                    # ALLREDUCE vs 2 ranks at _ALLGATHER_BASE).
++                    #
++                    # Instead, every rank runs the SAME forward+backward for the
++                    # padding micro-batch with a loss that is connected to the
++                    # model (FSDP post-backward hooks fire uniformly) but
++                    # exactly zero (masked_fill to 0.0 then sum == 0.0 for ANY
++                    # log_prob content, even -inf, so no gradient contribution).
++                    if response_mask.sum() == 0:
++                        _, log_prob = self._forward_micro_batch(micro_batch=data, temperature=temperature, calculate_entropy=False)
++                        loss = log_prob.masked_fill(torch.ones_like(log_prob, dtype=torch.bool), 0.0).sum() / self.gradient_accumulation
++                        loss.backward()
++                        continue
++
+                     old_log_prob = data["old_log_probs"]
+                     advantages = data["advantages"]
+ 
