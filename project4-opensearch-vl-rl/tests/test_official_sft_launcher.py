@@ -49,7 +49,8 @@ def main() -> None:
         assert config["save_steps"] == 5
         assert config["template"] == "qwen3_vl"
         assert config["cutoff_len"] == 5120
-        assert config["dataset"] == "wiki_en_official_1000"
+        assert config["dataset"] == "wiki_en_official_960_safe"
+        assert config["max_samples"] == 960
         assert config["finetuning_type"] == "lora"
         assert config["quantization_bit"] == 4
         assert config["quantization_method"] == "bnb"

@@ -984,3 +984,17 @@
   `600b9910c0651e05b6f85d5f0ec0e2c54d2f0b2310cba0e8a17c4aba7acba2c8`。
 - GPU1 cleanup 后 18 MiB、无 compute process；GPU0/GPU5 未参与。精确 tmux 在 dead/status 0 后关闭。
   下一步保持完全相同 profile，从 checkpoint-5 晋级到 20 steps。
+
+### 2026-08-25：20-step 暴露部分图像截断，发布 960-safe v4 数据门
+
+- v3 20-step Run 从 step 5 正确恢复，step 6～15 loss finite；下一样本报 image tokens 72 / features 222，
+  `exit_code=1`。GPU1 cleanup 后 18 MiB、无 compute process；GPU0/GPU5 未参与，失败 checkpoint-15
+  与日志保留但禁用，精确 dead/status 1 tmux 已关闭。
+- 根因是 5,120 cutoff 从多图占位块中间截断，而 collator 仍加载整行全部图片；此前“token>0”审计只能
+  检出全丢图，不能检出部分丢图。新增 collator 级 CPU 全量审计，1,000 行中 40 行 mismatch，失败样本
+  精确对应 dataset index 117；所有行仍有监督 label。
+- 不修改任何官方行内容或图片，非覆盖发布 960 条严格对齐派生集，rows_modified=0、图片 1,048；独立复审
+  mismatch=0、zero supervision=0。数据 SHA256 `571c9c59...e964a5`，复审报告 SHA256
+  `d39cee73...c66e6`，完整哈希见状态文档。
+- launcher profile 升级为 `official-wiki-en-safe960-qlora-v4`，硬固定 data/info/indices/alignment 哈希；禁止
+  v3 checkpoint 跨数据集 resume。下一步从 base 重新走 1→5→20→50。

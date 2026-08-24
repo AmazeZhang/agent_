@@ -142,3 +142,29 @@ pane dead、status 0 后关闭。该 checkpoint 现可作为同 profile 的 5-st
 SHA256 为 `600b9910c0651e05b6f85d5f0ec0e2c54d2f0b2310cba0e8a17c4aba7acba2c8`；optimizer 与
 trainer state 均存在。GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与；已退出的精确
 tmux status 0 后关闭。下一门为从 checkpoint-5 resume 到 20 steps。
+
+20-step Run `official-sft-wiki-en-qlora-v3-step20-20260824` 从 step 5 正确恢复，step 6～15 的 loss
+均有限，但下一样本在 forward 报 `image tokens: 72, features: 222`，因此 `exit_code=1`。失败不是 OOM；
+它揭示原先只检查“图像 token 非零”的门禁不充分：5,120 cutoff 可能从多图块中间截断，而 collator
+仍加载该行全部图片。Run 留下完整 `checkpoint-15` 作为失败证据，但不得用于后续 resume；GPU1 cleanup
+后 18 MiB、无 compute process，GPU0/GPU5 未参与，精确 dead/status 1 tmux 已关闭。
+
+新增 CPU collator 级全量审计后，冻结的 1,000 条中发现 40 条 token/feature mismatch，失败训练样本对应
+dataset index 117，和审计的 `72/222` 完全一致；其余 960 条严格对齐，且 1,000 条均有监督 label。处理不
+改 system、tools、conversation、answer 或图片，只非覆盖发布派生集：
+
+```text
+/media/imc/data/yzy/agent/project4-opensearch-vl-rl/datasets/processed/
+  search-vl-sft-wiki-en-official-960-safe-v2-r2c1c460-c5120/
+```
+
+- rows modified：0；排除原因仅为 `image_token_feature_mismatch_after_cutoff`；样本 960、图片 1,048；
+- dataset SHA256：`571c9c59a02309e8962d10ac0a0fdb14d86aa2c54cd8c9f86f4cfcbfa8e964a5`；
+- dataset_info SHA256：`21d191168c39087f5bdc26081bf70432f38da9af13345c9447f1b0c13f10958a`；
+- selected indices SHA256：`e11f2f3e74e18a05e5c4d57e57d7557b57aacc9eef4f86ec60a53e82a06d5bd0`；
+- manifest SHA256：`e005d329f4c3613dcb0f1d0ffffb87b8874600eef568084c0a3d32e1941e06e6`；
+- 独立 960 行复审报告 SHA256：`d39cee732c158005c020a6117ec8dfae2b1200116458933d5f47febf59fc66e6`，
+  mismatch=0、zero supervision=0、image token 范围 64～245。
+
+launcher profile 升级为 `official-wiki-en-safe960-qlora-v4` 并固定上述哈希/复审报告；任何 v3 checkpoint
+都因 manifest/profile 不匹配而 fail-closed。下一步必须从 base 重新执行 v4 的 1→5→20→50。

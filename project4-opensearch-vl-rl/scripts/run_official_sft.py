@@ -16,18 +16,19 @@ PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
 MODEL_ROOT = PROJECT_DATA / "models/Qwen3-VL-8B-Instruct"
 DATASET_ROOT = (
     PROJECT_DATA
-    / "datasets/processed/search-vl-sft-wiki-en-official-1000-r2c1c460"
+    / "datasets/processed/search-vl-sft-wiki-en-official-960-safe-v2-r2c1c460-c5120"
 )
 RUN_ROOT = PROJECT_DATA / "runs"
-DATASET_NAME = "wiki_en_official_1000"
+DATASET_NAME = "wiki_en_official_960_safe"
 SOURCE_REVISION = "2c1c460af4fa15bd63210cbf426a96664b959944"
 SOURCE_SHA256 = "a22a44c6a04d79d6dfd0064c89d8a792045278eed70a8e27c14b7c5e2f4850e3"
-DATASET_SHA256 = "af5eb4adc2a9e4fcc0529ed2c6cfc523fca3753740aec1178c57acd54b4a3dd7"
-DATASET_INFO_SHA256 = "6b065a7c32ddc1ac5ac79c4575fe84cc71322fd73f53739ac62d9443d0b3641f"
-INDICES_SHA256 = "3195eafee69202c74cfb382cb7572fc198a471a357ec6af625f58d653d072018"
+DATASET_SHA256 = "571c9c59a02309e8962d10ac0a0fdb14d86aa2c54cd8c9f86f4cfcbfa8e964a5"
+DATASET_INFO_SHA256 = "21d191168c39087f5bdc26081bf70432f38da9af13345c9447f1b0c13f10958a"
+INDICES_SHA256 = "e11f2f3e74e18a05e5c4d57e57d7557b57aacc9eef4f86ec60a53e82a06d5bd0"
+ALIGNMENT_REPORT_SHA256 = "d39cee732c158005c020a6117ec8dfae2b1200116458933d5f47febf59fc66e6"
 CUTOFF_LEN = 5120
 QUANTIZATION_METHOD = "bnb"
-TRAINING_PROFILE = "official-wiki-en-qlora-v3"
+TRAINING_PROFILE = "official-wiki-en-safe960-qlora-v4"
 
 
 def parse_args() -> argparse.Namespace:
@@ -70,17 +71,20 @@ def validate_dataset(root: Path = DATASET_ROOT) -> dict[str, Any]:
         raise ValueError("official SFT dataset escaped the processed data root")
     manifest_path = root / "manifest.json"
     info_path = root / "dataset_info.json"
-    data_path = root / "wiki_en_official_1000.json"
+    data_path = root / "wiki_en_official_960_safe.json"
+    alignment_path = root / "alignment-audit-cutoff5120-v1.json"
     with manifest_path.open(encoding="utf-8") as handle:
         manifest = json.load(handle)
     required = {
         "dataset_name": DATASET_NAME,
-        "sample_size": 1000,
+        "sample_size": 960,
         "source_revision": SOURCE_REVISION,
         "source_sha256": SOURCE_SHA256,
         "dataset_sha256": DATASET_SHA256,
         "dataset_info_sha256": DATASET_INFO_SHA256,
         "selected_indices_sha256": INDICES_SHA256,
+        "cutoff_len": CUTOFF_LEN,
+        "rows_modified": 0,
     }
     for field, expected in required.items():
         if manifest.get(field) != expected:
@@ -89,6 +93,13 @@ def validate_dataset(root: Path = DATASET_ROOT) -> dict[str, Any]:
         raise ValueError("official SFT JSON no longer matches the frozen hash")
     if sha256_file(info_path) != DATASET_INFO_SHA256:
         raise ValueError("official SFT dataset_info no longer matches the frozen hash")
+    if sha256_file(alignment_path) != ALIGNMENT_REPORT_SHA256:
+        raise ValueError("official SFT alignment report no longer matches the frozen hash")
+    alignment = json.loads(alignment_path.read_text(encoding="utf-8"))
+    if alignment.get("checked") != 960 or alignment.get("mismatch_count") != 0:
+        raise ValueError("official SFT alignment report does not prove all 960 rows safe")
+    if alignment.get("zero_supervision_count") != 0:
+        raise ValueError("official SFT alignment report contains rows without supervision")
     if 1900 in manifest.get("selected_indices", []):
         raise ValueError("incomplete official source row 1900 entered the training subset")
     with info_path.open(encoding="utf-8") as handle:
@@ -156,7 +167,7 @@ def training_config(
         "dataset_dir": str(DATASET_ROOT),
         "template": "qwen3_vl",
         "cutoff_len": CUTOFF_LEN,
-        "max_samples": 1000,
+        "max_samples": 960,
         "overwrite_cache": False,
         "preprocessing_num_workers": 1,
         "dataloader_num_workers": 0,
