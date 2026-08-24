@@ -1,0 +1,383 @@
+{
+  "kind": "p3-v2-counterfactual-stats",
+  "created_at": "2026-08-24",
+  "data_sha256": "ffebf468e756a673da267f5830cfc67f2e9c4dc44ec41c979a389c1efebfff60",
+  "qid_space": "0..255 sorted, unique per run (strict per-question pairing)",
+  "model": "p3-v2-tenstep-gs10-merged-20260823a (same merged model, greedy temp=0, GPU1)",
+  "mapping": "shuffled: evidence of q replaced by REAL docs of (q+17) mod 256; real retrieval executes first, non-success kept verbatim; no-evidence: fixed neutral envelope, no HTTP",
+  "preregistration_mapping_sha256": {
+    "shuffled": "93363b6730795ca4608cc2e88212126f366f0f261239014cbac5226f3166c480",
+    "no-evidence": "93363b6730795ca4608cc2e88212126f366f0f261239014cbac5226f3166c480"
+  },
+  "conditions": {
+    "real": {
+      "run_id": "p3-eval-v2-tenstep-gs10-confirm256-20260823a",
+      "em": 73,
+      "em_rate": 0.2852,
+      "wilson95": [
+        0.2333,
+        0.3433
+      ],
+      "searched": 239,
+      "search_rate": 0.9336,
+      "answered_offline": 247,
+      "answered_env_committed": 218,
+      "search_to_answer": 0.9623,
+      "search_to_correct": 0.272,
+      "no_search_to_correct": 0.4706,
+      "searched_and_correct_abs": 65,
+      "no_search_and_correct_abs": 8,
+      "avg_steps": 2.4883,
+      "invalid_query_questions": 3,
+      "max_steps_exhausted": 38,
+      "unanswered_termination": {
+        "max_steps_exhausted": 9,
+        "ended_no_answer_committed": 0,
+        "drafted_but_never_committed": 29
+      },
+      "metrics_search_status_counts": {
+        "success": 378
+      }
+    },
+    "shuffled": {
+      "run_id": "p3-eval-v2-tenstep-gs10-confirm256-shuffled-20260824a",
+      "em": 10,
+      "em_rate": 0.0391,
+      "wilson95": [
+        0.0214,
+        0.0704
+      ],
+      "searched": 239,
+      "search_rate": 0.9336,
+      "answered_offline": 222,
+      "answered_env_committed": 28,
+      "search_to_answer": 0.8577,
+      "search_to_correct": 0.0084,
+      "no_search_to_correct": 0.4706,
+      "searched_and_correct_abs": 2,
+      "no_search_and_correct_abs": 8,
+      "avg_steps": 3.7344,
+      "invalid_query_questions": 2,
+      "max_steps_exhausted": 228,
+      "unanswered_termination": {
+        "max_steps_exhausted": 34,
+        "ended_no_answer_committed": 0,
+        "drafted_but_never_committed": 194
+      },
+      "metrics_search_status_counts": {
+        "success": 698
+      }
+    },
+    "no-evidence": {
+      "run_id": "p3-eval-v2-tenstep-gs10-confirm256-noevidence-20260824a",
+      "em": 18,
+      "em_rate": 0.0703,
+      "wilson95": [
+        0.0449,
+        0.1084
+      ],
+      "searched": 239,
+      "search_rate": 0.9336,
+      "answered_offline": 219,
+      "answered_env_committed": 55,
+      "search_to_answer": 0.8452,
+      "search_to_correct": 0.0418,
+      "no_search_to_correct": 0.4706,
+      "searched_and_correct_abs": 10,
+      "no_search_and_correct_abs": 8,
+      "avg_steps": 3.6211,
+      "invalid_query_questions": 2,
+      "max_steps_exhausted": 201,
+      "unanswered_termination": {
+        "max_steps_exhausted": 37,
+        "ended_no_answer_committed": 0,
+        "drafted_but_never_committed": 164
+      },
+      "metrics_search_status_counts": {
+        "success": 669
+      }
+    }
+  },
+  "pairs": {
+    "real_vs_shuffled": {
+      "control": "real",
+      "target": "shuffled",
+      "contingency": {
+        "a11": 10,
+        "a00": 183,
+        "b10": 0,
+        "c01": 63
+      },
+      "net_gain": 63,
+      "discordant_n": 63,
+      "mcnemar_exact_two_sided_p": 0.0,
+      "wilson95": {
+        "real": [
+          0.2333,
+          0.3433
+        ],
+        "shuffled": [
+          0.0214,
+          0.0704
+        ]
+      },
+      "real_only_correct": 63,
+      "shuffled_only_correct": 0,
+      "real_only_correct_qids": [
+        12,
+        16,
+        19,
+        21,
+        22,
+        27,
+        31,
+        35,
+        39,
+        42,
+        43,
+        45,
+        46,
+        48,
+        54,
+        58,
+        62,
+        76,
+        82,
+        91,
+        98,
+        102,
+        114,
+        115,
+        128,
+        136,
+        137,
+        140,
+        142,
+        145,
+        154,
+        156,
+        158,
+        161,
+        168,
+        170,
+        174,
+        178,
+        180,
+        181,
+        182,
+        186,
+        188,
+        192,
+        194,
+        196,
+        197,
+        198,
+        202,
+        203,
+        205,
+        208,
+        209,
+        210,
+        212,
+        213,
+        215,
+        216,
+        219,
+        221,
+        240,
+        241,
+        251
+      ],
+      "shuffled_only_correct_qids": [],
+      "real_searched_and_correct_flips": {
+        "still_correct": 2,
+        "flipped": 63
+      },
+      "evidence_change_answer_unchanged": 21,
+      "evidence_change_answer_changed": 199,
+      "per_source_discordants": {
+        "2wikimultihopqa": {
+          "real_correct_cf_wrong": 10,
+          "real_wrong_cf_correct": 0,
+          "discordant": 10
+        },
+        "bamboogle": {
+          "real_correct_cf_wrong": 3,
+          "real_wrong_cf_correct": 0,
+          "discordant": 3
+        },
+        "hotpotqa": {
+          "real_correct_cf_wrong": 7,
+          "real_wrong_cf_correct": 0,
+          "discordant": 7
+        },
+        "musique": {
+          "real_correct_cf_wrong": 0,
+          "real_wrong_cf_correct": 0,
+          "discordant": 0
+        },
+        "nq": {
+          "real_correct_cf_wrong": 17,
+          "real_wrong_cf_correct": 0,
+          "discordant": 17
+        },
+        "popqa": {
+          "real_correct_cf_wrong": 9,
+          "real_wrong_cf_correct": 0,
+          "discordant": 9
+        },
+        "triviaqa": {
+          "real_correct_cf_wrong": 17,
+          "real_wrong_cf_correct": 0,
+          "discordant": 17
+        }
+      }
+    },
+    "real_vs_no-evidence": {
+      "control": "real",
+      "target": "no-evidence",
+      "contingency": {
+        "a11": 11,
+        "a00": 176,
+        "b10": 7,
+        "c01": 62
+      },
+      "net_gain": 55,
+      "discordant_n": 69,
+      "mcnemar_exact_two_sided_p": 0.0,
+      "wilson95": {
+        "real": [
+          0.2333,
+          0.3433
+        ],
+        "no-evidence": [
+          0.0449,
+          0.1084
+        ]
+      },
+      "real_only_correct": 62,
+      "no-evidence_only_correct": 7,
+      "real_only_correct_qids": [
+        12,
+        16,
+        19,
+        22,
+        27,
+        31,
+        35,
+        39,
+        42,
+        43,
+        45,
+        46,
+        48,
+        54,
+        58,
+        62,
+        65,
+        76,
+        82,
+        84,
+        98,
+        102,
+        114,
+        115,
+        128,
+        136,
+        137,
+        140,
+        142,
+        145,
+        154,
+        156,
+        158,
+        161,
+        168,
+        170,
+        174,
+        178,
+        180,
+        181,
+        182,
+        186,
+        188,
+        192,
+        194,
+        196,
+        197,
+        198,
+        202,
+        203,
+        205,
+        208,
+        210,
+        212,
+        213,
+        215,
+        216,
+        219,
+        221,
+        240,
+        241,
+        251
+      ],
+      "no-evidence_only_correct_qids": [
+        9,
+        26,
+        34,
+        119,
+        132,
+        195,
+        242
+      ],
+      "real_searched_and_correct_flips": {
+        "still_correct": 3,
+        "flipped": 62
+      },
+      "evidence_change_answer_unchanged": 24,
+      "evidence_change_answer_changed": 200,
+      "per_source_discordants": {
+        "2wikimultihopqa": {
+          "real_correct_cf_wrong": 10,
+          "real_wrong_cf_correct": 0,
+          "discordant": 10
+        },
+        "bamboogle": {
+          "real_correct_cf_wrong": 3,
+          "real_wrong_cf_correct": 1,
+          "discordant": 4
+        },
+        "hotpotqa": {
+          "real_correct_cf_wrong": 8,
+          "real_wrong_cf_correct": 1,
+          "discordant": 9
+        },
+        "musique": {
+          "real_correct_cf_wrong": 0,
+          "real_wrong_cf_correct": 0,
+          "discordant": 0
+        },
+        "nq": {
+          "real_correct_cf_wrong": 16,
+          "real_wrong_cf_correct": 3,
+          "discordant": 19
+        },
+        "popqa": {
+          "real_correct_cf_wrong": 9,
+          "real_wrong_cf_correct": 1,
+          "discordant": 10
+        },
+        "triviaqa": {
+          "real_correct_cf_wrong": 16,
+          "real_wrong_cf_correct": 1,
+          "discordant": 17
+        }
+      }
+    }
+  },
+  "integrity": {
+    "id_sets_equal": true,
+    "data_sha_identical": true,
+    "mapping_sha_verified": true
+  }
+}

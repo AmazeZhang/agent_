@@ -59,8 +59,8 @@ def mcnemar_exact_two_sided(b, c):
     return min(p, 1.0)
 
 
-def load_run(name, data_root):
-    base = Path(data_root) / "project3-search-agent-rl" / "runs" / RUNS[name]
+def load_run(name, data_root, runs):
+    base = Path(data_root) / "project3-search-agent-rl" / "runs" / runs[name]
     rows = [json.loads(l) for l in (base / "episodes.jsonl").open()]
     rj = json.load((base / "results.json").open())
     return rows, rj
@@ -122,11 +122,24 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-root", default="/media/imc/data")
     ap.add_argument("--out", default="gates/p3_v2_counterfactual_stats_20260823.json")
+    ap.add_argument("--real-run", default=RUNS["real"])
+    ap.add_argument("--shuffled-run", default=RUNS["shuffled"])
+    ap.add_argument("--no-evidence-run", default=RUNS["no-evidence"])
+    ap.add_argument(
+        "--model-label",
+        default="p3-v2-behavior-gs5-merged-20260823d (same merged model, greedy temp=0, GPU1)",
+    )
+    ap.add_argument("--created-at", default="2026-08-23")
     args = ap.parse_args()
+    runs = {
+        "real": args.real_run,
+        "shuffled": args.shuffled_run,
+        "no-evidence": args.no_evidence_run,
+    }
 
     data = {}
-    for name in RUNS:
-        rows, rj = load_run(name, args.data_root)
+    for name in runs:
+        rows, rj = load_run(name, args.data_root, runs)
         eps = [analyze_episode(e) for e in rows]
         by_qid = {e["qid"]: e for e in eps}
         data[name] = {
@@ -137,14 +150,14 @@ def main():
         }
         assert len(by_qid) == 256 and len(set(by_qid)) == 256, f"{name}: bad qid space"
         assert data[name]["by_qid"] is not None
-    shas = {n: data[n]["data_sha256"] for n in RUNS}
+    shas = {n: data[n]["data_sha256"] for n in runs}
     assert len(set(shas.values())) == 1, f"data SHA mismatch: {shas}"
 
     # pre-registration mapping SHA (from the two counterfactual run dirs)
     prereg_shas = {}
     for cond in CONDITIONS:
         p = (Path(args.data_root) / "project3-search-agent-rl" / "runs" /
-             RUNS[cond] / "retrieval_condition_preregistration.json")
+             runs[cond] / "retrieval_condition_preregistration.json")
         d = json.load(p.open())
         assert d["condition"] == cond and d["n_questions"] == 256 and d["shuffle_step"] == 17
         prereg_shas[cond] = d["mapping_sha256"]
@@ -152,10 +165,10 @@ def main():
 
     report = {
         "kind": "p3-v2-counterfactual-stats",
-        "created_at": "2026-08-23",
+        "created_at": args.created_at,
         "data_sha256": shas["real"],
         "qid_space": "0..255 sorted, unique per run (strict per-question pairing)",
-        "model": "p3-v2-behavior-gs5-merged-20260823d (same merged model, greedy temp=0, GPU1)",
+        "model": args.model_label,
         "mapping": "shuffled: evidence of q replaced by REAL docs of (q+17) mod 256; "
                    "real retrieval executes first, non-success kept verbatim; "
                    "no-evidence: fixed neutral envelope, no HTTP",
@@ -170,7 +183,7 @@ def main():
     }
 
     # --- per-condition behavior ---
-    for name in RUNS:
+    for name in runs:
         eps = list(data[name]["by_qid"].values())
         searched = [e for e in eps if e["searched"]]
         answered_off = [e for e in eps if e["has_answer_offline"]]
@@ -178,7 +191,7 @@ def main():
         nsc = [e for e in eps if (not e["searched"]) and e["won"]]
         no_a = [e for e in eps if not e["has_answer_offline"]]
         report["conditions"][name] = {
-            "run_id": RUNS[name],
+            "run_id": runs[name],
             "em": sum(e["won"] for e in eps),
             "em_rate": round(sum(e["won"] for e in eps) / 256, 4),
             "wilson95": wilson_ci(sum(e["won"] for e in eps), 256),
@@ -268,7 +281,7 @@ def main():
 
     # --- console ---
     print("== conditions (n=256, same model/seed/prompt, greedy) ==")
-    for name in RUNS:
+    for name in runs:
         c = report["conditions"][name]
         print(f"  {name:12s} em={c['em']:3d} ({c['em_rate']:.3f}) wilson={c['wilson95']} "
               f"searched={c['searched']} s2a={c['search_to_answer']:.3f} s2c={c['search_to_correct']:.3f} "

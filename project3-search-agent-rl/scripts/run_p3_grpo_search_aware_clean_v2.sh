@@ -162,10 +162,19 @@ if [[ "$profile" == "ten-step" ]]; then
   if [[ "$train_batch_size" != "66" || "$gpu_memory_utilization" != "0.60" \
         || "$max_num_seqs" != "64" || "$official_lr" != "1e-6" \
         || "$official_kl" != "0.001" || "$official_warmup_ratio" != "0.285" \
-        || "$env_max_steps" != "4" || "$env_history_length" != "4" \
-        || "$trainer_seed" != "1234" || "$data_seed" != "1234" ]]; then
-    echo "fail-closed: ten-step config must equal the v2 Step5 reference (train_batch_size=66, gpu_mem=0.60, max_num_seqs=64, lr=1e-6, kl=0.001, warmup=0.285, max_steps=4, history=4, seed=1234/1234)" >&2
+        || "$env_max_steps" != "4" || "$env_history_length" != "4" ]]; then
+    echo "fail-closed: ten-step config must equal the v2 Step5 reference except for an explicitly approved seed (train_batch_size=66, gpu_mem=0.60, max_num_seqs=64, lr=1e-6, kl=0.001, warmup=0.285, max_steps=4, history=4)" >&2
     exit 35
+  fi
+  if [[ "$trainer_seed" != "1234" || "$data_seed" != "1234" ]]; then
+    if [[ "${PROJECT3_MULTI_SEED_APPROVED:-}" != "yes" ]]; then
+      echo "fail-closed: non-reference ten-step seed requires PROJECT3_MULTI_SEED_APPROVED=yes" >&2
+      exit 36
+    fi
+    if [[ ! "$trainer_seed" =~ ^[0-9]+$ || "$trainer_seed" != "$data_seed" ]]; then
+      echo "fail-closed: approved multi-seed run requires one non-negative integer shared by trainer/data (got ${trainer_seed}/${data_seed})" >&2
+      exit 37
+    fi
   fi
 fi
 
@@ -274,7 +283,7 @@ overrides=(
   "actor_rollout_ref.actor.use_invalid_action_penalty=false"
   "trainer.logger=['console']"
   "trainer.project_name=search_r1_repro"
-  "trainer.experiment_name=p3_search_aware_clean_v2_${profile}_fsdp6_n5_b${train_batch_size}_s0"
+  "trainer.experiment_name=p3_search_aware_clean_v2_${profile}_fsdp6_n5_b${train_batch_size}_s${trainer_seed}"
   "+trainer.seed=${trainer_seed}"
   "trainer.n_gpus_per_node=6"
   "trainer.nnodes=1"
