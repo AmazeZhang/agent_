@@ -94,7 +94,7 @@ def tools_for_protocol(tool_protocol: str) -> list[dict[str, Any]]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset-root", type=Path, default=DATASET_ROOT)
-    parser.add_argument("--split", choices=("dev", "test"), default="dev")
+    parser.add_argument("--split", choices=("train", "dev", "test"), default="dev")
     parser.add_argument("--max-tasks", type=int, default=5)
     parser.add_argument("--task-id", action="append")
     parser.add_argument("--adapter", type=Path)

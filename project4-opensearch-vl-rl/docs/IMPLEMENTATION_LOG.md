@@ -1049,3 +1049,11 @@
 - 相关 provider/evaluator/stochastic/builder 测试 22/22 通过；纯 CPU/磁盘，无网络、API、GPU/tmux。
   下一步严格按预提交 `official_provider_rollout_gate_v1.json`：先 GPU1 单题 greedy phase A，只有工具协议
   正常才进入四类×4 的 rollout-only phase B，仍不启动 optimizer。
+
+### 2026-08-25：official-provider phase A 首次 CLI 预检失败
+
+- Run `official-provider-sft50-rollout-phasea-20260825` 在 argparse 阶段以 `exit_code=2` 退出：旧 evaluator
+  仅允许 `dev/test`，而冻结的 pre-RL rollout-only 门使用 train task。模型未加载、GPU1 始终 18 MiB，
+  cleanup 无 compute process；GPU0/GPU5 未参与，精确 tmux dead/status 2 后关闭。
+- 修复仅显式增加 `train` split CLI 选项并补 CPU 回归；不修改 task、provider、reward、采样参数或 adapter。
+  失败 Run 不复用，测试和提交通过后才以新 Run ID 重跑 phase A。

@@ -13,6 +13,12 @@ SPEC.loader.exec_module(MODULE)
 
 
 class EvaluateLocalAgentTest(unittest.TestCase):
+    def test_train_split_is_available_for_pre_rl_rollout_only_gate(self) -> None:
+        with mock.patch(
+            "sys.argv", ["evaluate_local_agent.py", "--split", "train", "--output", "x"]
+        ):
+            self.assertEqual(MODULE.parse_args().split, "train")
+
     def test_tool_call_parser_is_strict(self) -> None:
         call = MODULE.parse_tool_call(
             '<tool_call>{"name":"image_search","arguments":{"image":"img_1"}}</tool_call>'
