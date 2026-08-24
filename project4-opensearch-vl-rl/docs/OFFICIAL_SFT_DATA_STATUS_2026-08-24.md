@@ -127,3 +127,11 @@ launcher 已改为 `quantization_method: bnb`，profile 升级为 `official-wiki
 配置门禁，禁止旧字符串或非 NF4/double-quant 配置继续启动。CPU 离线 loader 诊断必须看到
 `BitsAndBytesConfig(load_in_4bit=True)` 后，才允许新的 1-step Run；v2 失败 Run 不可作为 resume 来源。
 该诊断现已通过：`load_in_4bit=True`、`quant_type=nf4`、`double_quant=True`，且没有加载模型权重。
+
+新的受管 Run `official-sft-wiki-en-qlora-v3-1step-20260824` 在物理 GPU1 完成了 1 次 optimizer
+update：训练 loss `1.1252400875`、grad norm `1.016`、runtime `5.5213s`、`global_step=1`、
+`exit_code=0`。日志明确出现 `Quantizing model to 4 bit with bitsandbytes`；加载后显存约 16.6 GiB，
+没有复现 BF16 的 logits OOM。`checkpoint-1` 同时包含 adapter、optimizer、scheduler、trainer state 和
+RNG state；adapter SHA256 为 `7e57a0834d2819655b75c40ae194a96a67624e42535f0bb9230eb3c5fe92c4fb`。
+GPU1 before/after 均 18 MiB，cleanup 为 `compute_processes=none`；GPU0/GPU5 未参与。精确 tmux 仅在确认
+pane dead、status 0 后关闭。该 checkpoint 现可作为同 profile 的 5-step resume 来源。

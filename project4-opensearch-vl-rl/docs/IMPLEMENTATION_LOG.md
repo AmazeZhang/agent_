@@ -964,3 +964,13 @@
   18 MiB/无 compute process；GPU0/GPU5 未参与，证据保留。
 - CPU 离线 loader gate 已实际得到 `BitsAndBytesConfig(load_in_4bit=True, quant_type=nf4,
   double_quant=True)`；测试没有加载模型权重。只有该门禁通过后才允许新的受管 GPU1 1-step Run。
+
+### 2026-08-24：官方 QLoRA v3 通过 1-step 晋级门
+
+- 受管 Run `official-sft-wiki-en-qlora-v3-1step-20260824` 只使用物理 GPU1，日志确认真实 4-bit
+  bitsandbytes 加载；GPU0/GPU5 未参与，网络/API/Clash 均未使用。
+- 完成 `global_step=1`：loss `1.1252400875`、grad norm `1.016`、runtime `5.5213s`，`exit_code=0`。
+  `checkpoint-1` 含 adapter、optimizer、scheduler、trainer/RNG state；adapter SHA256
+  `7e57a0834d2819655b75c40ae194a96a67624e42535f0bb9230eb3c5fe92c4fb`。
+- GPU1 before/after 均 18 MiB，cleanup 无 compute process；精确 tmux 在 pane dead/status 0 后关闭。
+  下一步只从该 checkpoint、同一 v3 profile resume 到 5 steps，不重用或覆盖 Run 目录。
