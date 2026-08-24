@@ -179,3 +179,9 @@ v4 Run `official-sft-wiki-en-safe960-v4-step5-20260825` 已从 global step 1 正
 `1.31734, 1.02210, 1.28102, 1.14079, 1.19138`，grad norm 均有限，`exit_code=0`。checkpoint-5
 adapter SHA256 为 `0d43e7b297b8d6d45bb612b4cead089bedb5e3d45e9af2be4a1115bca5a6101c`。GPU1 cleanup
 后 18 MiB、无 compute process，GPU0/GPU5 未参与；精确 tmux dead/status 0 后关闭。下一步晋级 20。
+
+v4 Run `official-sft-wiki-en-safe960-v4-step20-20260825` 已从 global step 5 正确恢复到 20，并越过 v3
+旧故障点。20 个 loss 范围 `0.68398～1.31734`，所有 loss/grad norm 均有限，`exit_code=0`。
+checkpoint-20 adapter SHA256 `c6f8f10f3883bca14f559ebd931e0e4871f5abc8bc42aa72befe250317c1b296`，
+optimizer/trainer state 完整。GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与；精确 tmux
+dead/status 0 后关闭。20-step 晋级门通过，下一步为用户已批准的总步数 50。

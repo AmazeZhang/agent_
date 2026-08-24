@@ -1012,3 +1012,12 @@
   全部 finite，`exit_code=0`。
 - checkpoint-5 adapter SHA256 `0d43e7b297b8d6d45bb612b4cead089bedb5e3d45e9af2be4a1115bca5a6101c`；
   GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与，精确 dead/status 0 tmux 已关闭。
+
+### 2026-08-25：960-safe v4 通过 20-step 门
+
+- Run `official-sft-wiki-en-safe960-v4-step20-20260825` 从 global step 5 正确恢复到 20，成功越过 v3
+  的部分图像截断故障点；20 个 loss 位于 `0.68398～1.31734`，loss/grad norm 全部 finite。
+- `exit_code=0`，checkpoint-20 adapter SHA256
+  `c6f8f10f3883bca14f559ebd931e0e4871f5abc8bc42aa72befe250317c1b296`，optimizer/trainer state 完整。
+- GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与；精确 dead/status 0 tmux 已关闭。
+  20-step 晋级门通过，下一步在资源/风险复述后 resume 到总步数 50。
