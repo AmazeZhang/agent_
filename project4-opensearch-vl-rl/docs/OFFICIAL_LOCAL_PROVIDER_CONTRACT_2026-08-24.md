@@ -78,3 +78,10 @@ rank2 组 4/4 full success 但组内零方差；transient 组 3/4 fatal；no-mat
 `d758cf88815122360139f4b1e0028576a1b4d8e3a5e159e9560fc4d7fbcfb6b0`。Run `exit_code=0`，GPU1
 最高观察约 58°C、cleanup 后 18 MiB/无 compute process；GPU0/GPU5 未参与，无网络/API，精确 tmux
 dead/status 0 后关闭。该门只授权单独实现并审查的 1-step RL smoke。
+
+受授权 Run `official-provider-grpo-replay-1step-20260825` 已完成首个 fatal-clamped GRPO adapter update：
+4 条 active trajectory、19 assistant turns、984 supervised tokens，weighted loss `5.1624e-05`、grad norm
+`0.0038859` 均 finite。adapter SHA256 由 SFT-50 的 `8b7e...c3698` 变为
+`b687be7d4ed8d911e9eae363ecfda5313774283f25adaed0a8274c98d31c3698`；optimizer/trainer state 已保存。
+Run `exit_code=0`，GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与，无网络/API，精确
+tmux dead/status 0 后关闭。下一阶段必须每步生成新 rollout，不允许重复多 epoch 消费同一 report。

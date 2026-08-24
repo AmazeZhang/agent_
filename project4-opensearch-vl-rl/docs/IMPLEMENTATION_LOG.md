@@ -1098,3 +1098,17 @@
   `global_step=1`、cleanup 正常才算通过。
 - CPU 单测 19/19 通过；真实 processor replay 检查得到 prompt 566 tokens、assistant 23 tokens、prefix
   完全一致。配置已预提交于 `official_grpo_replay_smoke_v1.json`；下一步仅物理 GPU1、无网络/API。
+
+### 2026-08-25：fatal-clamped GRPO 完成首个 optimizer step
+
+- Run `official-provider-grpo-replay-1step-20260825` 仅物理 GPU1，从固定 SFT-50 adapter 和 phase B
+  rank3 on-policy group 完成 1 次 QLoRA AdamW update；回放 4 条 active trajectory、19 个 assistant turn、
+  984 个监督 token。weighted loss `5.1624e-05`、grad norm `0.0038859`，均 finite，`global_step=1`。
+- adapter SHA256 从 `8b7e3e49...1c3698` 变为
+  `b687be7d4ed8d911e9eae363ecfda5313774283f25adaed0a8274c98d31c3698`，证明不是空 optimizer step；
+  optimizer SHA256 `6534ef5b...00f6d`，trainer state SHA256 `f3412725...bd07`，输出非覆盖且完整。
+- 该 step 是同一旧策略 rollout 上的单 epoch on-policy update；未重复利用该 batch 做多 epoch，也没有用
+  跨 prompt 均值伪造 advantage。它证明核心 RL 梯度/保存链可运行，不证明策略效果提升或官方分布式 runtime。
+- `exit_code=0`；GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与，无网络/API；精确
+  dead/status 0 tmux 已关闭。下一步先为 1→5 构建“每步重新 rollout、再更新一次”的在线小循环，禁止把
+  同一 phase B report 重放 5 次。
