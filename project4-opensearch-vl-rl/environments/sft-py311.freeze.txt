@@ -9,6 +9,7 @@ antlr4-python3-runtime==4.9.3
 anyio==4.14.2
 attrs==26.1.0
 av==16.0.0
+bitsandbytes==0.48.1
 brotli==1.2.0
 certifi==2026.7.22
 charset-normalizer==3.5.1

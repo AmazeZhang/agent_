@@ -48,6 +48,10 @@ def main() -> None:
         assert config["cutoff_len"] == 5120
         assert config["dataset"] == "wiki_en_official_1000"
         assert config["finetuning_type"] == "lora"
+        assert config["quantization_bit"] == 4
+        assert config["quantization_method"] == "bitsandbytes"
+        assert config["quantization_type"] == "nf4"
+        assert config["double_quantization"] is True
         assert config["freeze_vision_tower"] is True
         assert config["freeze_multi_modal_projector"] is True
         assert config["overwrite_output_dir"] is False

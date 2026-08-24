@@ -935,3 +935,15 @@
 - 安全：Run `exit_code=1`；GPU1 before/after 均 18 MiB、46°C、cleanup 无 compute process；GPU0/GPU5
   未参与。失败 Run 全量保留。launcher 将 cutoff 固定为 5,120，下一次仍仅做新 Run ID 的 1-step；OOM
   或占位符问题立即停止，不自动扩卡或改数据。
+
+### 2026-08-24：官方 SFT v2 logits OOM 与 QLoRA 内存适配
+
+- v2 以 5,120 cutoff 正确保留图像 token，进入首个 forward，随后在全词表 logits/cross-entropy OOM：
+  已用约 23.21 GiB，额外申请 2.90 GiB。未执行 optimizer update/checkpoint；`exit_code=1`，GPU1 cleanup
+  后 18 MiB/无 compute process，GPU0/GPU5 未参与，失败证据保留。
+- Liger 路线未采用：环境无包且固定 LLaMA Factory wrapper 不支持 qwen3_vl 路由。采用标准 4-bit NF4
+  QLoRA，仅量化冻结基座，保持官方数据、qwen3_vl template、5,120 cutoff、LoRA target/rank 不变。
+- 固定安装 `bitsandbytes==0.48.1`（官方 x86-64 wheel SHA256
+  `3e72cf07ba6d2169e69a61282a6f072fc675efee86049e56a33de099a0363ef2`）；60.1 MB 由华为云 PyPI
+  直连镜像取得，显式清空代理，未使用 Clash。launcher profile 升级为 `official-wiki-en-qlora-v2`，禁止
+  混用旧 LoRA checkpoint。下一步先做受管 GPU1 的独立 NF4 kernel smoke。

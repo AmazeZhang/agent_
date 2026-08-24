@@ -102,3 +102,13 @@ ValueError: Image features and image tokens do not match, tokens: 0, features: 7
 失败 Run `exit_code=1`，GPU1 前后均 18 MiB、无 compute process，46°C；GPU0/GPU5 未参与。失败 Run、
 traceback、配置和 cleanup 证据全部保留。launcher cutoff 已提升到 5,120；再次 GPU 尝试仍只允许新的
 1-step Run，若 OOM 则停止并重新评估单卡内存方案，不自动降回会破坏图像占位符的 cutoff。
+
+第二次 Run `official-sft-wiki-en-1step-v2-20260824` 保留了 image token，成功进入模型 forward，并在
+全词表 logits/cross-entropy 处 OOM：进程已用约 23.21 GiB，额外申请 2.90 GiB。Run `exit_code=1`，
+GPU1 cleanup 后回到 18 MiB、无 compute process；GPU0/GPU5 未参与。
+
+Liger/fused CE 当前不是可用的小改动：环境未安装，且固定 LLaMA Factory wrapper 没有 `qwen3_vl`
+Liger 路由。因此下一版 profile 改为标准 NF4 QLoRA：保持同一数据、template、5,120 cutoff 和 LoRA
+target，只把冻结基座改为 4-bit NF4 double quantization。固定安装 `bitsandbytes==0.48.1`；Linux x86-64
+wheel 官方 PyPI SHA256 为 `3e72cf07ba6d2169e69a61282a6f072fc675efee86049e56a33de099a0363ef2`。
+下载显式清空所有代理并使用华为云直连镜像，未经过 Clash 7890/7891。

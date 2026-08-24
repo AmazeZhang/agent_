@@ -125,7 +125,7 @@ def validate_checkpoint(
     provenance = json.loads(provenance_path.read_text())
     if provenance.get("dataset_manifest_sha256") != dataset_manifest_sha256:
         raise ValueError("resume checkpoint belongs to a different dataset manifest")
-    if provenance.get("training_profile") != "official-wiki-en-lora-v1":
+    if provenance.get("training_profile") != "official-wiki-en-qlora-v2":
         raise ValueError("resume checkpoint belongs to a different training profile")
     return checkpoint
 
@@ -139,6 +139,10 @@ def training_config(
         "video_max_pixels": 16384,
         "trust_remote_code": False,
         "flash_attn": "fa2",
+        "quantization_bit": 4,
+        "quantization_method": "bitsandbytes",
+        "quantization_type": "nf4",
+        "double_quantization": True,
         "stage": "sft",
         "do_train": True,
         "finetuning_type": "lora",
@@ -213,7 +217,7 @@ def main() -> int:
     config_path = run_dir / "official-sft-config.yaml"
     config_path.write_text(yaml.safe_dump(config, sort_keys=True))
     provenance = {
-        "training_profile": "official-wiki-en-lora-v1",
+        "training_profile": "official-wiki-en-qlora-v2",
         "source_is_official": True,
         "source_revision": SOURCE_REVISION,
         "dataset_root": str(DATASET_ROOT),
@@ -227,6 +231,7 @@ def main() -> int:
         "physical_gpu": physical_gpu,
         "method_deviations": {
             "full_finetuning_replaced_by_lora": True,
+            "frozen_base_quantized_to_4bit_nf4": True,
             "vision_tower_frozen": True,
             "projector_frozen": True,
             "cutoff_len": CUTOFF_LEN,
