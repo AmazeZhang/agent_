@@ -1083,3 +1083,18 @@
   无 compute process；GPU0/GPU5 未参与，精确 dead/status 0 tmux 已关闭。
 - rollout 门通过，下一步是先审计固定 RL 框架在 7×4090/避开 GPU0 条件下的最小可行路径，冻结 1-step
   optimizer smoke；尚未启动任何 RL 参数更新。
+
+### 2026-08-25：冻结单卡 1-step fatal-clamped GRPO replay smoke
+
+- 官方 8B preset 是 1×8 GPU、rollout TP4、Megatron TP2、70k response、256 prompts×8 responses；当前
+  SFT 环境也未安装 verl/vLLM/rLLM。它不能在排除 GPU0 的 7×24GB 4090 上原样运行，本阶段不声称复现
+  官方分布式 runtime。
+- 最小方法链路使用刚由同一 checkpoint-50 生成、且 adapter 尚未更新的冻结 phase B on-policy group；
+  取真实 group-centered `fatal_clamped` advantage，对每个 assistant turn 回放条件概率，目标为
+  `mean_i(mean_turn(A_i * cross_entropy_i))`，对 QLoRA adapter 做一次 AdamW update。正 advantage 提高
+  对应轨迹概率，负 advantage 降低；零 advantage/fatal-clamped 轨迹不产生梯度。
+- 输入 report/adapter/data/tasks/tool protocol/reward version 全部哈希 fail-closed，输出必须是新受管 Run 的
+  不存在 `output/`。保存 adapter、optimizer 和 trainer state；只有 adapter hash 改变、loss/grad finite、
+  `global_step=1`、cleanup 正常才算通过。
+- CPU 单测 19/19 通过；真实 processor replay 检查得到 prompt 566 tokens、assistant 23 tokens、prefix
+  完全一致。配置已预提交于 `official_grpo_replay_smoke_v1.json`；下一步仅物理 GPU1、无网络/API。

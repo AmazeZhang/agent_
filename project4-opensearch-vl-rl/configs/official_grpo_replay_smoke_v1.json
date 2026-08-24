@@ -1,0 +1,19 @@
+{
+  "algorithm": "single-epoch-on-policy-grpo-replay-fatal-clamped",
+  "dataset_manifest_sha256": "70142a78d31efcd97a041d7b11eb3d727ed964667c22d3941598d889ca01546c",
+  "dataset_root": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/datasets/processed/wit-rl-official-provider-v10",
+  "global_steps": 1,
+  "learning_rate": 1e-06,
+  "objective": "mean_i(mean_turn(advantage_i * assistant_cross_entropy))",
+  "optimizer": "torch-adamw",
+  "output_policy": "new-managed-run-output-no-overwrite",
+  "physical_gpu": 1,
+  "rollout_report": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/runs/official-provider-sft50-rollout-phaseb-g4n4-20260825/stochastic_rollout_audit.json",
+  "rollout_report_sha256": "d758cf88815122360139f4b1e0028576a1b4d8e3a5e159e9560fc4d7fbcfb6b0",
+  "source_adapter": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/runs/official-sft-wiki-en-safe960-v4-step50-20260825/output",
+  "source_adapter_sha256": "8b7e3e49526da33730868ba4b84dce0a5e3310bb602d480067fc6a4909a57955",
+  "task_id": "wit-00000885",
+  "tasks_sha256": "2ccdb0ef507ebbd20dfba54c199a724ab9056a868856d9291dd65949325cce55",
+  "tool_observation_schema": "official-provider-v1",
+  "tool_protocol": "official-local-v1"
+}

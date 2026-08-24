@@ -388,32 +388,16 @@ def execute_call(
     raise ValueError(f"unsupported tool: {name}")
 
 
-def evaluate_task(
-    model: Any,
-    processor: Any,
+def build_initial_messages(
     task: dict[str, Any],
-    text_index: LocalTextIndex,
-    *,
-    max_new_tokens: int,
-    do_sample: bool = False,
-    temperature: float = 1.0,
-    top_p: float = 1.0,
-    seed: int | None = None,
-    dataset_root: Path = DATASET_ROOT,
-    observation_format: str = "verbose-v1",
-    maximum_turns: int = 5,
-    tool_protocol: str = "legacy-v1",
-) -> dict[str, Any]:
-    if seed is not None:
-        import torch
-
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
+    dataset_root: Path,
+    tool_protocol: str,
+) -> list[dict[str, Any]]:
     image_path = resolve_local_image(Path(task["query_image"]), dataset_root)
     with Image.open(image_path) as image:
         image.load()
         query_image = image.convert("RGB")
-    messages: list[dict[str, Any]] = [
+    return [
         {
             "role": "system",
             "content": [
@@ -439,13 +423,34 @@ def evaluate_task(
             "role": "user",
             "content": [
                 {"type": "image", "image": query_image},
-                {
-                    "type": "text",
-                    "text": str(task["user_prompt"]),
-                },
+                {"type": "text", "text": str(task["user_prompt"])},
             ],
         },
     ]
+
+
+def evaluate_task(
+    model: Any,
+    processor: Any,
+    task: dict[str, Any],
+    text_index: LocalTextIndex,
+    *,
+    max_new_tokens: int,
+    do_sample: bool = False,
+    temperature: float = 1.0,
+    top_p: float = 1.0,
+    seed: int | None = None,
+    dataset_root: Path = DATASET_ROOT,
+    observation_format: str = "verbose-v1",
+    maximum_turns: int = 5,
+    tool_protocol: str = "legacy-v1",
+) -> dict[str, Any]:
+    if seed is not None:
+        import torch
+
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    messages = build_initial_messages(task, dataset_root, tool_protocol)
     turns = []
     tool_names = []
     fatal = None
