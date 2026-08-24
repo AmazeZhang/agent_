@@ -40,8 +40,9 @@ Checkpoint、原始 rollout、audit、Ray 日志和训练曲线等大文件保�
 - 时间：2026-08-24 15:47:19–19:35:39（Asia/Shanghai），总计 3:48:20；训练循环
   10/10 用时 3:45:30。
 - tmux：`p3-p3-aware-v2-grpo10-seed2026-fsdp6-20260824a`。
-- Retriever tmux：`p3-aware-v2-seed2026-retriever-20260824`；CPU-only，Wiki-18
-  IndexFlatIP，768维，21,015,324 vectors，`max_concurrent_queries=64`。
+- Retriever：CPU-only Wiki-18 IndexFlatIP，768维，21,015,324 vectors，
+  `max_concurrent_queries=64`。后验进程归属更正见“Retriever归属审计”：实际复用8月15日启动的
+  既有服务，本轮同名tmux未成功绑定端口。
 - 配置：Qwen2.5-3B-Instruct fresh Step0，全参数 FSDP；seed `2026/2026`；10 steps；
   train batch 66、rollout n=5、mini batch 330；max steps/history 4/4；save freq 5；
   lr `1e-6`、KL `0.001`、warmup ratio `0.285`；v2 step reward 与 trajectory return 开启。
@@ -117,3 +118,77 @@ official-confirm256-v1 上执行逐题配对评测。
 SIGTERM/SIGINT并让 `finally` 写出JSON，避免已完成训练中观察到的peak文件缺失。配对评测由
 `scripts/run_p3_seed2026_pair_eval_driver.sh` 串行执行；只有Clean Run完成256题、exit 0、
 无partial且GPU1清理通过后，才允许启动Aware Run。
+
+## confirm256 seed2026 配对评测结果
+
+### 完整性与运行
+
+- 数据：`searchr1-official-confirm256-v1/heldout.parquet`，SHA256
+  `ffebf468e756a673da267f5830cfc67f2e9c4dc44ec41c979a389c1efebfff60`；两边均为
+  qid 0..255、顺序一致、无泄漏重叠。
+- 固定条件：同一v2 clean-protocol评测入口，Prompt/projection/terminal reward四个关键文件
+  与pristine upstream逐字节一致；greedy temperature=0、seed=0、real evidence、topk=3、
+  max_steps/history=4/4、GPU1-only。
+- Clean Run：`p3-eval-clean-grpo10-seed2026-gs10-confirm256-20260824a`，
+  20:21:44–20:29:19，评测核心用时429.9秒，exit 0，256/256。
+- Aware Run：`p3-eval-aware-v2-seed2026-gs10-confirm256-20260824a`，
+  20:29:24–20:37:16，评测核心用时447.7秒，exit 0，256/256。
+- 两边均无partial、Traceback、OOM、CUDA/NCCL/Xid或Retriever timeout；退出后GPU1无
+  compute process。物理峰值显存文件经修复后正常生成：Clean 13,947 MiB、Aware 14,081 MiB。
+
+### 主结果
+
+| 指标 | Clean | Aware-v2 | Aware−Clean |
+|---|---:|---:|---:|
+| EM | 77/256（30.08%） | 78/256（30.47%） | **+1题（+0.39pp）** |
+| Wilson 95% | [24.79%, 35.96%] | [25.15%, 36.36%] | 区间高度重叠 |
+| 有效搜索题 | 182（71.09%） | 234（91.41%） | **+52（+20.31pp）** |
+| search→answer | 80.77% | 97.01% | **+16.24pp** |
+| 搜索且答对 | 56 | 71 | **+15** |
+| evidence-hit搜索且答对 | 49 | 64 | **+15** |
+| search→correct | 30.77% | 30.34% | −0.43pp |
+| answer compliance | 221（86.33%） | 249（97.27%） | **+28（+10.94pp）** |
+| max-steps耗尽 | 35 | 16 | **−19** |
+| invalid-query题 | 3 | 2 | −1 |
+| 有效搜索调用 | 291 | 328 | +37 |
+| 真冗余搜索 | 58（19.93%） | 43（13.11%） | **−15（−6.82pp）** |
+| 平均步骤/题 | 2.148 | 2.289 | +0.141 |
+
+逐题配对：共同答对55、共同答错156、Aware新增答对23、Aware丢失22，净+1；45个discordant
+pair的精确双侧McNemar `p=1.0`。因此本seed不支持“准确率提升”，只支持“搜索与最终作答行为
+显著向预期方向移动”。
+
+结合既有seed1234：Aware-v2 gs10为73/256、同条件clean GRPO10为74/256（净−1，p=1.0）；
+本seed为净+1（p=1.0）。两个seed的EM方向相反且量级均为1题，结论是准确率改进未稳定复现。
+但行为方向稳定：seed1234搜索率约62.9%→93.4%、search→answer约80.1%→96.2%；seed2026
+为71.1%→91.4%、80.8%→97.0%。这适合作为工程改进结论，不应包装为质量SOTA或论文级收益。
+
+权威配对artifact：`gates/p3_seed2026_pair_stats_20260824.json`，SHA256
+`1b6fce2a26ae85f3a906f159d7f6b191ef4a8d83ab7613dda3fb19852355e7d7`；由
+`scripts/analyze_p3_seed2026_pair.py` 从两份`episodes.jsonl`独立复算。
+
+关键证据SHA256：
+
+| Artifact | Clean | Aware-v2 |
+|---|---|---|
+| `results.json` | `38f88bd8be8e8376ce99deee8ba510d606eeff0487ad36dd640647153f5982cf` | `7edc9bbcddbf64e8c5983180ff4a2614f5afad1852ac63a6c964697054beea27` |
+| `episodes.jsonl` | `72c5b24ff1cd83c5f930b00cd4d222c9695b955837e6389c4874ba4d1732ad58` | `fd055ff85c848f25200de1596526379baf0fca310927fc250518ca40576b5756` |
+| `metadata.env` | `5ea1109625bd66ba1fc74489c0a79139021a26a4e4a2ce4dfb3b313888116fae` | `3b3956c35287b3f59288fe5adca12c9bb7a09eb029b90c14bc9895d828a9a678` |
+| `peak_memory_nvidia_smi.json` | `fdc51cbd16b730e31d048a3b26f0be6e9e43dd2372d02ca7078dc90a0a376d5d` | `3b6fba2b7db8a31477d3f913e4cb9f484f0242e1b761c70876611493dfb5dd74` |
+
+串行driver日志SHA256：`a9ea9cc968bd209bc653bd7e31ae72eeff63fe979394588f00a6b31672f6f212`。
+
+## Retriever归属审计与安全更正
+
+- 本轮曾创建tmux `p3-aware-v2-seed2026-retriever-20260824`；其服务进程277571加载索引后
+  因`127.0.0.1:18080 address already in use`退出，pane最终status 3。此前仅凭health ready将其
+  误记为本轮新服务，归属判断不准确。
+- 实际listener为PID 1355816（用户`imc`，父进程为user systemd PID7260），启动于
+  2026-08-15 16:33:17；完整命令为固定CPU Retriever、同一Wiki-18资源、threads=8、
+  max-concurrent-queries=64。health在训练和两次评测中始终为ready、21,015,324 vectors。
+- 该服务先于本轮存在且不属于本轮，故身份确认后没有向其发送TERM，也没有触碰其伴随的旧监控
+  进程。Clean与Aware复用同一实际服务，未产生配对条件差异，因此不推翻配对结果；但这是启动
+  流程的进程归属记录缺陷。
+- 后续硬门禁：发现18080已ready时，必须先通过`ss -ltnp`、完整`/proc/<pid>/cmdline`、
+  start time、owner和parent记录listener身份；只有端口未占用时才创建新Retriever tmux。禁止仅凭
+  curl health推断“本轮服务启动成功”。

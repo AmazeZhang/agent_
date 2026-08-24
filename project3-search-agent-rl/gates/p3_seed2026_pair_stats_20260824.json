@@ -1,0 +1,452 @@
+{
+  "kind": "p3-seed2026-clean-aware-paired-confirm256",
+  "data_sha256": "ffebf468e756a673da267f5830cfc67f2e9c4dc44ec41c979a389c1efebfff60",
+  "n": 256,
+  "runs": {
+    "clean": "p3-eval-clean-grpo10-seed2026-gs10-confirm256-20260824a",
+    "aware": "p3-eval-aware-v2-seed2026-gs10-confirm256-20260824a"
+  },
+  "integrity": {
+    "qid_space": "0..255 sorted and unique",
+    "data_sha_equal": true,
+    "decoding_and_environment_parameters_equal": true,
+    "temperature": 0.0,
+    "seed": 0,
+    "max_steps": 4,
+    "retrieval_condition": "real"
+  },
+  "behavior": {
+    "clean": {
+      "em": 77,
+      "wilson95": [
+        0.247887,
+        0.359566
+      ],
+      "searched": 182,
+      "search_rate": 0.7109375,
+      "search_action_questions_including_invalid": 183,
+      "answered_offline": 221,
+      "answered_env": 221,
+      "search_to_answer": 0.8076923076923077,
+      "searched_and_correct": 56,
+      "search_to_correct": 0.3076923076923077,
+      "no_search_and_correct": 21,
+      "invalid_questions": 3,
+      "max_steps_exhausted": 35,
+      "mean_steps": 2.1484375,
+      "search_action_calls_including_invalid": 294,
+      "valid_search_calls": 291,
+      "true_redundant_searches": 58,
+      "true_redundant_rate": 0.19931271477663232
+    },
+    "aware": {
+      "em": 78,
+      "wilson95": [
+        0.251535,
+        0.363615
+      ],
+      "searched": 234,
+      "search_rate": 0.9140625,
+      "search_action_questions_including_invalid": 234,
+      "answered_offline": 249,
+      "answered_env": 240,
+      "search_to_answer": 0.9700854700854701,
+      "searched_and_correct": 71,
+      "search_to_correct": 0.3034188034188034,
+      "no_search_and_correct": 7,
+      "invalid_questions": 2,
+      "max_steps_exhausted": 16,
+      "mean_steps": 2.2890625,
+      "search_action_calls_including_invalid": 330,
+      "valid_search_calls": 328,
+      "true_redundant_searches": 43,
+      "true_redundant_rate": 0.13109756097560976
+    }
+  },
+  "behavior_delta_aware_minus_clean": {
+    "em": 1,
+    "search_rate": 0.203125,
+    "search_to_answer": 0.16239316239316237,
+    "searched_and_correct": 15,
+    "search_to_correct": -0.004273504273504314,
+    "max_steps_exhausted": -19,
+    "mean_steps": 0.140625,
+    "true_redundant_searches": -15,
+    "true_redundant_rate": -0.06821515380102255
+  },
+  "paired": {
+    "cells": {
+      "both_correct": 55,
+      "both_wrong": 156,
+      "clean_correct_aware_wrong": 22,
+      "clean_wrong_aware_correct": 23
+    },
+    "gained": 23,
+    "lost": 22,
+    "net": 1,
+    "discordant_n": 45,
+    "mcnemar_exact_two_sided_p": 1.0,
+    "per_source": {
+      "nq": {
+        "both_correct": 13,
+        "both_wrong": 38,
+        "clean_correct_aware_wrong": 5,
+        "clean_wrong_aware_correct": 8
+      },
+      "hotpotqa": {
+        "both_correct": 8,
+        "both_wrong": 43,
+        "clean_correct_aware_wrong": 6,
+        "clean_wrong_aware_correct": 7
+      },
+      "popqa": {
+        "both_correct": 10,
+        "both_wrong": 21,
+        "clean_correct_aware_wrong": 0,
+        "clean_wrong_aware_correct": 1
+      },
+      "2wikimultihopqa": {
+        "both_correct": 7,
+        "both_wrong": 18,
+        "clean_correct_aware_wrong": 6,
+        "clean_wrong_aware_correct": 1
+      },
+      "triviaqa": {
+        "both_correct": 15,
+        "both_wrong": 9,
+        "clean_correct_aware_wrong": 3,
+        "clean_wrong_aware_correct": 5
+      },
+      "musique": {
+        "both_correct": 0,
+        "both_wrong": 16,
+        "clean_correct_aware_wrong": 0,
+        "clean_wrong_aware_correct": 0
+      },
+      "bamboogle": {
+        "both_correct": 2,
+        "both_wrong": 11,
+        "clean_correct_aware_wrong": 2,
+        "clean_wrong_aware_correct": 1
+      }
+    },
+    "discordant_questions": [
+      {
+        "question_id": 2,
+        "source": "nq",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 12,
+        "source": "nq",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 13,
+        "source": "nq",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 14,
+        "source": "nq",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": false
+      },
+      {
+        "question_id": 16,
+        "source": "nq",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 24,
+        "source": "nq",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 26,
+        "source": "nq",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 28,
+        "source": "nq",
+        "direction": "lost",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 31,
+        "source": "nq",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 38,
+        "source": "nq",
+        "direction": "lost",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 46,
+        "source": "nq",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 55,
+        "source": "nq",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 62,
+        "source": "nq",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 66,
+        "source": "hotpotqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 74,
+        "source": "hotpotqa",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 80,
+        "source": "hotpotqa",
+        "direction": "lost",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 82,
+        "source": "hotpotqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": false
+      },
+      {
+        "question_id": 83,
+        "source": "hotpotqa",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 84,
+        "source": "hotpotqa",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 88,
+        "source": "hotpotqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 91,
+        "source": "hotpotqa",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 98,
+        "source": "hotpotqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 102,
+        "source": "hotpotqa",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 115,
+        "source": "hotpotqa",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 119,
+        "source": "hotpotqa",
+        "direction": "lost",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 121,
+        "source": "hotpotqa",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 147,
+        "source": "popqa",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 164,
+        "source": "2wikimultihopqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 167,
+        "source": "2wikimultihopqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 170,
+        "source": "2wikimultihopqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 180,
+        "source": "2wikimultihopqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 186,
+        "source": "2wikimultihopqa",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 188,
+        "source": "2wikimultihopqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 189,
+        "source": "2wikimultihopqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 195,
+        "source": "triviaqa",
+        "direction": "lost",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 197,
+        "source": "triviaqa",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 202,
+        "source": "triviaqa",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 203,
+        "source": "triviaqa",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 205,
+        "source": "triviaqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 210,
+        "source": "triviaqa",
+        "direction": "gained",
+        "clean_searched": true,
+        "aware_searched": true
+      },
+      {
+        "question_id": 221,
+        "source": "triviaqa",
+        "direction": "lost",
+        "clean_searched": true,
+        "aware_searched": false
+      },
+      {
+        "question_id": 222,
+        "source": "triviaqa",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 242,
+        "source": "bamboogle",
+        "direction": "lost",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 251,
+        "source": "bamboogle",
+        "direction": "gained",
+        "clean_searched": false,
+        "aware_searched": true
+      },
+      {
+        "question_id": 255,
+        "source": "bamboogle",
+        "direction": "lost",
+        "clean_searched": false,
+        "aware_searched": true
+      }
+    ]
+  },
+  "claim_boundary": "The seed2026 pair supports a large search/completion behavior shift, but not an accuracy gain; EM is 78 vs 77 with exact paired p=1.0."
+}

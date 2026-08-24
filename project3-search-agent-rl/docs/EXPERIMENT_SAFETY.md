@@ -104,6 +104,12 @@ df -h /media/imc/data
 先检查Git状态、磁盘、GPU、Retriever端口、残留进程、Run ID是否已存在、配置和恢复源。
 不得把未知的dirty worktree、未知PID或已有Run目录当成“可以直接覆盖”。
 
+Retriever端口已ready时，不能仅凭`/health`推断“本轮Retriever启动成功”。启动新服务前必须
+先用`ss -ltnp`解析listener PID，并记录完整`/proc/<pid>/cmdline`、owner、start time、PPID和
+资源/并发配置。若是既有且配置匹配的共享服务，可明确记录后复用；若身份或配置不明则停止并
+询问用户。只有确认端口未占用时才允许创建新的Retriever tmux；本轮未创建的既有服务不得在
+收尾时被停止。
+
 ```bash
 export PROJECT3_DATA_ROOT=/media/imc/data
 bash scripts/preflight.sh 1
