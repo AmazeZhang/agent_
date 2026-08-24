@@ -894,3 +894,19 @@
 - 恢复原则：只从新的空 `.parts` 目录下载固定 revision 的 `wiki_en` JSON 与 images.zip；继续禁用环境
   代理，不使用 Clash 7890/7891；只有固定字节数和官方 SHA256 同时通过才发布。该步骤没有使用 GPU、
   API 或 tmux；GPU0/GPU5 均未参与。
+
+### 2026-08-24：官方 wiki_en 审计与固定 SFT-1000 发布
+
+- 下载恢复：固定 revision `2c1c460...` 的 JSON（131,910,169 B）和 images.zip（104,683,505 B）
+  均通过官方 SHA256；下载器显式忽略代理环境，未使用 Clash 7890/7891。ZIP 安全审计通过并非覆盖解压，
+  4,084 个文件、105,121,529 B 解压大小、最大压缩比约 10.286。
+- 全量审计：3,503 条、4,084 个唯一图片引用，工具声明完全一致。发现唯一不完整源样本索引 1900 以
+  observation 结束；官方源哈希正确。未伪造或补写答案，明确记录后从候选池排除，剩余 3,502 条。
+- 发布：固定 seed `opensearch-vl-official-sft-v1` 对源索引和完整内容做哈希排序，非覆盖发布 1,000 条、
+  1,155 张复制图片、约 67 MiB；精确索引与源/输出哈希写入数据盘 manifest。数据 JSON SHA256 为
+  `af5eb4adc2a9e4fcc0529ed2c6cfc523fca3753740aec1178c57acd54b4a3dd7`。
+- 工具覆盖：子集含 image_search 982、text_search 1,318、crop 115、layout_parsing 97、
+  super_resolution 33、sharpen 7 次调用；不改官方 system、工具声明、observation 或答案。详细证据见
+  `docs/OFFICIAL_SFT_DATA_STATUS_2026-08-24.md`。
+- 资源：本步为 CPU/网络/磁盘操作，无 API/GPU/tmux；GPU0/GPU5 均未参与。下一步先做 LLaMA Factory
+  数据加载门禁，再用新 Run ID、受管 tmux 和物理 GPU1 执行 SFT 1-step。

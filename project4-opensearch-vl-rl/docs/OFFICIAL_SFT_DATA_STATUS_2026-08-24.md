@@ -1,0 +1,82 @@
+# 官方 Search-VL SFT 数据状态（2026-08-24）
+
+## 结论
+
+用于工程复现的首个官方数据门禁已通过。当前不是自建/合成 SFT，而是从官方
+`OpenSearch-VL/Search-VL-SFT-36K` 的固定 revision 中取得 `wiki_en` 子集，保持原始 system、tools、
+conversation、observation 和答案不变，只做确定性抽样与一个不完整样本的排除。
+
+这一步足以进入 Base 模型的 1→5→20→50 optimizer-step LoRA SFT 验证，但不能声称已经复现完整
+SFT-36K 混合训练。其余语言与任务目录仍未下载。
+
+## 固定来源与完整性
+
+- 数据集 revision：`2c1c460af4fa15bd63210cbf426a96664b959944`
+- JSON：`wiki_en/wiki_en_llama_factory_filtered.json`
+  - size：`131910169`
+  - SHA256：`a22a44c6a04d79d6dfd0064c89d8a792045278eed70a8e27c14b7c5e2f4850e3`
+- 图片：`wiki_en/images.zip`
+  - size：`104683505`
+  - SHA256：`3576d4349aa8cca66f246b7dcdcf658ad8274567fc8d9eec16697ce34d264d0b`
+- ZIP 审计：4,084 files、2 directories、105,121,529 uncompressed bytes、最大压缩比约
+  `10.286`；CRC、路径、重复成员、符号链接、加密与膨胀限制均通过。
+
+两项资产均由强制忽略环境代理的 Range 下载器取得，没有使用 Clash 7890/7891。只有 size 与 SHA256
+同时匹配后才原子发布。原始数据和中断/并发事故证据均保留在项目四数据盘，不进入 Git。
+
+## 全量结构审计
+
+官方 `wiki_en` 有 3,503 条、4,084 个唯一图片引用。所有行使用同一份工具声明：
+
+```text
+crop, image_search, layout_parsing, perspective_correct,
+sharpen, super_resolution, text_search, web_search
+```
+
+实际工具调用总数：
+
+```text
+crop=422, image_search=3424, layout_parsing=411, sharpen=25,
+super_resolution=133, text_search=4603, web_search=5
+```
+
+发现官方索引 `1900` 以 `observation` 结束，没有最终 `gpt` 消息。源 JSON 的官方 SHA256 正确，因此这
+是源数据内容问题，不是下载损坏。构建器不伪造答案、不截断修补，明确记录并从训练候选池排除该行；
+剩余 3,502 条可训练。
+
+## 固定 1,000 条工程子集
+
+输出：
+
+```text
+/media/imc/data/yzy/agent/project4-opensearch-vl-rl/datasets/processed/
+  search-vl-sft-wiki-en-official-1000-r2c1c460/
+```
+
+- selection seed：`opensearch-vl-official-sft-v1`
+- 选择方法：对 seed、源索引和规范化完整行内容做 SHA256 排序，取前 1,000 条；不是易受 JSON 顺序
+  之外随机状态影响的运行时 shuffle。
+- 精确索引列表及 SHA256 写入 `manifest.json`；索引 1900 不在其中。
+- 样本：1,000；复制图片：1,155；目录约 67 MiB。
+- `wiki_en_official_1000.json` SHA256：
+  `af5eb4adc2a9e4fcc0529ed2c6cfc523fca3753740aec1178c57acd54b4a3dd7`
+- `dataset_info.json` SHA256：
+  `6b065a7c32ddc1ac5ac79c4575fe84cc71322fd73f53739ac62d9443d0b3641f`
+- `selected_indices` SHA256：
+  `3195eafee69202c74cfb382cb7572fc198a471a357ec6af625f58d653d072018`
+
+子集调用覆盖：`image_search=982`、`text_search=1318`、`crop=115`、`layout_parsing=97`、
+`super_resolution=33`、`sharpen=7`。官方全量仅有 5 次的 `web_search` 没有被确定性子集抽中；
+`perspective_correct` 在官方 `wiki_en` 全量中也没有实际调用。工具声明保持官方原样，没有给模型暴露
+本地 provider、SQLite、entity ID 或离线语料 revision。
+
+## 进入 SFT 前的剩余门禁
+
+1. 用固定 LLaMA Factory 环境加载 `dataset_info.json`，完成少量 CPU/preprocess 检查；
+2. 冻结 SFT launcher、模型、数据、seed、LoRA、cutoff 和输出目录约束；
+3. 先在受管 tmux 中运行 1 step，再依次 5、20；每个 Run 使用新 ID，只用空闲物理 GPU1，GPU0/GPU5
+   均不参与；
+4. 20-step 证据通过后，按用户已经批准的目标执行 50 optimizer steps，并保留 checkpoint、loss、GPU
+   与 cleanup 证据；出现 OOM、NaN/Inf、Xid、图片/工具 schema 错误立即停止，不自动扩卡。
+
+50-step 只证明官方数据上的训练链路和 checkpoint 正常，不等价于官方完整 SFT 收敛或论文指标复现。
