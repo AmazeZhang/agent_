@@ -860,3 +860,20 @@
   新增白名单回归测试，protocol/evaluator/reward 16 个相关 CPU 测试、`py_compile` 和 diff check 通过。
 - 下一步：以新 Run ID 重跑完全相同的 v8 Base dev20 greedy 对照；停止的 Run 不重用、不改数据、reward、
   seed 或生成参数。未重新启动 SFT、RL 或 optimizer。
+
+### 2026-08-24：官方工具协议透明本地 Provider
+
+- 纠偏：用户确认允许搜索语料变化，但要求模型侧工具名称、参数和调用方式保持官方不变；本地数据集只替换
+  执行后端。v7/v8 私有协议保留为历史证据，不再作为官方 SFT→RL 主链路。
+- 官方契约：根据固定 vendor 源码冻结 `image_search(url)` 和
+  `text_search(q/query, hl/lang, top_k)`；新增 `OfficialLocalSearchProvider`，不修改 vendor。图像结果仅向
+  模型投影 title/source，文本结果保持官方 `[Passage]/Title/URL/Summary` 布局。
+- 隔离：离线 image provider 只接受注册的 `img_N`，拒绝外部 URL、路径和非官方参数；模型 observation
+  不含 entity ID、similarity、SQLite、文件路径、corpus/revision 或 provider 名称。backend 异常统一脱敏，
+  不把异常详情回传模型。
+- 验证：6 个新增 CPU 合约测试、既有 local text/image 与 v8 protocol 回归测试、Ruff、`py_compile` 和
+  diff check 通过。真实 WIT replay 以 `image_search({"url":"img_1"})` 返回 3 个 title/source，再以
+  `text_search({"q":"Genny Lim","hl":"en","top_k":3})` 返回本地 Wikipedia Passage；内部字段扫描为 0。
+- 资源：本步无下载、无网络/API/GPU，未创建 Run 或 checkpoint。详细契约见
+  `docs/OFFICIAL_LOCAL_PROVIDER_CONTRACT_2026-08-24.md`。下一步为官方 SFT-36K 的非代理下载与数据审计，
+  在完整性门禁通过前不启动 SFT。
