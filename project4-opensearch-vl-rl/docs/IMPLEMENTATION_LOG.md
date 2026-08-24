@@ -1069,3 +1069,17 @@
   adapter/data/tasks 哈希均与冻结配置一致，`exit_code=0`。GPU1 峰值约 17.99 GiB，结束 18 MiB、cleanup
   无 compute process；GPU0/GPU5 未参与，无网络/API，精确 dead/status 0 tmux 已关闭。
 - phase A 仅授权 phase B：四类 train task × 4 stochastic rollout，仍为 rollout-only、无 optimizer。
+
+### 2026-08-25：SFT-50 通过 official-provider stochastic phase B
+
+- Run `official-provider-sft50-rollout-phaseb-g4n4-20260825` 完成冻结的四类×4 共 16 条 rollout；reward
+  使用 `evidence-fidelity-v2`，无 API/optimizer。3/4 组有真实组内方差，variable fraction `0.75`，
+  format valid `0.8125`，fatal `0.1875`，通过预声明 `>=0.25 / >=0.75 / <=0.25` 门，nonzero advantage=true。
+- rank3、transient、no-match 组可变；rank2 组 4/4 full success 但零方差，真实贡献零 GRPO gradient。
+  transient 组 3/4 fatal，no-match 有 3 条 query-only reward；这些说明信号存在但仍有明显协议/投机风险，
+  不把 gate pass 表述为效果提升。
+- 报告 SHA256 `d758cf88815122360139f4b1e0028576a1b4d8e3a5e159e9560fc4d7fbcfb6b0`；adapter、
+  manifest、tasks hash 均匹配冻结配置，`exit_code=0`。仅物理 GPU1，最高观察约 58°C，cleanup 后 18 MiB、
+  无 compute process；GPU0/GPU5 未参与，精确 dead/status 0 tmux 已关闭。
+- rollout 门通过，下一步是先审计固定 RL 框架在 7×4090/避开 GPU0 条件下的最小可行路径，冻结 1-step
+  optimizer smoke；尚未启动任何 RL 参数更新。

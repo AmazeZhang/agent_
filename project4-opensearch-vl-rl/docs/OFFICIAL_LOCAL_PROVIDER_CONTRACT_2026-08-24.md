@@ -69,3 +69,12 @@ assistant turn 严格输出 `image_search({"url":"img_1"})`，完整工具序列
 只授权 phase B 方差审计，不当作准确率提升证据。evaluation SHA256
 `b9155e96774982cfa8d4907f5d2f45b18c21955ea9b6d649581a8b7d801055f2`；Run `exit_code=0`，GPU1
 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与，精确 tmux dead/status 0 后关闭。
+
+Phase B Run `official-provider-sft50-rollout-phaseb-g4n4-20260825` 按冻结配置完成四类 train task × 4
+stochastic rollout。3/4 组 reward variance>0，variable group fraction `0.75`；format valid fraction
+`0.8125`，fatal fraction `0.1875`，均通过 `0.25/0.75/0.25` 预声明门槛，并存在真实非零 advantage。
+rank2 组 4/4 full success 但组内零方差；transient 组 3/4 fatal；no-match 组有 3 条 query-only reward，
+这些风险均保留披露。报告 SHA256
+`d758cf88815122360139f4b1e0028576a1b4d8e3a5e159e9560fc4d7fbcfb6b0`。Run `exit_code=0`，GPU1
+最高观察约 58°C、cleanup 后 18 MiB/无 compute process；GPU0/GPU5 未参与，无网络/API，精确 tmux
+dead/status 0 后关闭。该门只授权单独实现并审查的 1-step RL smoke。
