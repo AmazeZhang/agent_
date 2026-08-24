@@ -5,12 +5,15 @@
 
 ## 1. 当前事实与最高优先级
 
-- 项目仍在veRL框架下复现Search-R1；当前只完成到单卡、8题、seed 0、Global Step 5的工程闭环；
-- 当前审计为`WARN`：Step 4/5训练batch reward和success均为0，且没有held-out evaluation；
-- “训练能跑、权重变化、退出码0”不等于质量提升或完整复现；
+- 项目已在veRL框架下完成Qwen2.5-3B全参数FSDP六卡的GRPO/GiGPO工程复现，以及
+  Search-aware v2两组seed、10-step训练和固定confirm256 held-out配对评测；
+- 最终证据支持工程复现和搜索/作答行为改善，不支持Search-aware v2的EM稳定提升：
+  seed1234净−1题、seed2026净+1题，两次精确McNemar均`p=1.0`；
+- “训练能跑、权重变化、退出码0”仍不等于质量提升或论文官方完整规模复现；
 - 物理GPU 0永久保留给Linux图形界面，任何实验都不得使用；
 - 物理GPU 5有历史不稳定记录，默认排除；
-- 最近成功Run使用物理GPU1，但这不代表GPU1永远空闲，启动前必须重新检查；
+- 最近正式训练使用物理GPU`1,2,3,4,6,7`，评测使用GPU1；这不代表这些卡永远空闲，
+  任何新任务启动前必须重新检查；
 - 数据盘挂载点为`/media/imc/data`，项目专用目录为
   `/media/imc/data/project3-search-agent-rl/`。不得格式化、重新挂载或清理整块盘。
 
@@ -190,17 +193,22 @@ pstree -aps <pid>
 
 当前只允许如下声明：
 
-- veRL下Search-R1小规模工程链路、真实Wiki Retriever、GRPO更新和Step 2→5恢复已跑通；
-- Checkpoint、Loss Mask、检索元数据和Actor生命周期有证据支持。
+- veRL下Search-R1工程链路、真实Wiki Retriever、Qwen2.5-3B全参数FSDP、GRPO与GiGPO
+  对照、Checkpoint合并和固定held-out评测已跑通；
+- Search-aware v2在两组seed上稳定提高搜索率和search-to-answer，并在seed2026降低
+  max-steps耗尽与真实冗余搜索；
+- 反事实检索评测支持Aware-v2的多数搜索正确答案依赖真实Retriever证据；
+- Checkpoint、Loss Mask、检索元数据、逐题统计、训练曲线和Actor生命周期有证据支持。
 
 当前禁止如下声明：
 
-- 模型质量得到提升、已经收敛或能够泛化；
-- 已完成论文级/官方Search-R1效果复现；
-- 参数变化、非零梯度或训练reward等同held-out性能。
+- Search-aware v2稳定提高EM、已经收敛或达到SOTA；
+- 已完成论文级/官方Search-R1完整规模效果复现；
+- 参数变化、非零梯度或训练reward等同held-out性能；
+- 四轮交互上限已经修复。
 
-后续必须先对基础模型、Step 2、Step 5做同条件held-out评测，再增加baseline和多个seed，才能
-判断是否扩大训练。
+当前实验已收尾，无需自动扩大训练。任何后续实验必须先预注册单变量假设；四轮上限优先做
+evaluation-only协议检查，再决定是否进行新的小步训练。
 
 ## 10. 交接时的最短检查清单
 

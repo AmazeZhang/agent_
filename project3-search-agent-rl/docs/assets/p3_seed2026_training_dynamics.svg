@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="500" viewBox="0 0 960 500" role="img" aria-labelledby="title desc">
+  <title id="title">Seed2026 ten-step training dynamics</title>
+  <desc id="desc">On-policy batch reward for Clean GRPO and Aware-v2, plus Aware-v2 search trajectory and true redundant rates.</desc>
+  <rect width="960" height="500" fill="#fbfcfe"/>
+  <style>
+    text{font-family:Inter,Arial,"Noto Sans SC",sans-serif;fill:#172033}.h{font-size:23px;font-weight:700}.s{font-size:13px;fill:#526079}.l{font-size:12px}.axis{stroke:#cbd3df}.grid{stroke:#e7ebf1}.c{fill:none;stroke:#62748e;stroke-width:3}.a{fill:none;stroke:#17a589;stroke-width:3}.r{fill:none;stroke:#d66b5d;stroke-width:3}.dotc{fill:#62748e}.dota{fill:#17a589}.dotr{fill:#d66b5d}
+  </style>
+  <text class="h" x="40" y="40">seed2026：10-step 在线训练曲线</text>
+  <text class="s" x="40" y="65">训练批次指标存在明显波动，只用于健康检查，不替代 held-out 评测</text>
+
+  <text x="40" y="105" font-size="16" font-weight="700">Episode reward mean</text>
+  <line class="axis" x1="75" y1="330" x2="475" y2="330"/><line class="axis" x1="75" y1="120" x2="75" y2="330"/>
+  <line class="grid" x1="75" y1="150" x2="475" y2="150"/><text class="l" x="42" y="154">0.4</text>
+  <line class="grid" x1="75" y1="225" x2="475" y2="225"/><text class="l" x="42" y="229">0.3</text>
+  <line class="grid" x1="75" y1="300" x2="475" y2="300"/><text class="l" x="42" y="304">0.2</text>
+  <polyline class="c" points="90,198 130,232 170,236 210,249 250,223 290,239 330,269 370,248 410,191 450,307"/>
+  <polyline class="a" points="90,198 130,233 170,224 210,255 250,216 290,249 330,262 370,234 410,172 450,278"/>
+  <text class="l" x="84" y="350">1</text><text class="l" x="244" y="350">5</text><text class="l" x="443" y="350">10</text>
+  <rect class="dotc" x="95" y="375" width="12" height="12"/><text class="l" x="114" y="386">Clean reward</text>
+  <rect class="dota" x="220" y="375" width="12" height="12"/><text class="l" x="239" y="386">Aware reward</text>
+  <text class="s" x="75" y="417">10步均值：Clean 0.2812；Aware 0.2909</text>
+
+  <text x="525" y="105" font-size="16" font-weight="700">Aware-v2 搜索行为</text>
+  <line class="axis" x1="560" y1="330" x2="920" y2="330"/><line class="axis" x1="560" y1="120" x2="560" y2="330"/>
+  <line class="grid" x1="560" y1="150" x2="920" y2="150"/><text class="l" x="525" y="154">100%</text>
+  <line class="grid" x1="560" y1="240" x2="920" y2="240"/><text class="l" x="531" y="244">50%</text>
+  <line class="grid" x1="560" y1="330" x2="920" y2="330"/><text class="l" x="539" y="334">0%</text>
+  <polyline class="a" points="575,185 612,181 649,189 686,200 723,195 760,203 797,190 834,189 871,178 908,169"/>
+  <polyline class="r" points="575,301 612,305 649,294 686,313 723,306 760,305 797,306 834,314 871,318 908,309"/>
+  <text class="l" x="569" y="350">1</text><text class="l" x="716" y="350">5</text><text class="l" x="900" y="350">10</text>
+  <rect class="dota" x="580" y="375" width="12" height="12"/><text class="l" x="599" y="386">搜索轨迹率（80.6%→89.4%）</text>
+  <rect class="dotr" x="580" y="400" width="12" height="12"/><text class="l" x="599" y="411">真实冗余率（step10 11.9%）</text>
+  <text class="s" x="40" y="470">数据源：两个受管 Run 的 training_curves/metrics.csv 与 search_behavior.csv</text>
+</svg>

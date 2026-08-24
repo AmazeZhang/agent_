@@ -1,91 +1,71 @@
-# 项目三：Search Agent RL
+# Search Agent RL：Search-R1 工程复现与 Search-aware 改进
 
-> **交接安全门禁：** 任何人或AI在启动、停止、恢复、下载、清理或扩容实验前，必须先完整阅读
-> [`AGENTS.md`](AGENTS.md)和
-> [`docs/EXPERIMENT_SAFETY.md`](docs/EXPERIMENT_SAFETY.md)。物理GPU0永久禁用；禁止全局
-> `pkill`/`killall`/`ray stop --force`；所有GPU训练必须使用新Run ID、tmux和受管脚本。
+> 项目最终状态：已在 veRL/verl-agent 上完成 Qwen2.5-3B-Instruct 的 Search-R1
+> GRPO、GiGPO 工程复现，并完成 Search-aware v2 的两组种子对照实验。本项目定位是
+> **秋招工程项目：可靠复现、问题诊断、适度改进与诚实评测**，不宣称论文级 SOTA。
 
-本项目研究多轮搜索智能体中稀疏奖励如何经由 Advantage Estimation 和 Policy Loss 更新
-模型策略。主框架使用 `verl-agent` 集成的 Search-R1 环境，算法主线为：
+## 最终阅读入口
+
+- **学习与面试讲解主文档：**
+  [`docs/FINAL_PROJECT_GUIDE_2026-08-24.md`](docs/FINAL_PROJECT_GUIDE_2026-08-24.md)
+- seed2026 Clean/Aware 完整执行记录：
+  [`docs/P3_SEED2026_PAIR_EXECUTION_LOG_2026-08-24.md`](docs/P3_SEED2026_PAIR_EXECUTION_LOG_2026-08-24.md)
+- 训练曲线与四轮上限计划：
+  [`docs/P3_TRAINING_CURVES_AND_TURN_CAP_PLAN_2026-08-24.md`](docs/P3_TRAINING_CURVES_AND_TURN_CAP_PLAN_2026-08-24.md)
+- 可复算统计：
+  [`gates/p3_seed2026_pair_stats_20260824.json`](gates/p3_seed2026_pair_stats_20260824.json)
+
+## 项目结论
+
+固定 `official-confirm256-v1`、greedy 解码和真实 Wiki-18 Retriever，对 Clean GRPO 与
+Aware-v2 做逐题配对：
+
+| seed | Clean GRPO | Aware-v2 | Aware−Clean | McNemar p |
+|---|---:|---:|---:|---:|
+| 1234 | 74/256 | 73/256 | −1 | 1.0 |
+| 2026 | 77/256 | 78/256 | +1 | 1.0 |
+
+两组种子的 EM 方向相反，**不能声称准确率稳定提升**。但 Aware-v2 的行为改善方向稳定；
+seed2026 中有效搜索率 `71.1%→91.4%`、search→answer `80.8%→97.0%`、四步耗尽
+`35→16`、真实冗余率 `19.9%→13.1%`。反事实检索还表明，Aware-v2 搜索后答对主要依赖
+真实证据，而不是仅仅学会调用工具。
+
+![两组种子与 seed2026 行为对比](docs/assets/p3_final_eval_comparison.svg)
+
+## 技术方案
+
+- 模型：`Qwen2.5-3B-Instruct`，全参数 FSDP；
+- 框架：veRL/verl-agent，vLLM rollout，Ray 编排；
+- 搜索：CPU Wiki-18 Retriever，E5 + `IndexFlatIP`，21,015,324 vectors，top-k=3；
+- 训练：6 张稳定计算卡 `1,2,3,4,6,7`，物理 GPU0 永久禁用、GPU5 默认排除；
+- 采样：每步 66 个 prompt，每题 5 条 rollout，共 330 条 trajectory，10 optimizer steps；
+- 评测：独立 confirm256，temperature=0，逐题配对 McNemar；
+- 改进：在不改变 clean prompt/projection/终止协议的前提下，为 GRPO 加入搜索证据奖励、
+  无效/冗余/答案泄漏惩罚和 trajectory-return 信用分配。
+
+GRPO 与 GiGPO 是先完成的两条**独立对照线**；最终 Aware-v2 使用的是 GRPO，不是把二者
+同时叠加。256 题是 held-out 评测集，不是“只用 256 题训练”。
+
+## 仓库结构
 
 ```text
-Reward → Return → GRPO/GiGPO Advantage → PPO-style Loss → Policy Update
+vendor/verl-agent/            固定的上游实现
+patches/                      可审阅的上游补丁
+searchr1_repro/               奖励、审计与复算逻辑
+scripts/                      受管训练、评测、合并和曲线脚本
+gates/                        小型统计与审计结果
+docs/                         预注册、执行记录、结果与最终讲解
 ```
 
-## 上游源码
+大模型、Checkpoint、Retriever 索引、原始 rollout、日志和详细训练曲线保存在
+`/media/imc/data/project3-search-agent-rl/`，不会提交到 Git。
 
-```text
-vendor/verl-agent/
-```
+## 安全门禁
 
-该目录由根仓库作为 Git submodule 管理，固定上游
-[`langfengQ/verl-agent`](https://github.com/langfengQ/verl-agent)。它已经包含Search-R1环境、
-本地Retriever、GRPO、GiGPO、PPO、DAPO、GSPO和RLOO。原始
-[`PeterGriffinJin/Search-R1`](https://github.com/PeterGriffinJin/Search-R1)只作为论文、
-模型和实验日志对照，不再引入第二套旧版verl源码。
+任何启动、停止、恢复、下载、清理或扩容前，必须完整阅读 [`AGENTS.md`](AGENTS.md) 和
+[`docs/EXPERIMENT_SAFETY.md`](docs/EXPERIMENT_SAFETY.md)。GPU 训练只能在只读预检后，
+通过新 Run ID、命名 tmux 与 `scripts/run_managed.sh` 启动；禁止物理 GPU0、默认排除 GPU5，
+禁止全局 `pkill`、`killall` 或 `ray stop --force`。
 
-## 当前基线
-
-- 开发模型：`Qwen/Qwen2.5-1.5B-Instruct`；
-- 正式模型：`Qwen/Qwen2.5-3B-Instruct`；
-- 基线算法：Outcome-only GRPO；
-- 改进算法：Similarity-based GiGPO；
-- 候选创新：结构化Anchor State、Dynamic Sampling或Reward/Advantage可靠性加权；
-- 核心观测：Reward、Return、Advantage均值/方差、有效Group比例、KL、Entropy、Clip
-  Fraction、Gradient Norm、搜索次数、答案准确率和跨数据集泛化。
-
-## 开发依据与当前阶段
-
-项目按以下两份文件逐阶段实施：
-
-- [`docs/SEARCH_R1_REPRODUCTION_PLAN_2026-08-12.md`](docs/SEARCH_R1_REPRODUCTION_PLAN_2026-08-12.md)：复现口径、逐级门槛与秋招交付主线；
-- [`docs/P1_SEARCH_PIPELINE_AUDIT_2026-08-12.md`](docs/P1_SEARCH_PIPELINE_AUDIT_2026-08-12.md)：数据、Retriever、Reward语义、泄漏与故障归因审计；
-- [`docs/PROGRESS_SYNC_2026-08-12.md`](docs/PROGRESS_SYNC_2026-08-12.md)：当前完成项、哈希、复现命令和下一阶段同步入口；
-- [`docs/DEVELOPMENT_SPEC_2026-08-11.md`](docs/DEVELOPMENT_SPEC_2026-08-11.md)：时间表、模块接口、验收门槛和服务器实验流程；
-- [`configs/experiment_profiles.yaml`](configs/experiment_profiles.yaml)：Smoke、开发、主实验和完整实验的初始资源配置。
-
-当前状态为：真实Wiki-18 Retriever、Qwen2.5-1.5B LoRA、veRL GRPO单卡训练、Checkpoint恢复
-和Global Step 2→5短程工程闭环已经跑通；Actor生命周期与资源释放已验证。实验仍为8题、seed 0
-且未执行held-out evaluation，Step 4/5训练batch reward和success为0，因此尚未完成效果复现，
-不得声称质量提升。最新状态见五步完成报告和实验审计；扩大到20 Step前应先完成同条件held-out
-评测、baseline和多seed设计。
-
-服务器准备完成后先运行只读预检，不直接启动训练：
-
-```bash
-bash scripts/preflight.sh 1
-# 当前8卡服务器默认使用六张稳定计算卡；GPU 0禁用，GPU 5默认排除
-bash scripts/preflight.sh 1,2,3,4,6,7
-# 仅在明确接受掉卡风险并有人值守时临时启用GPU 5
-ALLOW_UNSTABLE_GPU5=1 bash scripts/preflight.sh 1,2,3,4,5,6,7
-```
-
-预检和所有GPU实验都必须将`PROJECT3_DATA_ROOT`指向已挂载的大容量数据盘。GPU任务通过
-`scripts/run_managed.sh`启动、通过`scripts/stop_managed.sh`定向停止；禁止直接执行上游
-8卡脚本。完整生命周期规则见[`docs/EXPERIMENT_SAFETY.md`](docs/EXPERIMENT_SAFETY.md)。
-当前服务器使用`export PROJECT3_DATA_ROOT=/media/imc/data`。
-固定的软件与硬件基线见[`docs/ENVIRONMENT_BASELINE_2026-08-12.md`](docs/ENVIRONMENT_BASELINE_2026-08-12.md)。
-
-## 资源结论
-
-- 12GB：只做推理和Reward链路，不作为RL训练配置；
-- 1×24GB：最小训练Smoke，限定1.5B LoRA、短上下文、Group 2和CPU/小型Retriever；
-- 2×24GB或1×48GB：推荐开发下限；
-- 4×24GB：3B简历级主实验下限；
-- 7×4090：完整主实验推荐配置。
-
-完整E5 Flat Index约64.6GB，不能在单张24GB上与训练模型共存。单卡阶段必须使用CPU
-BM25、CPU ANN、在线Retriever或裁剪Corpus。详细资源预算和租机门禁见
-[`docs/RESOURCE_PLAN.md`](docs/RESOURCE_PLAN.md)。
-
-## 阅读顺序
-
-1. `agent_system/environments/env_package/search/`：环境、工具和最终答案Reward；
-2. `verl/trainer/ppo/ray_trainer.py`：Reward进入Advantage Estimator；
-3. `gigpo/core_gigpo.py`：Episode/Step Advantage与State Grouping；
-4. `verl/trainer/ppo/core_algos.py`：Clipped Policy Loss和KL；
-5. `verl/workers/actor/dp_actor.py`：Entropy、KL、Loss聚合和反向传播；
-6. `examples/gigpo_trainer/run_search.sh`：官方Search GiGPO配置。
-
-所有上游修改必须形成独立Commit或保存在`patches/`，实验结果放在`experiments/`，不得把
-模型、Corpus、FAISS Index、Checkpoint或密钥提交到Git。
+当前实验已经收尾，**无需继续训练**。`max_steps=4` 仍是已知限制，应作为后续工作说明，
+不能表述为已经修复。

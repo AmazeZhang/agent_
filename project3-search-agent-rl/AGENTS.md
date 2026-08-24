@@ -24,7 +24,7 @@ directory.
 - Scale one variable at a time. Multi-GPU is allowed only after an explicit physical-GPU whitelist,
   idle checks, memory estimate, veRL/Ray resource review, and a new smoke/resume/cleanup gate.
 - A successful process exit or changing weights proves an engineering run, not quality improvement.
-  Do not claim Search-R1 reproduction quality without held-out evaluation, baselines, and multiple
-  seeds. Current Step 5 audit is WARN.
+  Final held-out and two-seed results support engineering reproduction and stable behavior changes,
+  but not a stable EM improvement. Do not broaden that claim without new controlled evidence.
 
 If a requested action conflicts with these rules, stop and explain the conflict instead of guessing.
