@@ -19,6 +19,7 @@
   "phase_b": {
     "max_new_tokens": 256,
     "rollouts_per_task": 4,
+    "reward_version": "evidence-fidelity-v2",
     "seed": 20260825,
     "task_ids": [
       "wit-00000885",

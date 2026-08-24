@@ -26,6 +26,7 @@ from scripts.evaluate_local_agent import (  # noqa: E402
     DATASET_ROOT,
     MODEL_ROOT,
     evaluate_task,
+    load_tasks,
     observation_schema,
     protocol_version,
     require_managed_run,
@@ -62,22 +63,7 @@ def load_selected_tasks(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     if not 1 <= len(task_ids) <= 8 or len(task_ids) != len(set(task_ids)):
         raise ValueError("provide between one and eight unique task IDs")
-    dataset_root = validate_dataset_root(dataset_root)
-    with (dataset_root / "manifest.json").open(encoding="utf-8") as handle:
-        manifest = json.load(handle)
-    with (dataset_root / "tasks.jsonl").open(encoding="utf-8") as handle:
-        all_tasks = {
-            item["task_id"]: item
-            for line in handle
-            if line.strip() and (item := json.loads(line))
-        }
-    missing = set(task_ids) - set(all_tasks)
-    if missing:
-        raise KeyError(f"unknown task IDs: {sorted(missing)}")
-    tasks = [all_tasks[task_id] for task_id in task_ids]
-    if any(task["split"] != "train" for task in tasks):
-        raise ValueError("stochastic pre-RL audit is restricted to train tasks")
-    return manifest, tasks
+    return load_tasks("train", len(task_ids), dataset_root, task_ids)
 
 
 def summarize_group(items: list[dict[str, Any]]) -> dict[str, Any]:
