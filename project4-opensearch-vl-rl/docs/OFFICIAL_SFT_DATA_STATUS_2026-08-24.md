@@ -112,3 +112,7 @@ Liger 路由。因此下一版 profile 改为标准 NF4 QLoRA：保持同一数�
 target，只把冻结基座改为 4-bit NF4 double quantization。固定安装 `bitsandbytes==0.48.1`；Linux x86-64
 wheel 官方 PyPI SHA256 为 `3e72cf07ba6d2169e69a61282a6f072fc675efee86049e56a33de099a0363ef2`。
 下载显式清空所有代理并使用华为云直连镜像，未经过 Clash 7890/7891。
+
+独立受管 Run `bnb-nf4-smoke-20260824` 已在物理 GPU1 通过 4096×4096 NF4 Linear 前向/反向；
+loss `0.32608724`，峰值分配 117,891,072 B，`exit_code=0`，cleanup 后 GPU1 为 18 MiB 且无 compute
+process。GPU0/GPU5 未参与。该结果只证明 NF4 kernel 可用，下一步仍从新的 1-step QLoRA Run 开始。

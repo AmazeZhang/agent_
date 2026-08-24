@@ -947,3 +947,7 @@
   `3e72cf07ba6d2169e69a61282a6f072fc675efee86049e56a33de099a0363ef2`）；60.1 MB 由华为云 PyPI
   直连镜像取得，显式清空代理，未使用 Clash。launcher profile 升级为 `official-wiki-en-qlora-v2`，禁止
   混用旧 LoRA checkpoint。下一步先做受管 GPU1 的独立 NF4 kernel smoke。
+- NF4 kernel Run `bnb-nf4-smoke-20260824` 通过：物理 GPU1、逻辑 cuda:0，4096×4096 Linear4bit
+  NF4 double-quant forward/backward 均 finite，loss `0.32608724`，PyTorch peak allocated
+  117,891,072 B。Run `exit_code=0`，cleanup 后 GPU1 18 MiB/无 compute process，GPU0/GPU5 未参与；
+  精确已退出 tmux 随后关闭。QLoRA 1-step 现已满足内核晋级门禁。
