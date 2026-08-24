@@ -80,3 +80,25 @@ super_resolution=133, text_search=4603, web_search=5
    与 cleanup 证据；出现 OOM、NaN/Inf、Xid、图片/工具 schema 错误立即停止，不自动扩卡。
 
 50-step 只证明官方数据上的训练链路和 checkpoint 正常，不等价于官方完整 SFT 收敛或论文指标复现。
+
+## 首次 1-step 发现的 cutoff 门禁
+
+首次 Run `official-sft-wiki-en-1step-20260824` 使用 2,048 cutoff。LLaMA Factory 成功读取和转换全部
+1,000 条，并加载模型，但首个 forward 在 optimizer update 前报：
+
+```text
+ValueError: Image features and image tokens do not match, tokens: 0, features: 77
+```
+
+原因不是图片或工具 schema：官方 system prompt 加完整 8 工具 JSON 声明超过 4K token。CPU 同样本审计
+显示 2,048/3,072/4,096 均在图像占位符之前截断，到 5,120 才保留图像 token。对全 1,000 条以 5,120
+重新预处理后：
+
+- zero image-token rows：0；
+- zero supervised-label rows：0；
+- 每行 image token 数：64～245；
+- 997/1,000 行仍在 5,120 截断，因此这是单卡闭环配置，不是完整轨迹 SFT。
+
+失败 Run `exit_code=1`，GPU1 前后均 18 MiB、无 compute process，46°C；GPU0/GPU5 未参与。失败 Run、
+traceback、配置和 cleanup 证据全部保留。launcher cutoff 已提升到 5,120；再次 GPU 尝试仍只允许新的
+1-step Run，若 OOM 则停止并重新评估单卡内存方案，不自动降回会破坏图像占位符的 cutoff。

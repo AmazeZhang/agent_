@@ -923,3 +923,15 @@
   provenance。该配置验证的是可训练闭环，不宣称等价于官方 128-GPU full SFT。
 - CPU policy tests 覆盖受管 Run、GPU0/GPU5/多卡拒绝、LoRA/冻结/非覆盖/save-step 配置；真实 manifest
   校验与 `llamafactory-cli version` 通过。本步未使用 GPU；下一步提交后才启动 1-step。
+
+### 2026-08-24：官方 SFT 首次 1-step 在 optimizer 前 fail-closed
+
+- Run `official-sft-wiki-en-1step-20260824` 按规定由命名 tmux/受管脚本仅使用物理 GPU1；数据转换和
+  1,000 条 tokenizer 处理成功，模型加载成功，但首个 forward 报 image features=77、image tokens=0，
+  未执行 optimizer step、未生成 checkpoint。
+- 根因：2K cutoff 被官方长 system prompt 与完整工具声明占满，在用户图像占位符之前截断。CPU 对照
+  2,048/3,072/4,096 均为零 image token；5,120 起恢复。全 1,000 条以 5,120 审计为零缺图、零无监督
+  label，image token 64～245；997 条仍截断，明确属于工程闭环而非完整轨迹复现。
+- 安全：Run `exit_code=1`；GPU1 before/after 均 18 MiB、46°C、cleanup 无 compute process；GPU0/GPU5
+  未参与。失败 Run 全量保留。launcher 将 cutoff 固定为 5,120，下一次仍仅做新 Run ID 的 1-step；OOM
+  或占位符问题立即停止，不自动扩卡或改数据。

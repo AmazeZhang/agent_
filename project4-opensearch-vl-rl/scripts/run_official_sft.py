@@ -26,6 +26,7 @@ SOURCE_SHA256 = "a22a44c6a04d79d6dfd0064c89d8a792045278eed70a8e27c14b7c5e2f4850e
 DATASET_SHA256 = "af5eb4adc2a9e4fcc0529ed2c6cfc523fca3753740aec1178c57acd54b4a3dd7"
 DATASET_INFO_SHA256 = "6b065a7c32ddc1ac5ac79c4575fe84cc71322fd73f53739ac62d9443d0b3641f"
 INDICES_SHA256 = "3195eafee69202c74cfb382cb7572fc198a471a357ec6af625f58d653d072018"
+CUTOFF_LEN = 5120
 
 
 def parse_args() -> argparse.Namespace:
@@ -149,7 +150,7 @@ def training_config(
         "dataset": DATASET_NAME,
         "dataset_dir": str(DATASET_ROOT),
         "template": "qwen3_vl",
-        "cutoff_len": 2048,
+        "cutoff_len": CUTOFF_LEN,
         "max_samples": 1000,
         "overwrite_cache": False,
         "preprocessing_num_workers": 1,
@@ -228,7 +229,7 @@ def main() -> int:
             "full_finetuning_replaced_by_lora": True,
             "vision_tower_frozen": True,
             "projector_frozen": True,
-            "cutoff_len": 2048,
+            "cutoff_len": CUTOFF_LEN,
             "official_cutoff_len": 32000,
             "reason": "single RTX 4090 24GB bounded engineering reproduction",
         },
