@@ -910,3 +910,16 @@
   `docs/OFFICIAL_SFT_DATA_STATUS_2026-08-24.md`。
 - 资源：本步为 CPU/网络/磁盘操作，无 API/GPU/tmux；GPU0/GPU5 均未参与。下一步先做 LLaMA Factory
   数据加载门禁，再用新 Run ID、受管 tmux 和物理 GPU1 执行 SFT 1-step。
+
+### 2026-08-24：官方 SFT-1000 单卡 LoRA launcher 门禁
+
+- 新增 `scripts/run_official_sft.py`，只接受项目四受管 Run、单张稳定物理卡，并硬拒绝 GPU0/GPU5 和
+  多卡选择；训练步数限定 1..50，输出目录拒绝覆盖，resume 只接受项目四 Run 内含 trainer state、adapter
+  和匹配 provenance/profile 的 checkpoint。
+- 数据门禁固定官方 revision、源 JSON、子集 JSON、dataset_info 与 selection indices SHA256，并确认样本
+  数 1,000、排除源索引 1900、图片 payload 完整；本机 LLaMA Factory `0.9.5.dev0` 可见。
+- 资源适配：保持官方 Qwen3-VL template 和完整监督轨迹，但因单卡 24GB 将官方 full fine-tune 改为 LoRA
+  rank 8，冻结视觉塔/projector，cutoff 从 32K 降为 2K，图像像素上限 65,536；所有偏差写入每个 Run 的
+  provenance。该配置验证的是可训练闭环，不宣称等价于官方 128-GPU full SFT。
+- CPU policy tests 覆盖受管 Run、GPU0/GPU5/多卡拒绝、LoRA/冻结/非覆盖/save-step 配置；真实 manifest
+  校验与 `llamafactory-cli version` 通过。本步未使用 GPU；下一步提交后才启动 1-step。
