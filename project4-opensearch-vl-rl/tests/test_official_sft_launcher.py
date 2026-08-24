@@ -4,6 +4,8 @@ import importlib.util
 import tempfile
 from pathlib import Path
 
+from llamafactory.extras.constants import QuantizationMethod
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -19,6 +21,7 @@ def load_module():
 
 def main() -> None:
     launcher = load_module()
+    assert launcher.QUANTIZATION_METHOD == QuantizationMethod.BNB.value
     with tempfile.TemporaryDirectory(prefix="p4-official-sft-launcher.") as temporary:
         run_root = Path(temporary) / "runs"
         run_dir = run_root / "run-1"
@@ -49,12 +52,20 @@ def main() -> None:
         assert config["dataset"] == "wiki_en_official_1000"
         assert config["finetuning_type"] == "lora"
         assert config["quantization_bit"] == 4
-        assert config["quantization_method"] == "bitsandbytes"
+        assert config["quantization_method"] == "bnb"
         assert config["quantization_type"] == "nf4"
         assert config["double_quantization"] is True
         assert config["freeze_vision_tower"] is True
         assert config["freeze_multi_modal_projector"] is True
         assert config["overwrite_output_dir"] is False
+        launcher.validate_training_config(config)
+        invalid_config = dict(config, quantization_method="bitsandbytes")
+        try:
+            launcher.validate_training_config(invalid_config)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("unknown quantization method passed the fail-closed gate")
 
     print("official SFT launcher tests: PASS")
 

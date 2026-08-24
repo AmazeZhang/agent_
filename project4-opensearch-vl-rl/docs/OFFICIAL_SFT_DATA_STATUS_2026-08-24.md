@@ -116,3 +116,14 @@ wheel 官方 PyPI SHA256 为 `3e72cf07ba6d2169e69a61282a6f072fc675efee86049e56a3
 独立受管 Run `bnb-nf4-smoke-20260824` 已在物理 GPU1 通过 4096×4096 NF4 Linear 前向/反向；
 loss `0.32608724`，峰值分配 117,891,072 B，`exit_code=0`，cleanup 后 GPU1 为 18 MiB 且无 compute
 process。GPU0/GPU5 未参与。该结果只证明 NF4 kernel 可用，下一步仍从新的 1-step QLoRA Run 开始。
+
+首次 QLoRA Run `official-sft-wiki-en-qlora-1step-20260824` 没有真正量化：launcher 写入了
+`quantization_method: bitsandbytes`，但固定 LLaMA Factory revision 的唯一合法枚举是 `bnb`。其 parser
+保留未知字符串且未报错，量化分支因此被静默跳过；日志没有 `Quantizing model ...` 标志，参数统计仍为
+8,788,947,184，显存与 BF16 Run 相同，并在同一 logits/loss 位置 OOM。该 Run 未执行 optimizer update、
+`exit_code=1`；GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与，失败证据完整保留。
+
+launcher 已改为 `quantization_method: bnb`，profile 升级为 `official-wiki-en-qlora-v3`，并新增 fail-closed
+配置门禁，禁止旧字符串或非 NF4/double-quant 配置继续启动。CPU 离线 loader 诊断必须看到
+`BitsAndBytesConfig(load_in_4bit=True)` 后，才允许新的 1-step Run；v2 失败 Run 不可作为 resume 来源。
+该诊断现已通过：`load_in_4bit=True`、`quant_type=nf4`、`double_quant=True`，且没有加载模型权重。

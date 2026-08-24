@@ -951,3 +951,16 @@
   NF4 double-quant forward/backward 均 finite，loss `0.32608724`，PyTorch peak allocated
   117,891,072 B。Run `exit_code=0`，cleanup 后 GPU1 18 MiB/无 compute process，GPU0/GPU5 未参与；
   精确已退出 tmux 随后关闭。QLoRA 1-step 现已满足内核晋级门禁。
+
+### 2026-08-24：QLoRA 方法名静默失效与 fail-closed 修复
+
+- 首个 QLoRA Run `official-sft-wiki-en-qlora-1step-20260824` 仍在全词表 logits/loss 处 OOM，显存与 BF16
+  Run 相同；日志无量化标志、总参数仍为 8,788,947,184，未执行 optimizer update/checkpoint。
+- 根因是 launcher 使用 `quantization_method: bitsandbytes`，而固定 LLaMA Factory
+  `c5c02a49780e...` 的枚举值只能是 `bnb`。parser 没有拒绝未知字符串，导致量化分支静默跳过；这不是
+  Qwen3-VL 或 NF4 kernel 的原理故障。
+- 修复为 `bnb`，训练 profile 升级到 `official-wiki-en-qlora-v3`，并增加启动前硬校验和 CPU 回归测试，
+  防止再次以“配置存在但基座未量化”的状态训练或 resume。失败 Run `exit_code=1`，GPU1 cleanup 后
+  18 MiB/无 compute process；GPU0/GPU5 未参与，证据保留。
+- CPU 离线 loader gate 已实际得到 `BitsAndBytesConfig(load_in_4bit=True, quant_type=nf4,
+  double_quant=True)`；测试没有加载模型权重。只有该门禁通过后才允许新的受管 GPU1 1-step Run。

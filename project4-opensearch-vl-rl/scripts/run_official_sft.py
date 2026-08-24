@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Run bounded offline LoRA SFT on the audited official Search-VL subset."""
 
 from __future__ import annotations
@@ -27,6 +26,8 @@ DATASET_SHA256 = "af5eb4adc2a9e4fcc0529ed2c6cfc523fca3753740aec1178c57acd54b4a3d
 DATASET_INFO_SHA256 = "6b065a7c32ddc1ac5ac79c4575fe84cc71322fd73f53739ac62d9443d0b3641f"
 INDICES_SHA256 = "3195eafee69202c74cfb382cb7572fc198a471a357ec6af625f58d653d072018"
 CUTOFF_LEN = 5120
+QUANTIZATION_METHOD = "bnb"
+TRAINING_PROFILE = "official-wiki-en-qlora-v3"
 
 
 def parse_args() -> argparse.Namespace:
@@ -125,7 +126,7 @@ def validate_checkpoint(
     provenance = json.loads(provenance_path.read_text())
     if provenance.get("dataset_manifest_sha256") != dataset_manifest_sha256:
         raise ValueError("resume checkpoint belongs to a different dataset manifest")
-    if provenance.get("training_profile") != "official-wiki-en-qlora-v2":
+    if provenance.get("training_profile") != TRAINING_PROFILE:
         raise ValueError("resume checkpoint belongs to a different training profile")
     return checkpoint
 
@@ -140,7 +141,7 @@ def training_config(
         "trust_remote_code": False,
         "flash_attn": "fa2",
         "quantization_bit": 4,
-        "quantization_method": "bitsandbytes",
+        "quantization_method": QUANTIZATION_METHOD,
         "quantization_type": "nf4",
         "double_quantization": True,
         "stage": "sft",
@@ -185,6 +186,21 @@ def training_config(
     return config
 
 
+def validate_training_config(config: dict[str, object]) -> None:
+    """Fail closed if the frozen QLoRA contract would silently load BF16 weights."""
+    if config.get("quantization_bit") != 4:
+        raise ValueError("official SFT requires a 4-bit frozen base")
+    if config.get("quantization_method") != QUANTIZATION_METHOD:
+        raise ValueError(
+            "this LLaMA Factory revision only accepts quantization_method='bnb'"
+        )
+    if (
+        config.get("quantization_type") != "nf4"
+        or config.get("double_quantization") is not True
+    ):
+        raise ValueError("official SFT requires NF4 double quantization")
+
+
 def main() -> int:
     args = parse_args()
     if not 1 <= args.max_steps <= 50:
@@ -214,10 +230,11 @@ def main() -> int:
         }
     )
     config = training_config(run_dir, args.max_steps, checkpoint)
+    validate_training_config(config)
     config_path = run_dir / "official-sft-config.yaml"
     config_path.write_text(yaml.safe_dump(config, sort_keys=True))
     provenance = {
-        "training_profile": "official-wiki-en-qlora-v2",
+        "training_profile": TRAINING_PROFILE,
         "source_is_official": True,
         "source_revision": SOURCE_REVISION,
         "dataset_root": str(DATASET_ROOT),
