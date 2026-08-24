@@ -248,6 +248,7 @@ export PYTHONPATH="${vendor_dir}:${project_dir}${PYTHONPATH:+:${PYTHONPATH}}"
 peak_file="${PROJECT3_RUN_DIR}/peak_memory_nvidia_smi.json"
 "$python_bin" - "$peak_file" <<'PY' &
 import json
+import signal
 import subprocess
 import sys
 import time
@@ -255,8 +256,16 @@ import time
 peak_file = sys.argv[1]
 peaks = {}
 started = time.monotonic()
+stop_requested = False
+
+def request_stop(_signum, _frame):
+    global stop_requested
+    stop_requested = True
+
+signal.signal(signal.SIGTERM, request_stop)
+signal.signal(signal.SIGINT, request_stop)
 try:
-    while time.monotonic() - started < 14400:  # 4h cap
+    while not stop_requested and time.monotonic() - started < 14400:  # 4h cap
         try:
             out = subprocess.run(
                 ["nvidia-smi", "--query-gpu=index,memory.used,memory.total",

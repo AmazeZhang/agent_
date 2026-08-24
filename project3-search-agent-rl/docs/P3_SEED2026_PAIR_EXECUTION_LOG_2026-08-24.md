@@ -89,3 +89,31 @@ Checkpoint、原始 rollout、audit、Ray 日志和训练曲线等大文件保�
 
 当前工程训练闭环完成，但质量结论仍待：merge clean/aware gs10，并按预注册协议在同一
 official-confirm256-v1 上执行逐题配对评测。
+
+## gs10 FSDP 合并与验证完成
+
+- 2026-08-24 20:20（Asia/Shanghai）完成；全程 `CUDA_VISIBLE_DEVICES=''`，未使用GPU。
+- 可复现入口：`scripts/merge_p3_seed2026_pair.sh`；独立 tmux
+  `p3-seed2026-pair-merge-20260824a`，最终状态 `PAIR_MERGE_PASS`。
+- Clean merged：
+  `models/p3-clean-grpo10-seed2026-gs10-merged-20260824a`，6,810,172,671 bytes；
+  权重 shard SHA256 为 `268136f3ad3a11aa25ab28c7877b2b297992c913f080fee6e4d15f72eab8731a`、
+  `e871ceb85da784ebc7ec4d5a7f8b5b076c852b36f53272a06213215192c94b1a`。
+- Aware merged：
+  `models/p3-aware-v2-grpo10-seed2026-gs10-merged-20260824a`，6,810,172,743 bytes；
+  权重 shard SHA256 为 `a14f40f198ac8feea9cf175d8608253e6d71768c829c6059cf164bbc7daee057`、
+  `595539480b8aa1b959105d885dc052000a445dca1661272d3a6b928152a3ca46`。
+- 两个模型均为 Qwen2ForCausalLM、3,397,103,616参数、bf16、36层/16头；NaN/Inf=0，
+  missing/unexpected keys均为空，独立lm_head与embed_tokens逐字节一致，tokenizer可加载；
+  `VERIFY_MERGED: PASS`。
+- 源checkpoint保护：Clean和Aware各26个actor文件合并前后SHA manifest逐字节一致。
+  Clean manifest SHA256 `58ccefd21c9ef78be4b2603042f9040f9a0db26d98d3d938c91fb22b8b0df4e4`；
+  Aware manifest SHA256 `f4adf7bea3dedc56b0e8413ca9f6e5ea0f87d09b6c8d5f2f2951f43f77ca052d`。
+- 完整gate目录：
+  `/media/imc/data/project3-search-agent-rl/gates/p3-seed2026-pair-merge-20260824a/`；
+  driver日志 SHA256 `8f040a56290f417ecad82901ea0d39e56c3ae9f35c6e0b5a52b54743cc0deb2b`。
+
+评测前同时修复 `run_p3_eval_v2.sh` 与未来Aware训练入口的物理显存采样器：显式捕获
+SIGTERM/SIGINT并让 `finally` 写出JSON，避免已完成训练中观察到的peak文件缺失。配对评测由
+`scripts/run_p3_seed2026_pair_eval_driver.sh` 串行执行；只有Clean Run完成256题、exit 0、
+无partial且GPU1清理通过后，才允许启动Aware Run。
