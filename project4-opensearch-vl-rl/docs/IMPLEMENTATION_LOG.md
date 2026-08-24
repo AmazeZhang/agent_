@@ -877,3 +877,20 @@
 - 资源：本步无下载、无网络/API/GPU，未创建 Run 或 checkpoint。详细契约见
   `docs/OFFICIAL_LOCAL_PROVIDER_CONTRACT_2026-08-24.md`。下一步为官方 SFT-36K 的非代理下载与数据审计，
   在完整性门禁通过前不启动 SFT。
+
+### 2026-08-24：官方 SFT wiki_en 下载并发事故与恢复门禁
+
+- 事故：编排层已返回后台 session，但没有及时展示 session ID；操作者误判任务结束，对同一输出又启动了
+  下载器。最多三个 JSON 下载器并发追加同一组 Range part，导致每个 JSON part 超过固定范围长度；图片
+  下载只有一个进程，但处于未完成中断态。最终文件均未发布，size/SHA256 原子发布门禁避免了错误资产进入
+  数据集。
+- 精确处置：先按完整命令行和 PGID 确认四个下载进程，只对 PGID `912251`、`921075`、`933026`、
+  `944419` 发送 TERM；未使用 `pkill`、`killall`、全局 Ray 或 tmux 清理。复核无残留进程后，不删除任何
+  part，将 JSON 和图片分片分别改名为 `.parts.concurrent-corrupt-20260824` 与
+  `.parts.interrupted-20260824` 保留证据。
+- 修复：下载器新增按最终输出路径命名的 `flock(LOCK_EX|LOCK_NB)` 独占锁。第二个相同目标下载器现在会
+  fail-closed，不会打开或追加 part；锁释放后的新任务可正常取得锁。新增回归测试覆盖“并发拒绝”和
+  “释放后可重新取得”，项目固定 Python 环境测试、`py_compile` 和 Ruff 均通过。
+- 恢复原则：只从新的空 `.parts` 目录下载固定 revision 的 `wiki_en` JSON 与 images.zip；继续禁用环境
+  代理，不使用 Clash 7890/7891；只有固定字节数和官方 SHA256 同时通过才发布。该步骤没有使用 GPU、
+  API 或 tmux；GPU0/GPU5 均未参与。

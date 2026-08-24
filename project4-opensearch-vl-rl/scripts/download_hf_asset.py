@@ -8,6 +8,7 @@ the expected byte count and SHA256 before publishing the final file.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import ipaddress
 import os
@@ -62,6 +63,19 @@ def sha256_file(path: Path) -> str:
         while chunk := handle.read(CHUNK_BYTES):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def acquire_output_lock(output: Path):
+    """Hold a non-blocking per-output lock for the lifetime of one downloader."""
+
+    lock_path = output.with_name(f".{output.name}.download.lock")
+    handle = lock_path.open("a+b")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as error:
+        handle.close()
+        raise RuntimeError(f"another downloader owns the output lock: {output}") from error
+    return handle
 
 
 def split_ranges(size: int, workers: int) -> list[tuple[int, int]]:
@@ -170,6 +184,7 @@ def main() -> int:
     validate_public_https(args.url)
     output = validate_output(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
+    output_lock = acquire_output_lock(output)
     if output.exists():
         if (
             output.stat().st_size == args.size
@@ -222,6 +237,7 @@ def main() -> int:
     assembling.rename(output)
     print(f"verified: {output} size={total} sha256={actual_sha256}")
     print(f"resume parts preserved: {parts_dir}")
+    output_lock.close()
     return 0
 
 

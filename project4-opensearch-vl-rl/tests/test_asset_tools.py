@@ -72,6 +72,20 @@ def main() -> None:
         else:
             raise AssertionError("download output escaped the project data root")
 
+        locked_output = root / "asset.bin"
+        first_lock = downloader.acquire_output_lock(locked_output)
+        try:
+            try:
+                downloader.acquire_output_lock(locked_output)
+            except RuntimeError as error:
+                assert "another downloader owns" in str(error)
+            else:
+                raise AssertionError("concurrent downloader acquired the same output lock")
+        finally:
+            first_lock.close()
+        final_lock = downloader.acquire_output_lock(locked_output)
+        final_lock.close()
+
     print("asset tool tests: PASS")
 
 
