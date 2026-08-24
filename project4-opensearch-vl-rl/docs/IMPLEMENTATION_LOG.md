@@ -1005,3 +1005,10 @@
   4-bit 加载明确，loss `1.3173`、grad norm `0.9405`、runtime `5.439s`、`exit_code=0`。
 - checkpoint-1 完整，adapter SHA256 `2ebdd6ed527df9bc6a81ce74bf8567b302af15bc6237c32e47f6466883d92f26`。
   GPU1 cleanup 后 18 MiB/无 compute process，GPU0/GPU5 未参与；精确 dead/status 0 tmux 已关闭。
+
+### 2026-08-25：960-safe v4 通过 5-step resume 门
+
+- Run `official-sft-wiki-en-safe960-v4-step5-20260825` 从 global step 1 正确恢复至 5；五步 loss/grad norm
+  全部 finite，`exit_code=0`。
+- checkpoint-5 adapter SHA256 `0d43e7b297b8d6d45bb612b4cead089bedb5e3d45e9af2be4a1115bca5a6101c`；
+  GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与，精确 dead/status 0 tmux 已关闭。

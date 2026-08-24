@@ -174,3 +174,8 @@ loss `1.3173`、grad norm `0.9405`、runtime `5.439s`、`global_step=1`、`exit_
 bitsandbytes；checkpoint-1 完整，adapter SHA256
 `2ebdd6ed527df9bc6a81ce74bf8567b302af15bc6237c32e47f6466883d92f26`。GPU1 cleanup 后 18 MiB、
 无 compute process，GPU0/GPU5 未参与；精确 tmux dead/status 0 后关闭。下一步可同 profile resume 到 5。
+
+v4 Run `official-sft-wiki-en-safe960-v4-step5-20260825` 已从 global step 1 正确恢复到 5，五步 loss
+`1.31734, 1.02210, 1.28102, 1.14079, 1.19138`，grad norm 均有限，`exit_code=0`。checkpoint-5
+adapter SHA256 为 `0d43e7b297b8d6d45bb612b4cead089bedb5e3d45e9af2be4a1115bca5a6101c`。GPU1 cleanup
+后 18 MiB、无 compute process，GPU0/GPU5 未参与；精确 tmux dead/status 0 后关闭。下一步晋级 20。
