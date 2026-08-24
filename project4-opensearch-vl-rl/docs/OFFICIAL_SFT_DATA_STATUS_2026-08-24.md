@@ -135,3 +135,10 @@ update：训练 loss `1.1252400875`、grad norm `1.016`、runtime `5.5213s`、`g
 RNG state；adapter SHA256 为 `7e57a0834d2819655b75c40ae194a96a67624e42535f0bb9230eb3c5fe92c4fb`。
 GPU1 before/after 均 18 MiB，cleanup 为 `compute_processes=none`；GPU0/GPU5 未参与。精确 tmux 仅在确认
 pane dead、status 0 后关闭。该 checkpoint 现可作为同 profile 的 5-step resume 来源。
+
+受管 Run `official-sft-wiki-en-qlora-v3-step5-20260824` 已从上述 `checkpoint-1` 正确恢复；Trainer 日志
+明确记录 `Continuing training from global step 1`，最终 `global_step=5`、`exit_code=0`。step 1～5 loss
+依次为 `1.12524, 1.35522, 1.16823, 1.31633, 1.08457`，grad norm 均有限。`checkpoint-5` adapter
+SHA256 为 `600b9910c0651e05b6f85d5f0ec0e2c54d2f0b2310cba0e8a17c4aba7acba2c8`；optimizer 与
+trainer state 均存在。GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与；已退出的精确
+tmux status 0 后关闭。下一门为从 checkpoint-5 resume 到 20 steps。

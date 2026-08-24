@@ -974,3 +974,13 @@
   `7e57a0834d2819655b75c40ae194a96a67624e42535f0bb9230eb3c5fe92c4fb`。
 - GPU1 before/after 均 18 MiB，cleanup 无 compute process；精确 tmux 在 pane dead/status 0 后关闭。
   下一步只从该 checkpoint、同一 v3 profile resume 到 5 steps，不重用或覆盖 Run 目录。
+
+### 2026-08-24：官方 QLoRA v3 通过 5-step resume 门
+
+- 新 Run `official-sft-wiki-en-qlora-v3-step5-20260824` 仅用物理 GPU1，从固定 v3 `checkpoint-1`
+  resume；Trainer 明确记录从 global step 1 继续，未从头伪跑。
+- 最终 `global_step=5`、`exit_code=0`；五步 loss 为 `1.12524, 1.35522, 1.16823, 1.31633,
+  1.08457`，grad norm 全部 finite。checkpoint-5 adapter SHA256
+  `600b9910c0651e05b6f85d5f0ec0e2c54d2f0b2310cba0e8a17c4aba7acba2c8`。
+- GPU1 cleanup 后 18 MiB、无 compute process；GPU0/GPU5 未参与。精确 tmux 在 dead/status 0 后关闭。
+  下一步保持完全相同 profile，从 checkpoint-5 晋级到 20 steps。
