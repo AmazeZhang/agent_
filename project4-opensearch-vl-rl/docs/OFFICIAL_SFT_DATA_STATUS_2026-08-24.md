@@ -185,3 +185,13 @@ v4 Run `official-sft-wiki-en-safe960-v4-step20-20260825` 已从 global step 5 �
 checkpoint-20 adapter SHA256 `c6f8f10f3883bca14f559ebd931e0e4871f5abc8bc42aa72befe250317c1b296`，
 optimizer/trainer state 完整。GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与；精确 tmux
 dead/status 0 后关闭。20-step 晋级门通过，下一步为用户已批准的总步数 50。
+
+v4 Run `official-sft-wiki-en-safe960-v4-step50-20260825` 已从 global step 20 正确恢复并完成目标
+`global_step=50`，`exit_code=0`。50 个 loss 位于 `0.53710～1.31734`，末步 loss `0.68966`，全部
+loss/grad norm 均有限。最终 adapter 与 `checkpoint-50` adapter 一致，SHA256
+`8b7e3e49526da33730868ba4b84dce0a5e3310bb602d480067fc6a4909a57955`；checkpoint-50 optimizer
+SHA256 `65201b0bbb0bfd903ad9aa22ad9550156c063cb4f27341e7362d4d12b9f00e18`，trainer state SHA256
+`ffc8849b8560537a8ca0185b44ea5a469f83e284d954b758ed76ae2017c8590b`。GPU1 cleanup 后 18 MiB、
+无 compute process，GPU0/GPU5 未参与；精确 tmux dead/status 0 后关闭。该结果证明 base model 在
+冻结的官方 SFT 数据派生集上完成了 50 次真实 optimizer update、保存与恢复链路；它不单独证明任务
+质量提升。下一门为使用该 adapter 的小规模 rollout 行为与本地 provider 兼容性验证。

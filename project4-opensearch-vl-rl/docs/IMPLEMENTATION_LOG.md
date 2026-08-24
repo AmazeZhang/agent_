@@ -1021,3 +1021,17 @@
   `c6f8f10f3883bca14f559ebd931e0e4871f5abc8bc42aa72befe250317c1b296`，optimizer/trainer state 完整。
 - GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与；精确 dead/status 0 tmux 已关闭。
   20-step 晋级门通过，下一步在资源/风险复述后 resume 到总步数 50。
+
+### 2026-08-25：960-safe v4 完成 50-step SFT 目标
+
+- Run `official-sft-wiki-en-safe960-v4-step50-20260825` 从 global step 20 正确恢复到 50；50 个 loss
+  位于 `0.53710～1.31734`，末步 `0.68966`，loss/grad norm 全部 finite，`exit_code=0`。
+- 最终 adapter 与 checkpoint-50 adapter SHA256 均为
+  `8b7e3e49526da33730868ba4b84dce0a5e3310bb602d480067fc6a4909a57955`；optimizer SHA256
+  `65201b0bbb0bfd903ad9aa22ad9550156c063cb4f27341e7362d4d12b9f00e18`，trainer state SHA256
+  `ffc8849b8560537a8ca0185b44ea5a469f83e284d954b758ed76ae2017c8590b`。
+- 全程仅用物理 GPU1；结束后 GPU1 18 MiB、cleanup `compute_processes=none`，GPU0/GPU5 未参与；精确
+  tmux 在 pane dead/status 0 后关闭。无网络、API 或 Clash 流量。
+- 当前结论仅是“base + 官方数据无内容改写的 960-safe 派生集完成 50 次真实 optimizer update，且
+  resume/save/cleanup 正常”，不把训练 loss 当成任务效果。下一步先对 checkpoint-50 做小规模 rollout
+  门禁，核验工具协议和本地 provider，再决定是否允许 1-step RL。
