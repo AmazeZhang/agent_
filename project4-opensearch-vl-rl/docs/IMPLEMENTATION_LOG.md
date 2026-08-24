@@ -1057,3 +1057,15 @@
   cleanup 无 compute process；GPU0/GPU5 未参与，精确 tmux dead/status 2 后关闭。
 - 修复仅显式增加 `train` split CLI 选项并补 CPU 回归；不修改 task、provider、reward、采样参数或 adapter。
   失败 Run 不复用，测试和提交通过后才以新 Run ID 重跑 phase A。
+
+### 2026-08-25：SFT-50 通过 official-provider rollout phase A
+
+- 新 Run `official-provider-sft50-rollout-phasea-v2-20260825` 在物理 GPU1 加载固定 checkpoint-50；首 turn
+  严格为 `image_search({"url":"img_1"})`，随后三次 `text_search`，完整路径与 oracle 一致且 fatal=null，
+  通过预声明的“首工具/至少一次调用/无 fatal”行为门。
+- 最终 `<response>` 格式和标题 `«Mary Rose»` 正确；证据包含正确首句但继续生成了后续句，因此严格
+  evidence_exact/full_success 为 0。这里只证明 SFT 后工具 rollout 正常，不把单题或宽松包含关系当准确率。
+- evaluation SHA256 `b9155e96774982cfa8d4907f5d2f45b18c21955ea9b6d649581a8b7d801055f2`；
+  adapter/data/tasks 哈希均与冻结配置一致，`exit_code=0`。GPU1 峰值约 17.99 GiB，结束 18 MiB、cleanup
+  无 compute process；GPU0/GPU5 未参与，无网络/API，精确 dead/status 0 tmux 已关闭。
+- phase A 仅授权 phase B：四类 train task × 4 stochastic rollout，仍为 rollout-only、无 optimizer。

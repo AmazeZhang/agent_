@@ -61,3 +61,11 @@ phase B 通过预声明方差/格式/fatal 门后，才允许另行审查 1-step
   `70142a78d31efcd97a041d7b11eb3d727ed964667c22d3941598d889ca01546c`。
 - 首次 v9 派生发布继承了未复制文件的旧 `sft_sha256` 字段，故不进入实验；builder 已 fail-closed 修复，
   v10 不含悬空 SFT provenance。此步无 GPU、网络或 API。
+
+Phase A Run `official-provider-sft50-rollout-phasea-v2-20260825` 已通过预声明行为门：checkpoint-50 首个
+assistant turn 严格输出 `image_search({"url":"img_1"})`，完整工具序列为
+`image_search → text_search → text_search → text_search`，与 oracle path 一致，fatal=null。最终 response
+格式与标题正确；模型返回了多句证据而非要求的精确首句，因此 evidence_exact/full_success 为 0。该结果
+只授权 phase B 方差审计，不当作准确率提升证据。evaluation SHA256
+`b9155e96774982cfa8d4907f5d2f45b18c21955ea9b6d649581a8b7d801055f2`；Run `exit_code=0`，GPU1
+cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与，精确 tmux dead/status 0 后关闭。
