@@ -1,7 +1,7 @@
 # OpenSearch-VL 官方协议与本地 Provider 适配契约
 
 > 日期：2026-08-24
-> 状态：CPU 合约与真实 WIT replay 已通过；尚未接入官方 SFT-36K 或 RL optimizer。
+> 状态：CPU 合约、官方 960-safe SFT-50 与 QVA 字节不变的 v10 rollout 适配已通过；尚未启动 RL optimizer。
 
 ## 目标
 
@@ -44,5 +44,20 @@ official tool call
 
 ## 下一门禁
 
-下载官方 SFT-36K 后，先逐条审计其 `tools` schema 是否与本契约一致，并用真实 tokenizer 验证一个不超过
-1,000 条的固定分层子集。任何字段差异先记录和兼容，不批量改写官方原始数据。
+受管 GPU1 上先运行冻结的 `official_provider_rollout_gate_v1.json` phase A 单题 greedy。只有首个工具为
+`image_search`、至少一次工具调用且无 fatal，才允许 phase B 四类 train task、每题 4 条随机 rollout；
+phase B 通过预声明方差/格式/fatal 门后，才允许另行审查 1-step RL。
+
+## 2026-08-25 适配审计
+
+- 官方 960-safe SFT 的 960 行 `system` 与 `tools` 分别各只有一个 SHA256；模型学习的是
+  `image_search({"url":"img_1"})` 和 `text_search({"q":...})`。
+- 历史 evaluator 却把官方分支接成 `image_search({"image":"img_1"})`，并输出含本地 `entity_id` / similarity
+  的 compact observation；随机 rollout 审计器还漏传 `tool_protocol`，会退回 legacy。以上均已修复并由
+  CPU tests 覆盖，官方分支现在实际调用 `OfficialLocalSearchProvider`。
+- 非覆盖派生集 `wit-rl-official-provider-v10` 保持 v8 QVA `tasks.jsonl` 字节完全一致，SHA256
+  `2ccdb0ef507ebbd20dfba54c199a724ab9056a868856d9291dd65949325cce55`，120 条任务/120 张图片；
+  `rows_modified=0`。只改变隐藏执行层和 observation schema 声明，manifest SHA256
+  `70142a78d31efcd97a041d7b11eb3d727ed964667c22d3941598d889ca01546c`。
+- 首次 v9 派生发布继承了未复制文件的旧 `sft_sha256` 字段，故不进入实验；builder 已 fail-closed 修复，
+  v10 不含悬空 SFT provenance。此步无 GPU、网络或 API。

@@ -27,6 +27,7 @@ from scripts.evaluate_local_agent import (  # noqa: E402
     MODEL_ROOT,
     evaluate_task,
     observation_schema,
+    protocol_version,
     require_managed_run,
     validate_adapter,
     validate_dataset_root,
@@ -164,6 +165,11 @@ def main() -> int:
     dataset_root = validate_dataset_root(args.dataset_root)
     manifest, tasks = load_selected_tasks(args.task_id, dataset_root)
     runtime_observation_format = observation_schema(manifest)
+    runtime_protocol = protocol_version(manifest)
+    if runtime_protocol == "official-local-v1" and runtime_observation_format != "official-provider-v1":
+        raise ValueError(
+            "official-local-v1 stochastic rollout requires official-provider-v1 observations"
+        )
     reward_function = (
         score_trajectory
         if args.reward_version == "rules-v1"
@@ -202,6 +208,7 @@ def main() -> int:
                     seed=seed,
                     dataset_root=dataset_root,
                     observation_format=runtime_observation_format,
+                    tool_protocol=runtime_protocol,
                 )
                 reward = reward_function(result, task)
                 items.append({"seed": seed, "result": result, "reward": reward})
@@ -247,6 +254,7 @@ def main() -> int:
         "dataset_manifest_sha256": sha256_file(dataset_root / "manifest.json"),
         "tasks_sha256": sha256_file(dataset_root / "tasks.jsonl"),
         "tool_observation_schema": runtime_observation_format,
+        "tool_protocol": runtime_protocol,
         "reward_version": args.reward_version,
         "physical_gpu": physical_gpu,
         "generation": {

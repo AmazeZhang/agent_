@@ -1035,3 +1035,17 @@
 - 当前结论仅是“base + 官方数据无内容改写的 960-safe 派生集完成 50 次真实 optimizer update，且
   resume/save/cleanup 正常”，不把训练 loss 当成任务效果。下一步先对 checkpoint-50 做小规模 rollout
   门禁，核验工具协议和本地 provider，再决定是否允许 1-step RL。
+
+### 2026-08-25：修复官方 SFT→本地 rollout 协议错位
+
+- CPU 审计确认 960 条官方 SFT 的 system/tools 各自完全一致；官方调用是 `image_search(url=img_1)` 与
+  `text_search(q/query, hl/lang, top_k)`。历史 evaluator 仍要求 `image_search(image=img_1)`，且 official
+  分支输出包含内部 entity ID/similarity 的 compact observation；随机审计器还漏传 protocol 并退回 legacy。
+- evaluator 现只向 official 分支暴露官方 search schema，并实际经 `OfficialLocalSearchProvider` 执行；
+  observation 隐藏本地 ID、相似度和路径。随机审计增加 protocol 透传与 official-provider fail-closed 门。
+- 发布 `wit-rl-official-provider-v10`：v8 的 120 条 QVA 与 120 张图完全不改，tasks SHA256 仍为
+  `2ccdb0ef...cce55`，`rows_modified=0`；只替换隐藏 provider/schema 声明，manifest SHA256
+  `70142a78...1546c`。v9 因继承悬空 SFT 哈希被复核拒绝，保留但禁用；v10 已修复。
+- 相关 provider/evaluator/stochastic/builder 测试 22/22 通过；纯 CPU/磁盘，无网络、API、GPU/tmux。
+  下一步严格按预提交 `official_provider_rollout_gate_v1.json`：先 GPU1 单题 greedy phase A，只有工具协议
+  正常才进入四类×4 的 rollout-only phase B，仍不启动 optimizer。

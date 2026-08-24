@@ -1,0 +1,40 @@
+{
+  "adapter": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/runs/official-sft-wiki-en-safe960-v4-step50-20260825/output",
+  "adapter_sha256": "8b7e3e49526da33730868ba4b84dce0a5e3310bb602d480067fc6a4909a57955",
+  "dataset_manifest_sha256": "70142a78d31efcd97a041d7b11eb3d727ed964667c22d3941598d889ca01546c",
+  "dataset_root": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/datasets/processed/wit-rl-official-provider-v10",
+  "mode": "rollout-only-no-optimizer-no-api",
+  "phase_a": {
+    "generation": "greedy",
+    "max_new_tokens": 256,
+    "task_ids": [
+      "wit-00000885"
+    ]
+  },
+  "phase_a_gate": {
+    "fatal": null,
+    "minimum_tool_calls": 1,
+    "required_first_tool": "image_search"
+  },
+  "phase_b": {
+    "max_new_tokens": 256,
+    "rollouts_per_task": 4,
+    "seed": 20260825,
+    "task_ids": [
+      "wit-00000885",
+      "wit-00001521",
+      "wit-00011482",
+      "boundary-no-match-train-000"
+    ],
+    "temperature": 0.7,
+    "top_p": 1.0
+  },
+  "phase_b_gate": {
+    "maximum_fatal_fraction": 0.25,
+    "minimum_format_valid_fraction": 0.75,
+    "minimum_variable_group_fraction": 0.25
+  },
+  "physical_gpu": 1,
+  "tool_observation_schema": "official-provider-v1",
+  "tool_protocol": "official-local-v1"
+}

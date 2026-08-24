@@ -16,7 +16,13 @@ from PIL import Image
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from local_retrieval import LocalTextIndex, entity_tool_observation, text_tool_observation  # noqa: E402
+from local_retrieval import (  # noqa: E402
+    LocalTextIndex,
+    OfficialLocalSearchProvider,
+    entity_tool_observation,
+    official_search_tool_schemas,
+    text_tool_observation,
+)
 from local_retrieval.image_search_backend import resolve_local_image  # noqa: E402
 from local_retrieval.resnet50_encoder import sha256_file  # noqa: E402
 
@@ -79,7 +85,7 @@ TEXT_LOOKUP_TOOL = {
 
 def tools_for_protocol(tool_protocol: str) -> list[dict[str, Any]]:
     if tool_protocol == "official-local-v1":
-        return [*COMMON_TOOLS, TEXT_SEARCH_TOOL]
+        return official_search_tool_schemas()
     if tool_protocol == "legacy-v1":
         return [*COMMON_TOOLS, TEXT_LOOKUP_TOOL]
     raise ValueError(f"unsupported tool protocol: {tool_protocol}")
@@ -170,7 +176,11 @@ def validate_dataset_root(raw_root: Path) -> Path:
 
 def observation_schema(manifest: dict[str, Any]) -> str:
     schema = str(manifest.get("tool_observation_schema", "verbose-v1"))
-    if schema not in {"verbose-v1", "boundary-compact-v1"}:
+    if schema not in {
+        "verbose-v1",
+        "boundary-compact-v1",
+        "official-provider-v1",
+    }:
         raise ValueError(f"unsupported tool observation schema: {schema}")
     return schema
 
@@ -195,7 +205,12 @@ def load_tasks(
         manifest = json.load(handle)
     if (
         manifest.get("status")
-        not in {"challenge-ready", "rl-boundary-ready", "rl-protocol-ready"}
+        not in {
+            "challenge-ready",
+            "rl-boundary-ready",
+            "rl-protocol-ready",
+            "rl-official-provider-ready",
+        }
         or manifest.get("image_observation_contains_text_summary") is not False
         or manifest.get("image_runtime_handle") != "img_1"
         or manifest.get("final_response_format")
@@ -292,6 +307,21 @@ def execute_call(
 ) -> tuple[str, bool]:
     name = call["name"]
     arguments = call["arguments"]
+    if tool_protocol == "official-local-v1":
+        if name == "image_search" and image_search_call_count <= int(
+            task.get("image_search_failures_before_success", 0)
+        ):
+            return (
+                "Tool execution error:\nimage_search failed in the current environment.",
+                True,
+            )
+        provider = OfficialLocalSearchProvider(
+            text_index,
+            lambda reference, top_k: task["retrieval_results"][:top_k]
+            if reference == "img_1"
+            else [],
+        )
+        return provider.safe_call(name, arguments), name == "image_search"
     if name == "image_search":
         if arguments.get("image") != "img_1":
             raise ValueError("image_search must reference img_1")
@@ -355,33 +385,6 @@ def execute_call(
         if observation_format != "verbose-v1":
             raise ValueError(f"unsupported tool observation schema: {observation_format}")
         return text_tool_observation([] if result is None else [result]), False
-    if name == "text_search":
-        if tool_protocol != "official-local-v1":
-            raise ValueError("text_search is not registered in legacy-v1")
-        if set(arguments) - {"q", "top_k"} or not isinstance(arguments.get("q"), str):
-            raise ValueError("text_search requires q and accepts optional top_k")
-        top_k = int(arguments.get("top_k", 3))
-        if not 1 <= top_k <= 3:
-            raise ValueError("text_search top_k must be between 1 and 3")
-        matches = text_index.search(arguments["q"], top_k=top_k)
-        if observation_format == "boundary-compact-v1":
-            payload = {
-                "backend": "frozen_local_wikipedia_search",
-                "match_count": len(matches),
-                "results": [
-                    {
-                        "entity_id": str(match["entity_id"]),
-                        "title": str(match["title"]),
-                        "source": str(match["source"]),
-                        "summary": str(match["summary"]),
-                    }
-                    for match in matches
-                ],
-            }
-            return "Tool execution result:\n" + json.dumps(
-                payload, ensure_ascii=False, indent=2, sort_keys=True
-            ), False
-        return text_tool_observation(matches), False
     raise ValueError(f"unsupported tool: {name}")
 
 
@@ -567,6 +570,10 @@ def main() -> int:
     )
     runtime_observation_format = observation_schema(dataset_manifest)
     runtime_protocol = protocol_version(dataset_manifest)
+    if runtime_protocol == "official-local-v1" and runtime_observation_format != "official-provider-v1":
+        raise ValueError(
+            "official-local-v1 evaluation requires official-provider-v1 observations"
+        )
     processor = AutoProcessor.from_pretrained(
         MODEL_ROOT, local_files_only=True, trust_remote_code=False
     )

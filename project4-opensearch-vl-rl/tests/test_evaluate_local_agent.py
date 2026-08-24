@@ -64,6 +64,30 @@ class EvaluateLocalAgentTest(unittest.TestCase):
         self.assertIn("TRANSIENT_FAILURE", first)
         self.assertIn("entity-1", second)
 
+    def test_official_protocol_uses_url_and_hides_local_fields(self) -> None:
+        call = {"name": "image_search", "arguments": {"url": "img_1"}}
+        task = {
+            "retrieval_results": [
+                {
+                    "entity_id": "private-entity",
+                    "title": "Entity One",
+                    "source": "https://example.test/entity-1",
+                    "similarity": 0.9,
+                }
+            ]
+        }
+        observation, _ = MODULE.execute_call(
+            call,
+            task,
+            None,
+            image_search_call_count=1,
+            observation_format="official-provider-v1",
+            tool_protocol="official-local-v1",
+        )
+        self.assertIn("Title: Entity One", observation)
+        self.assertNotIn("private-entity", observation)
+        self.assertNotIn("similarity", observation)
+
     def test_compact_image_observation_matches_boundary_contract(self) -> None:
         call = {"name": "image_search", "arguments": {"image": "img_1"}}
         task = {
