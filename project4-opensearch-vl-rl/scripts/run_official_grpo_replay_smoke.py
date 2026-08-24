@@ -7,7 +7,6 @@ import argparse
 import json
 import math
 import os
-import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -93,6 +92,82 @@ def append_turn_messages(messages: list[dict[str, Any]], turn: dict[str, Any]) -
         )
 
 
+def replay_group_backward(
+    model: Any,
+    processor: Any,
+    group: dict[str, Any],
+    task: dict[str, Any],
+    dataset_root: Path,
+    protocol: str,
+    tools: list[dict[str, Any]],
+) -> dict[str, float | int]:
+    import torch
+
+    advantages = [float(value) for value in group["summary"]["advantages"]["fatal_clamped"]]
+    active_count = sum(value != 0.0 for value in advantages)
+    if active_count == 0:
+        raise ValueError("rollout group has no active trajectory")
+    replayed_turns = 0
+    token_count = 0
+    weighted_loss_total = 0.0
+    for item, advantage in zip(group["items"], advantages, strict=True):
+        if advantage == 0.0:
+            continue
+        turns = item["result"]["turns"]
+        if not turns:
+            raise ValueError("active rollout trajectory has no assistant turns")
+        messages = build_initial_messages(task, dataset_root, protocol)
+        for turn in turns:
+            prompt = processor.apply_chat_template(
+                messages,
+                tools=tools,
+                tokenize=True,
+                add_generation_prompt=True,
+                return_dict=True,
+                return_tensors="pt",
+            )
+            full_messages = messages + [
+                {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": turn["assistant"]}],
+                }
+            ]
+            full = processor.apply_chat_template(
+                full_messages,
+                tools=tools,
+                tokenize=True,
+                add_generation_prompt=False,
+                return_dict=True,
+                return_tensors="pt",
+            )
+            prompt_len = int(prompt["input_ids"].shape[1])
+            if not torch.equal(full["input_ids"][:, :prompt_len], prompt["input_ids"]):
+                raise RuntimeError("assistant replay does not preserve the prompt token prefix")
+            labels = full["input_ids"].clone()
+            labels[:, :prompt_len] = -100
+            supervised = int((labels != -100).sum().item())
+            if supervised <= 0:
+                raise RuntimeError("assistant replay produced no supervised tokens")
+            full = full.to("cuda:0")
+            labels = labels.to("cuda:0")
+            output = model(**full, labels=labels, use_cache=False)
+            if not torch.isfinite(output.loss):
+                raise FloatingPointError("non-finite replay cross-entropy")
+            scale = advantage / (active_count * len(turns))
+            weighted = output.loss * scale
+            weighted.backward()
+            weighted_loss_total += float(weighted.detach().cpu())
+            replayed_turns += 1
+            token_count += supervised
+            append_turn_messages(messages, turn)
+    return {
+        "active_trajectory_count": active_count,
+        "replayed_assistant_turns": replayed_turns,
+        "supervised_token_count": token_count,
+        "weighted_loss": weighted_loss_total,
+    }
+
+
 def main() -> int:
     import torch
     from peft import PeftModel, prepare_model_for_kbit_training
@@ -150,61 +225,9 @@ def main() -> int:
     optimizer = torch.optim.AdamW(trainable, lr=args.learning_rate)
     optimizer.zero_grad(set_to_none=True)
 
-    advantages = [float(value) for value in group["summary"]["advantages"]["fatal_clamped"]]
-    active_count = sum(value != 0.0 for value in advantages)
-    replayed_turns = 0
-    token_count = 0
-    weighted_loss_total = 0.0
-    for item, advantage in zip(group["items"], advantages, strict=True):
-        if advantage == 0.0:
-            continue
-        turns = item["result"]["turns"]
-        if not turns:
-            raise ValueError("active rollout trajectory has no assistant turns")
-        messages = build_initial_messages(task, dataset_root, protocol)
-        for turn in turns:
-            prompt = processor.apply_chat_template(
-                messages,
-                tools=tools,
-                tokenize=True,
-                add_generation_prompt=True,
-                return_dict=True,
-                return_tensors="pt",
-            )
-            full_messages = messages + [
-                {
-                    "role": "assistant",
-                    "content": [{"type": "text", "text": turn["assistant"]}],
-                }
-            ]
-            full = processor.apply_chat_template(
-                full_messages,
-                tools=tools,
-                tokenize=True,
-                add_generation_prompt=False,
-                return_dict=True,
-                return_tensors="pt",
-            )
-            prompt_len = int(prompt["input_ids"].shape[1])
-            if not torch.equal(full["input_ids"][:, :prompt_len], prompt["input_ids"]):
-                raise RuntimeError("assistant replay does not preserve the prompt token prefix")
-            labels = full["input_ids"].clone()
-            labels[:, :prompt_len] = -100
-            supervised = int((labels != -100).sum().item())
-            if supervised <= 0:
-                raise RuntimeError("assistant replay produced no supervised tokens")
-            full = full.to("cuda:0")
-            labels = labels.to("cuda:0")
-            output = model(**full, labels=labels, use_cache=False)
-            if not torch.isfinite(output.loss):
-                raise FloatingPointError("non-finite replay cross-entropy")
-            scale = advantage / (active_count * len(turns))
-            weighted = output.loss * scale
-            weighted.backward()
-            weighted_loss_total += float(weighted.detach().cpu())
-            replayed_turns += 1
-            token_count += supervised
-            append_turn_messages(messages, turn)
+    replay = replay_group_backward(
+        model, processor, group, task, dataset_root, protocol, tools
+    )
 
     grad_norm = torch.nn.utils.clip_grad_norm_(trainable, max_norm=1.0)
     if not torch.isfinite(grad_norm):
@@ -231,10 +254,7 @@ def main() -> int:
         "dataset_manifest_sha256": sha256_file(dataset_root / "manifest.json"),
         "tasks_sha256": sha256_file(dataset_root / "tasks.jsonl"),
         "learning_rate": args.learning_rate,
-        "active_trajectory_count": active_count,
-        "replayed_assistant_turns": replayed_turns,
-        "supervised_token_count": token_count,
-        "weighted_loss": weighted_loss_total,
+        **replay,
         "grad_norm": float(grad_norm.detach().cpu()),
     }
     (staging / "trainer_state.json").write_text(

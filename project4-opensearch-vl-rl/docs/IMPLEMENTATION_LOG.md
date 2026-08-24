@@ -1112,3 +1112,14 @@
 - `exit_code=0`；GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与，无网络/API；精确
   dead/status 0 tmux 已关闭。下一步先为 1→5 构建“每步重新 rollout、再更新一次”的在线小循环，禁止把
   同一 phase B report 重放 5 次。
+
+### 2026-08-25：冻结 RL 1→5 fresh-rollout 在线循环
+
+- 新 launcher 从 step-1 adapter 与其专属 optimizer state 恢复；step 2～5 每步都由当前 policy 对同一
+  预声明 rank3 train task 重新采样 4 条轨迹，再计算 `evidence-fidelity-v2` reward、组内 centered/fatal-
+  clamped advantage，并只做 1 次 update。旧 phase B report 不再参与后续梯度。
+- 每个新 group 必须同时通过：reward variance>0、format valid fraction>=0.75、fatal fraction<=0.25；否则
+  整个 Run fail-closed，不换题、不重采直到碰巧通过。每步 adapter hash 必须变化，并原子保存
+  `checkpoint-N/{adapter,optimizer,rollouts,state}`，最终再发布 output adapter/optimizer/state。
+- 固定为物理 GPU1、4 rollouts、temperature 0.7、top-p 1.0、max-new-tokens 256、lr 1e-6、目标 step5；
+  CPU 测试 18/18 通过。配置见 `official_grpo_online_step5_v1.json`；无网络/API/GPU5。

@@ -1,0 +1,25 @@
+{
+  "algorithm": "online-fresh-rollout-grpo-fatal-clamped",
+  "dataset_manifest_sha256": "70142a78d31efcd97a041d7b11eb3d727ed964667c22d3941598d889ca01546c",
+  "dataset_root": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/datasets/processed/wit-rl-official-provider-v10",
+  "generation": {
+    "max_new_tokens": 256,
+    "rollouts_per_step": 4,
+    "seed": 20260825,
+    "temperature": 0.7,
+    "top_p": 1.0
+  },
+  "learning_rate": 1e-06,
+  "optimizer": "torch-adamw-resume",
+  "physical_gpu": 1,
+  "resume_adapter": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/runs/official-provider-grpo-replay-1step-20260825/output",
+  "resume_adapter_sha256": "b687be7d4ed8d911e9eae363ecfda5313774283f25adaed0a8274c98d31c3698",
+  "resume_optimizer_sha256": "6534ef5be05fb261114414c95b31e0fb543a5d5ef9752311ad2026689f700f6d",
+  "resume_trainer_state_sha256": "f3412725581fe1ad38820b0d9c0048740118abff892afc250d8e42203685bd07",
+  "start_step": 1,
+  "target_step": 5,
+  "task_id": "wit-00000885",
+  "tasks_sha256": "2ccdb0ef507ebbd20dfba54c199a724ab9056a868856d9291dd65949325cce55",
+  "tool_observation_schema": "official-provider-v1",
+  "tool_protocol": "official-local-v1"
+}
