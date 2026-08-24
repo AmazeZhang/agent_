@@ -120,6 +120,35 @@ cleanup() {
     echo "warning: preserving live Ray temp because archive target exists: ${ray_tmp_dir}" | tee -a "${run_dir}/cleanup.log" >&2
   fi
   echo "finished_at=$(date --iso-8601=seconds)" >>"${run_dir}/metadata.env"
+  generate_training_curves
+}
+
+generate_training_curves() {
+  local curve_script="${script_dir}/generate_training_curves.py"
+  local curve_python="${project_data_dir}/envs/searchr1-repro-cu124/bin/python"
+  local curve_log="${run_dir}/curve_generation.log"
+
+  # Evaluation/diagnostic runs do not emit verl optimizer-step metrics.  Skip
+  # them without creating an empty artifact directory.
+  if ! grep -q 'training/global_step:' "${run_dir}/stdout.log" 2>/dev/null; then
+    echo "curve_generation=skipped_no_training_metrics" >>"${run_dir}/metadata.env"
+    return 0
+  fi
+  if [[ ! -x "$curve_python" || ! -f "$curve_script" ]]; then
+    echo "curve generation skipped: fixed Python or generator missing" >"$curve_log"
+    echo "curve_generation=skipped_generator_missing" >>"${run_dir}/metadata.env"
+    return 0
+  fi
+
+  # Derived plots are CPU-only and fail-open with respect to the immutable
+  # training result: a plotting bug must never rewrite the command exit code.
+  if CUDA_VISIBLE_DEVICES='' PYTHONNOUSERSITE=1 "$curve_python" "$curve_script" \
+      --run-dir "$run_dir" >>"$curve_log" 2>&1; then
+    echo "curve_generation=generated" >>"${run_dir}/metadata.env"
+  else
+    echo "warning: training curve generation failed; see ${curve_log}" >&2
+    echo "curve_generation=failed" >>"${run_dir}/metadata.env"
+  fi
 }
 
 trap 'cleanup EXIT; exit 130' INT
