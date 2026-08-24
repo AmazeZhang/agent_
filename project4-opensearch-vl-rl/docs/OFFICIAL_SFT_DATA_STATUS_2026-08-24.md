@@ -168,3 +168,9 @@ dataset index 117，和审计的 `72/222` 完全一致；其余 960 条严格对
 
 launcher profile 升级为 `official-wiki-en-safe960-qlora-v4` 并固定上述哈希/复审报告；任何 v3 checkpoint
 都因 manifest/profile 不匹配而 fail-closed。下一步必须从 base 重新执行 v4 的 1→5→20→50。
+
+v4 受管 Run `official-sft-wiki-en-safe960-v4-1step-20260825` 已从 base 完成首个 optimizer update：
+loss `1.3173`、grad norm `0.9405`、runtime `5.439s`、`global_step=1`、`exit_code=0`。日志确认 4-bit
+bitsandbytes；checkpoint-1 完整，adapter SHA256
+`2ebdd6ed527df9bc6a81ce74bf8567b302af15bc6237c32e47f6466883d92f26`。GPU1 cleanup 后 18 MiB、
+无 compute process，GPU0/GPU5 未参与；精确 tmux dead/status 0 后关闭。下一步可同 profile resume 到 5。

@@ -998,3 +998,10 @@
   `d39cee73...c66e6`，完整哈希见状态文档。
 - launcher profile 升级为 `official-wiki-en-safe960-qlora-v4`，硬固定 data/info/indices/alignment 哈希；禁止
   v3 checkpoint 跨数据集 resume。下一步从 base 重新走 1→5→20→50。
+
+### 2026-08-25：960-safe v4 重新通过 1-step 门
+
+- Run `official-sft-wiki-en-safe960-v4-1step-20260825` 从 base、仅物理 GPU1 完成 `global_step=1`；
+  4-bit 加载明确，loss `1.3173`、grad norm `0.9405`、runtime `5.439s`、`exit_code=0`。
+- checkpoint-1 完整，adapter SHA256 `2ebdd6ed527df9bc6a81ce74bf8567b302af15bc6237c32e47f6466883d92f26`。
+  GPU1 cleanup 后 18 MiB/无 compute process，GPU0/GPU5 未参与；精确 dead/status 0 tmux 已关闭。
