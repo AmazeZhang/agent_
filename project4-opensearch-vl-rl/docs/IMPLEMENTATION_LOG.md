@@ -1282,3 +1282,24 @@
 - report SHA256 `6c3e7353...51c0`，exit0，仅物理 GPU1；cleanup 后 18 MiB、
   `compute_processes=none`，GPU0/GPU5 未参与，无网络/API，精确 dead/status0 tmux 已关闭。为节省额度，
   本轮不追加 max-turns=4 的 GPU probe。
+
+### 2026-08-25：纠正过严 turn/token 门限并完成 20-turn 复测
+
+- 源码复核确认：官方自定义 DeepResearch Agent 允许最多 50 次 LLM call、单次 response 4096 tokens；通用
+  rLLM 配置默认 `max_steps=20`，8B 官方 rollout group=8、temperature=0.7、top-p=1.0。此前 crop probe
+  的 3 turns/256 tokens 只是低成本诊断值，不是官方复现值；正式本地 RL 的 8 turns/256 tokens/group4
+  也属于资源缩放，后续不得把 `maximum-turns-exceeded` 直接解释成模型能力失败。
+- probe 现支持冻结行子集、2..20 turns 和 64..1024 tokens；新增配置
+  `official_crop_rollout_probe_relaxed_v2.json` 固定 row71、20 turns、1024 tokens。92/92 CPU 测试和 Ruff
+  通过后提交，再启动 GPU Run。
+- Run `official-toolrich97-sft20-row71-relaxed20t-20260825` 完整跑满 20 turns，仍未生成最终 `<response>`。
+  前五轮为有效视觉纠错：`crop(img_1)->layout(img_2='bee')->crop(img_3)->crop(img_4)->
+  layout(img_4='no text')`；第 6～9 轮逐步调整 Wiki query，此后同一 `text_search` query/observation 重复到
+  第 20 轮。
+- 每轮实际输出仅 68..125 tokens，证明本样本的 256-token 上限不是直接瓶颈；放宽 turn 揭示的真实问题是
+  静态本地检索结果下缺少“停止搜索并作答”的策略，而不是简单 rollout 数不足。重复调用均返回成功，
+  因此也不会触发官方的连续 3 次工具错误终止逻辑。
+- report SHA256 `b12239e3...b2d`，exit0，仅物理 GPU1；最高观察约 23.6 GiB/66°C，cleanup 后 18 MiB、
+  `compute_processes=none`，GPU0/GPU5 未参与，无网络/API，精确 dead/status0 tmux 已关闭。
+- 下一步应在官方 SFT 数据中增加“检索后形成 final response”和“重复结果后停止/改策略”的轨迹覆盖，并在
+  RL reward/fatal-aware 逻辑中单独记录重复成功调用；不应靠重新收紧 turn 上限掩盖循环。
