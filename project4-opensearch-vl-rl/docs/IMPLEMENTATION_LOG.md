@@ -1409,3 +1409,22 @@
   逐条 group-centered advantages 与原报告一致。原因是受影响的两个组内每条 reward 都统一增加0.2，中心化
   后抵消；因此已执行的1-step GRPO梯度不受本次修正影响。但历史报告对 query reward 的绝对值/计数偏低，
   后续引用必须使用修正口径。
+
+### 2026-08-25：20-turn 同源对照确认当前 QVA 语义不适配
+
+- 为排除原 v10 的8 turns/256 tokens过严，新增有界 evaluator 参数并冻结
+  `official_final8b_matched_v10_relaxed_v2.json`；同一官方模型、同一 `wit-00000885`、同一 provider/reward，
+  只放宽为20 turns/1024 tokens。evaluator预算上限仍硬限制20/1024，CPU回归14/14通过后才启动GPU。
+- Run `official-final8b-v10-wit885-relaxed20t-20260825` 仍为
+  `image_search -> text_search×19 -> maximum-turns-exceeded`，没有final。所有单轮输出仅22..56 tokens，因此
+  token上限不是原因；从第5轮开始反复围绕 `Mary Rose + Norwegian nurse/WWII/resistance/SOE/pilot` 改写，
+  说明策略已经把人工 clue `invasjonsfl` 错解为与 `invasjonsfly`/aircraft有关，扩大turn只延长错误搜索。
+- 修正后的 reward 能确认至少一次 observation 含精确gold evidence：`evidence_path_valid=true`；20次工具调用
+  相对oracle导致 `r_query=0.2`。但 fatal且无final令 `r_format=0`，乘法门后总reward仍为0。evaluation
+  SHA256 `2b43ca39...71e8`，reward报告 SHA256 `e3e57dd7...ffdc`。
+- exit0，仅物理GPU1；cleanup 后18 MiB、无 compute process，GPU0/GPU5未参与，精确tmux已关闭。由8轮
+  扩到20轮仍失败，故不进入 stochastic batch或optimizer。当前最小阻塞不是接口、检索覆盖或生成预算，而是
+  v10 QVA把截断/多语种关键词做成生硬筛选指令，与官方搜索策略的自然问题分布不一致。
+- 下一步应非覆盖重建少量自然语言 QVA：问题应由对应WIT实体/图片与完整Wiki证据生成，保留完整词而非截断
+  stem，并让答案可从同一 frozen index验证；工具schema/provider保持不变。先用官方最终模型通过若干
+  deterministic rollout和reward门，再让本地SFT模型进入新的RL环境，不能在当前v10上继续堆rollout数量。
