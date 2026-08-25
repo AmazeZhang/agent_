@@ -157,6 +157,7 @@ def main() -> int:
                 "gold_title": "PROBE_ONLY",
                 "gold_evidence_sentence": "PROBE_ONLY",
                 "final_response_wrapper": "response-v1",
+                "allow_official_think_prefix": True,
                 "oracle_steps": ["crop", "final"],
             }
             result = evaluate_task(

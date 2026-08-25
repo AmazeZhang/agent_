@@ -31,6 +31,32 @@ class EvaluateLocalAgentTest(unittest.TestCase):
                 'prefix <tool_call>{"name":"image_search","arguments":{}}</tool_call>'
             )
 
+    def test_official_parser_allows_only_one_well_formed_think_prefix(self) -> None:
+        text = (
+            "<think>Inspect the image first.</think>\n"
+            '<tool_call>{"name":"crop","arguments":{"image":"img_1",'
+            '"x":0,"y":0,"width":10,"height":10}}</tool_call>'
+        )
+        call = MODULE.parse_tool_call(text, allow_official_think_prefix=True)
+        self.assertEqual(call["name"], "crop")
+        with self.assertRaisesRegex(ValueError, "standalone"):
+            MODULE.parse_tool_call(
+                "unsafe-prefix " + text, allow_official_think_prefix=True
+            )
+
+    def test_official_final_score_allows_think_prefix_when_declared(self) -> None:
+        task = {
+            "gold_title": "Alpha",
+            "gold_evidence_sentence": "Alpha fact.",
+            "final_response_wrapper": "response-v1",
+            "allow_official_think_prefix": True,
+        }
+        score = MODULE.score_final(
+            "<think>Done.</think><response>Title: Alpha\nEvidence: Alpha fact.</response>",
+            task,
+        )
+        self.assertTrue(score["format_valid"])
+
     def test_final_score_requires_both_fields(self) -> None:
         task = {"gold_title": "An Entity", "gold_evidence_sentence": "A fact."}
         score = MODULE.score_final("Title: An Entity\nEvidence: A fact.", task)

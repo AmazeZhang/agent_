@@ -1155,3 +1155,16 @@
 - CPU 预检：冻结 SFT/data hash 与三条首动作均通过；row15 专家 bbox 实际得到 `200x120` 图，live 后端
   返回非空 Visual Match。完整测试 79/79 通过。配置冻结于 `official_crop_rollout_probe_v1.json`；下一步
   新 Run ID、命名 tmux、仅物理 GPU1，无 optimizer/网络/API/GPU5。
+
+### 2026-08-25：首次官方完整 prompt probe 暴露 think-prefix 解析错位
+
+- Run `official-sft50-crop-probe-v1-20260825` 使用物理 GPU1、三条官方首动作 crop 问题，三条首轮都生成
+  合法官方形态 `<think>...</think><tool_call>...</tool_call>`，且实际首工具均为
+  `image_search(url=img_1)`。旧严格解析器因 tool call 前存在 think block 将三条全部误报
+  `invalid-tool-format`；这不是模型工具 JSON 失败，也不能据此评估后续链路。
+- 原始报告 SHA256 `772bd3b0...44cba8`；Run exit 0，cleanup `compute_processes=none`，GPU1 回到 18 MiB，
+  GPU0/GPU5 未参与，无网络/API，精确 dead/status0 tmux 已关闭。失败报告保留且不复用 Run ID。
+- 修复只允许一个格式完整、位于消息开头的 `<think>...</think>`，其后仍必须是唯一独立 tool call；任意
+  自由前缀、多个调用或调用后文本继续拒绝。最终 response 同样只在 probe 明确声明时允许官方 think
+  前缀。修复后使用新 Run ID 重跑；由于三条当前首选择都是 image_search，初步迹象是 SFT-50 尚未形成
+  专家 crop 选择行为，但需解析后继续执行才能形成正式结论。

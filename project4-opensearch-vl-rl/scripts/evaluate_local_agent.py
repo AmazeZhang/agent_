@@ -35,6 +35,7 @@ MODEL_ROOT = PROJECT_DATA / "models/Qwen3-VL-8B-Instruct"
 DATASET_ROOT = PROJECT_DATA / "datasets/processed/wit-agentic-challenge-v5"
 RUN_ROOT = PROJECT_DATA / "runs"
 TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
+THINK_PREFIX_RE = re.compile(r"\s*<think>.*?</think>\s*", re.DOTALL)
 
 COMMON_TOOLS = [
     {
@@ -109,11 +110,21 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def parse_tool_call(text: str) -> dict[str, Any] | None:
-    matches = TOOL_CALL_RE.findall(text)
+def strip_official_think_prefix(text: str) -> str:
+    """Remove one well-formed leading official think block, and nothing else."""
+
+    match = THINK_PREFIX_RE.match(text)
+    return text[match.end() :] if match is not None else text
+
+
+def parse_tool_call(
+    text: str, *, allow_official_think_prefix: bool = False
+) -> dict[str, Any] | None:
+    candidate = strip_official_think_prefix(text) if allow_official_think_prefix else text
+    matches = TOOL_CALL_RE.findall(candidate)
     if not matches:
         return None
-    if len(matches) != 1 or TOOL_CALL_RE.sub("", text).strip():
+    if len(matches) != 1 or TOOL_CALL_RE.sub("", candidate).strip():
         raise ValueError("assistant turn must contain exactly one standalone tool call")
     call = json.loads(matches[0])
     if not isinstance(call, dict) or set(call) != {"name", "arguments"}:
@@ -128,6 +139,8 @@ def normalise(text: str) -> str:
 
 
 def score_final(text: str, task: dict[str, Any]) -> dict[str, bool]:
+    if task.get("allow_official_think_prefix") is True:
+        text = strip_official_think_prefix(text)
     response_match = re.fullmatch(r"\s*<response>\s*(.*?)\s*</response>\s*", text, re.DOTALL)
     requires_response_wrapper = task.get("final_response_wrapper") == "response-v1"
     if requires_response_wrapper and response_match is None:
@@ -495,7 +508,12 @@ def evaluate_task(
         }
         turns.append(turn)
         try:
-            call = parse_tool_call(output)
+            call = parse_tool_call(
+                output,
+                allow_official_think_prefix=(
+                    tool_protocol == "official-local-multimodal-v1"
+                ),
+            )
         except (ValueError, json.JSONDecodeError) as error:
             fatal = f"invalid-tool-format:{error}"
             break
