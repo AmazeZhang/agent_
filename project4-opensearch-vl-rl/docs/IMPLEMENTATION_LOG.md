@@ -1339,3 +1339,19 @@
   精确引用上述四个 shard。验证和下载 tmux 均已精确结束；本步骤没有加载 GPU。
 - 下一步执行冻结的官方最终策略 row71、greedy、4-turn/256-token rollout-only smoke，只使用物理 GPU1；
   若加载 OOM、环境接口不兼容或出现 Xid，立即停止，不自动量化、扩卡或进入 RL。
+
+### 2026-08-25：官方最终 8B 通过本地环境 4-turn smoke
+
+- 受管 Run `official-final8b-row71-smoke4t-20260825` 使用官方最终完整权重、row71、greedy、4 turns、
+  256 tokens，无 adapter/optimizer/API。模型以 BF16 完整加载到逻辑 cuda:0＝物理 GPU1，观察显存约
+  18.9 GiB；exit0，cleanup 后 GPU1 回到18 MiB/`compute_processes=none`，GPU0/GPU5未参与。
+- 第一轮生成 `crop(img_1, x=0,y=170,width=300,height=30)`，与冻结官方 SFT 专家调用**完全一致**；crop
+  成功注册 `img_2`。随后依次为 `sharpen(img_2)`（本地 provider 明确受控失败）、
+  `layout_parsing(img_2)`（Tesseract 返回低质量 `eae a`）、`image_search(img_1)`。这证明官方最终策略可在
+  我们保持同名/同参、仅替换执行后端的环境中运行 crop、图像句柄传递与失败恢复链。
+- 4轮边界以 `maximum-turns-exceeded` 结束，没有最终 `<response>`；`live_image_search_img2=false`，且本地
+  visual index 候选质量较差。因此本结果只通过“官方策略↔本地工具环境兼容”门，不证明答案成功，也不证明
+  当前 reward 有效。report SHA256 `635c2e18...9b70`。
+- 按预先冻结的 promotion rule，下一步只把同一模型、同一样本放宽到20 turns 做 rollout-only 诊断；仍不
+  进入优化器。重点观察模型能否在失败/低质量 observation 后停止搜索并输出 final response，以及是否出现
+  与本地 SFT-20 相同的重复检索循环。
