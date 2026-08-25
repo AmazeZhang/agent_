@@ -1267,3 +1267,18 @@
 - 现在真实可运行的模型可见图像工具为 `crop/layout_parsing/image_search`；其中 layout 是明确受限的英文
   OCR。`perspective_correct/super_resolution/sharpen` 仍返回受控失败，下一步不应在 RL reward 中假定它们
   已可用。
+
+### 2026-08-25：同 adapter 的 crop + 真实 layout 环境复测
+
+- Run `official-toolrich97-sft20-crop-layout-probe-20260825` 固定 checkpoint-20、row15/71/90、greedy 和
+  maximum-turns=3；相对上一 Run 唯一实质变量是 `layout_parsing` 从受控失败改成上述真实 Tesseract
+  provider。`first_tool_crop/crop_succeeded/followup_uses_img2` 仍为 `1/3`，说明 row71 首动作可复现。
+- row71 完整三轮为 `crop(img_1, 0,0,200,50) -> layout_parsing(img_2) ->
+  crop(img_1, 0,100,200,50)`。第二轮真实 observation 是 `Layout parsing result:\nbee`；模型判断该结果不符合
+  预期并主动换 bbox 生成 `img_3`，提供了图像句柄状态、多工具链和低质量 observation 后纠正动作的真实
+  行为证据。
+- 固定 3-turn 边界在第二次 crop 后停止，未验证 `layout_parsing(img_3)`，也不宣称最终答案或 OCR 正确。
+  row15/90 仍不选择 crop，因此不能写成稳定多工具成功率。
+- report SHA256 `6c3e7353...51c0`，exit0，仅物理 GPU1；cleanup 后 18 MiB、
+  `compute_processes=none`，GPU0/GPU5 未参与，无网络/API，精确 dead/status0 tmux 已关闭。为节省额度，
+  本轮不追加 max-turns=4 的 GPU probe。
