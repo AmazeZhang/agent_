@@ -20,6 +20,15 @@ from run_official_sft import DATASET_ROOT as DEFAULT_DATASET_ROOT
 from run_official_sft import PROJECT_DATA, training_config, validate_training_config
 
 
+def source_indices_for_manifest(manifest: dict, dataset_size: int) -> list[int]:
+    raw = manifest.get("selected_indices")
+    if raw is None:
+        raw = manifest.get("selected_source_indices")
+    if not isinstance(raw, list) or len(raw) != dataset_size:
+        raise ValueError("manifest source indices no longer align with the tokenized dataset")
+    return [int(value) for value in raw]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", type=Path)
@@ -92,9 +101,7 @@ def main() -> int:
     image_token_id = int(processor.image_token_id)
     merge_length = int(processor.image_processor.merge_size) ** 2
     manifest = json.loads((dataset_root / "manifest.json").read_text(encoding="utf-8"))
-    source_indices = manifest["selected_indices"]
-    if len(source_indices) != len(dataset):
-        raise ValueError("manifest selected_indices no longer aligns with the tokenized dataset")
+    source_indices = source_indices_for_manifest(manifest, len(dataset))
     mismatches: list[dict[str, int]] = []
     zero_supervision: list[int] = []
     checked = min(len(dataset), args.limit or len(dataset))
