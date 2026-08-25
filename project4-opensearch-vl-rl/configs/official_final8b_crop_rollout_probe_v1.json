@@ -1,0 +1,25 @@
+{
+  "adapter": null,
+  "comparison_role": "official-final-policy environment-compatibility control",
+  "generation": {
+    "do_sample": false,
+    "max_new_tokens": 256,
+    "maximum_turns": 4
+  },
+  "gpu_policy": {
+    "physical_gpu": 1,
+    "forbidden": [0, 5]
+  },
+  "image_search_backend": "live-local-resnet50-v1-cpu",
+  "model": {
+    "local_root": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/models/OpenSearch-VL-8B-official",
+    "repository": "OpenSearch-VL/OpenSearch-VL-8B",
+    "revision": "8711cdd1f913563f4b1226c379668effeffbd82a",
+    "stage": "official-final-sft-plus-rl"
+  },
+  "optimizer": false,
+  "probe_rows": [71],
+  "promotion_rule": "Only expand to 20 turns after a clean four-turn managed rollout.",
+  "source_dataset_sha256": "571c9c59a02309e8962d10ac0a0fdb14d86aa2c54cd8c9f86f4cfcbfa8e964a5",
+  "tool_protocol": "official-local-multimodal-v1"
+}

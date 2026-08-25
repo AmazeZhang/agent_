@@ -1318,3 +1318,6 @@
 - CPU 回归 `test_official_crop_rollout_probe.py` 5/5、`test_evaluate_local_agent.py` 12/12 通过。权重完成并
   通过大小/索引/离线加载检查后，只在物理 GPU1 先跑单行短 rollout；行为成立后才讨论 1～3 step LoRA
   RL 环境适配，不直接放大训练。
+- 首个冻结配置为 `official_final8b_crop_rollout_probe_v1.json`：官方 revision
+  `8711cdd1f913563f4b1226c379668effeffbd82a`、row71、greedy、4 turns、256 tokens、无 optimizer。
+  只有该受管 smoke 干净退出，才把同一模型/样本放宽到 20 turns；不会把模型下载完成自动等同于 GPU 晋级。
