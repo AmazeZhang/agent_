@@ -7,64 +7,54 @@ filesystem paths, similarity scores, or provider implementation details.
 from __future__ import annotations
 
 from copy import deepcopy
+from functools import lru_cache
+import json
+from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from .text_index import LocalTextIndex
 
 ImageLookup = Callable[[str, int], Sequence[Mapping[str, object]]]
 
-_IMAGE_SEARCH_SCHEMA: dict[str, Any] = {
-    "type": "function",
-    "function": {
-        "name": "image_search",
-        "description": (
-            "Visually identify the contents of an image. Returns summarized "
-            "title/source pairs filtered by Qwen3-32B."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "Image reference (e.g., 'img_1') or a direct image URL.",
-                }
-            },
-            "required": ["url"],
-        },
-    },
-}
-
-_TEXT_SEARCH_SCHEMA: dict[str, Any] = {
-    "type": "function",
-    "function": {
-        "name": "text_search",
-        "description": (
-            "Search for text documents using Serper + Jina + Qwen summarization. "
-            "Use for entity / fact lookups."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "q": {"type": "string"},
-                "query": {"type": "string", "description": "Alias for 'q'."},
-                "hl": {"type": "string", "default": "en"},
-                "lang": {
-                    "type": "string",
-                    "description": "Alias for 'hl'.",
-                    "default": "en",
-                },
-                "top_k": {"type": "integer", "default": 5},
-            },
-            "required": [],
-        },
-    },
-}
-
-
 def official_search_tool_schemas() -> list[dict[str, Any]]:
-    """Return an isolated copy of the official model-facing search schemas."""
+    """Return search schemas from the exact contract seen during official SFT."""
 
-    return deepcopy([_IMAGE_SEARCH_SCHEMA, _TEXT_SEARCH_SCHEMA])
+    return [
+        item
+        for item in official_tool_schemas()
+        if item["function"]["name"] in {"image_search", "text_search"}
+    ]
+
+
+@lru_cache(maxsize=1)
+def _official_sft_contract() -> dict[str, Any]:
+    contract_path = (
+        Path(__file__).resolve().parents[1]
+        / "contracts/official_sft_tool_contract.json"
+    )
+    with contract_path.open(encoding="utf-8") as handle:
+        contract = json.load(handle)
+    if (
+        contract.get("schema_version") != 1
+        or contract.get("source_revision")
+        != "2c1c460af4fa15bd63210cbf426a96664b959944"
+        or not isinstance(contract.get("system"), str)
+        or not isinstance(contract.get("tools"), list)
+    ):
+        raise ValueError("frozen official SFT tool contract is malformed")
+    return contract
+
+
+def official_tool_schemas() -> list[dict[str, Any]]:
+    """Return the complete tool schema exactly as seen during official SFT."""
+
+    return deepcopy(_official_sft_contract()["tools"])
+
+
+def official_system_prompt() -> str:
+    """Return the exact system prompt seen by the official SFT trajectories."""
+
+    return str(_official_sft_contract()["system"])
 
 
 def _clean_field(value: object, *, maximum: int = 4_000) -> str:

@@ -17,10 +17,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from local_retrieval import (  # noqa: E402
+    LocalImageRegistry,
     LocalTextIndex,
+    OfficialLocalMultimodalProvider,
     OfficialLocalSearchProvider,
     entity_tool_observation,
     official_search_tool_schemas,
+    official_system_prompt,
+    official_tool_schemas,
     text_tool_observation,
 )
 from local_retrieval.image_search_backend import resolve_local_image  # noqa: E402
@@ -84,6 +88,8 @@ TEXT_LOOKUP_TOOL = {
 
 
 def tools_for_protocol(tool_protocol: str) -> list[dict[str, Any]]:
+    if tool_protocol == "official-local-multimodal-v1":
+        return official_tool_schemas()
     if tool_protocol == "official-local-v1":
         return official_search_tool_schemas()
     if tool_protocol == "legacy-v1":
@@ -397,25 +403,29 @@ def build_initial_messages(
     with Image.open(image_path) as image:
         image.load()
         query_image = image.convert("RGB")
+    if tool_protocol == "official-local-multimodal-v1":
+        system_text = official_system_prompt()
+    else:
+        system_text = (
+            "Use one tool call per turn. Pass the literal handle img_1 to "
+            "image_search; do not replace it with a filename or image description. "
+            "Image search returns entity candidates only. "
+            + (
+                "Use text_search with a natural-language query to verify evidence. "
+                "Reply exactly once with <response> containing Title and Evidence lines. "
+                if tool_protocol == "official-local-v1"
+                else "text_lookup supplies answer evidence. The final response must contain exactly "
+                "two lines named Title and Evidence. "
+            )
+            + "Retry a tool only when its error says retryable=true. Do not invent missing evidence."
+        )
     return [
         {
             "role": "system",
             "content": [
                 {
                     "type": "text",
-                    "text": (
-                        "Use one tool call per turn. Pass the literal handle img_1 to "
-                        "image_search; do not replace it with a filename or image description. "
-                        "Image search returns entity candidates only. "
-                        + (
-                            "Use text_search with a natural-language query to verify evidence. "
-                            "Reply exactly once with <response> containing Title and Evidence lines. "
-                            if tool_protocol == "official-local-v1"
-                            else "text_lookup supplies answer evidence. The final response must contain exactly "
-                            "two lines named Title and Evidence. "
-                        )
-                        + "Retry a tool only when its error says retryable=true. Do not invent missing evidence."
-                    ),
+                    "text": system_text,
                 }
             ],
         },
@@ -444,6 +454,7 @@ def evaluate_task(
     observation_format: str = "verbose-v1",
     maximum_turns: int = 5,
     tool_protocol: str = "legacy-v1",
+    visual_lookup: Any | None = None,
 ) -> dict[str, Any]:
     if seed is not None:
         import torch
@@ -457,6 +468,15 @@ def evaluate_task(
     final_text = ""
     image_search_call_count = 0
     active_tools = tools_for_protocol(tool_protocol)
+    multimodal_provider = None
+    if tool_protocol == "official-local-multimodal-v1":
+        if visual_lookup is None:
+            raise ValueError("multimodal protocol requires a live visual lookup backend")
+        image_path = resolve_local_image(Path(task["query_image"]), dataset_root)
+        with Image.open(image_path) as source_image:
+            source_image.load()
+            registry = LocalImageRegistry(source_image.convert("RGB"))
+        multimodal_provider = OfficialLocalMultimodalProvider(registry, visual_lookup)
     for _ in range(maximum_turns):
         output, input_tokens, output_tokens = generate_turn(
             model,
@@ -485,14 +505,29 @@ def evaluate_task(
         try:
             if call["name"] == "image_search":
                 image_search_call_count += 1
-            observation, used_image_cache = execute_call(
-                call,
-                task,
-                text_index,
-                image_search_call_count=image_search_call_count,
-                observation_format=observation_format,
-                tool_protocol=tool_protocol,
-            )
+            tool_image = None
+            if multimodal_provider is not None and call["name"] in {"crop", "image_search"}:
+                tool_result = multimodal_provider.safe_call(call["name"], call["arguments"])
+                observation = tool_result.observation
+                tool_image = tool_result.image
+                used_image_cache = False
+            elif multimodal_provider is not None and call["name"] == "text_search":
+                provider = OfficialLocalSearchProvider(text_index, lambda _ref, _top_k: [])
+                observation = provider.safe_call(call["name"], call["arguments"])
+                used_image_cache = False
+            elif multimodal_provider is not None:
+                tool_result = multimodal_provider.safe_call(call["name"], call["arguments"])
+                observation = tool_result.observation
+                used_image_cache = False
+            else:
+                observation, used_image_cache = execute_call(
+                    call,
+                    task,
+                    text_index,
+                    image_search_call_count=image_search_call_count,
+                    observation_format=observation_format,
+                    tool_protocol=tool_protocol,
+                )
         except (ValueError, TypeError) as error:
             fatal = f"tool-error:{error}"
             break
@@ -503,17 +538,16 @@ def evaluate_task(
         messages.append(
             {"role": "assistant", "content": [{"type": "text", "text": output}]}
         )
-        messages.append(
+        response_content = []
+        if tool_image is not None:
+            response_content.append({"type": "image", "image": tool_image})
+        response_content.append(
             {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"<tool_response>\n{observation}\n</tool_response>",
-                    }
-                ],
+                "type": "text",
+                "text": f"<tool_response>\n{observation}\n</tool_response>",
             }
         )
+        messages.append({"role": "user", "content": response_content})
     else:
         fatal = "maximum-turns-exceeded"
     final_score = score_final(final_text, task)

@@ -1,3 +1,4 @@
+import copy
 import importlib.util
 import json
 import tempfile
@@ -45,6 +46,74 @@ class EvaluateLocalAgentTest(unittest.TestCase):
         source = Path(MODULE.__file__).read_text()
         self.assertNotIn('"content": output}', source)
         self.assertIn('"type": "text", "text": output', source)
+
+    def test_multimodal_rollout_injects_crop_pixels_and_searches_img2(self) -> None:
+        from PIL import Image
+        from local_retrieval import LocalTextIndex, build_text_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "images").mkdir()
+            Image.new("RGB", (100, 80), "white").save(root / "images/source.png")
+            index_path = root / "text.sqlite"
+            build_text_index(
+                index_path,
+                [{"entity_id": "a", "title": "Alpha", "source": "wiki", "text": "Alpha fact."}],
+                corpus="test",
+                corpus_revision="1",
+            )
+            outputs = iter(
+                [
+                    '<tool_call>{"name":"crop","arguments":{"image":"img_1","x":10,"y":15,"width":30,"height":20}}</tool_call>',
+                    '<tool_call>{"name":"image_search","arguments":{"url":"img_2"}}</tool_call>',
+                    '<response>Title: Alpha\nEvidence: Alpha fact.</response>',
+                ]
+            )
+            message_snapshots = []
+
+            def fake_generate(_model, _processor, messages, **_kwargs):
+                message_snapshots.append(copy.deepcopy(messages))
+                return next(outputs), 10, 5
+
+            seen = []
+
+            def visual_lookup(image, top_k):
+                seen.append((image.size, top_k))
+                return [{"title": "Alpha", "source": "wiki", "entity_id": "hidden"}]
+
+            task = {
+                "task_id": "crop-probe",
+                "task_type": "crop-live-search",
+                "split": "dev",
+                "query_image": "images/source.png",
+                "user_prompt": "Crop then search.",
+                "gold_title": "Alpha",
+                "gold_evidence_sentence": "Alpha fact.",
+                "final_response_wrapper": "response-v1",
+                "oracle_steps": ["crop", "image_search", "final"],
+            }
+            with LocalTextIndex(index_path) as text_index, mock.patch.object(
+                MODULE, "generate_turn", side_effect=fake_generate
+            ):
+                result = MODULE.evaluate_task(
+                    None,
+                    None,
+                    task,
+                    text_index,
+                    max_new_tokens=64,
+                    dataset_root=root,
+                    observation_format="official-provider-v1",
+                    maximum_turns=3,
+                    tool_protocol="official-local-multimodal-v1",
+                    visual_lookup=visual_lookup,
+                )
+            crop_response = message_snapshots[1][-1]["content"]
+            self.assertEqual(crop_response[0]["type"], "image")
+            self.assertEqual(crop_response[0]["image"].size, (30, 20))
+            self.assertIn("New image ID: img_2", crop_response[1]["text"])
+            self.assertEqual(seen, [((30, 20), 5)])
+            self.assertEqual(result["tool_names"], ["crop", "image_search"])
+            self.assertIsNone(result["fatal"])
 
     def test_transient_image_failure_is_deterministic(self) -> None:
         call = {"name": "image_search", "arguments": {"image": "img_1"}}

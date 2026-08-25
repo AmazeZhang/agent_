@@ -43,6 +43,25 @@ class ProtocolV8Tests(unittest.TestCase):
         self.assertEqual(image_schema["function"]["parameters"]["required"], ["url"])
         self.assertNotIn("text_lookup", names)
 
+    def test_multimodal_protocol_exposes_complete_official_toolbox(self) -> None:
+        names = [
+            item["function"]["name"]
+            for item in EVALUATOR.tools_for_protocol("official-local-multimodal-v1")
+        ]
+        self.assertEqual(
+            names,
+            [
+                "crop",
+                "layout_parsing",
+                "web_search",
+                "image_search",
+                "text_search",
+                "perspective_correct",
+                "super_resolution",
+                "sharpen",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

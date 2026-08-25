@@ -1123,3 +1123,22 @@
   `checkpoint-N/{adapter,optimizer,rollouts,state}`，最终再发布 output adapter/optimizer/state。
 - 固定为物理 GPU1、4 rollouts、temperature 0.7、top-p 1.0、max-new-tokens 256、lr 1e-6、目标 step5；
   CPU 测试 18/18 通过。配置见 `official_grpo_online_step5_v1.json`；无网络/API/GPU5。
+
+### 2026-08-25：官方 SFT 多工具契约与本地 crop 像素闭环
+
+- 复核发现 vendored inference `prompts.py/get_tools_definition()` 与官方发布 SFT 数据的实际 system/tools
+  参数兼容但描述文字并非逐字相同。模型训练分布应以冻结的官方 SFT revision
+  `2c1c460...` 为准；因此从 960-safe 中唯一的 system/tools 非覆盖发布
+  `contracts/official_sft_tool_contract.json`，运行时不再把较新的 vendor 文案误称为 SFT 精确契约。
+- 数据盘交叉检查得到 `prompt_exact=true`、`tools_exact=true`。完整模型可见工具按官方 SFT 顺序为
+  `crop/layout_parsing/web_search/image_search/text_search/perspective_correct/super_resolution/sharpen`；旧双搜索
+  协议继续只取该契约中的两个搜索 schema，不改变已完成实验的执行语义。
+- 新增 per-trajectory 内存图片注册表和 `OfficialLocalMultimodalProvider`：`crop` 严格校验官方五个参数、
+  拒绝越界/额外参数/未知句柄，真实裁剪后注册 `img_2`；live `image_search(url=img_2)` 接收裁剪后的 PIL
+  像素并隐藏 entity ID、similarity、路径和异常细节，不调用 COS 或网络。
+- rollout 新协议使用官方 SFT system prompt 和完整八工具 schema；crop observation 同时注入真实图片与
+  脱敏的新句柄文本。CPU 模拟轨迹已验证 `img_1 -> crop -> img_2 -> live image_search(img_2)`，检索后端
+  实收尺寸为 `30x20`，不是旧 `img_1` cache。当前仅 crop/search 有真实实现；其余已声明工具返回稳定
+  脱敏错误，尚不宣称 layout/enhancement 可用。
+- 全部 CPU 测试 77/77 通过，无 GPU、网络、API 或数据覆盖。下一步单独构建小型 crop 行为 probe，并在
+  物理 GPU1 对 SFT-50 做 rollout-only；不启动 optimizer，也不恢复 GPU5。
