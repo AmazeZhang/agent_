@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import unittest
+from subprocess import CompletedProcess
+from unittest.mock import patch
 
 from PIL import Image
 
 from local_retrieval import (
     LocalImageRegistry,
     OfficialLocalMultimodalProvider,
-    official_tool_schemas,
     official_system_prompt,
+    official_tool_schemas,
 )
 
 
@@ -76,7 +78,9 @@ class OfficialMultimodalProviderTests(unittest.TestCase):
             {"image": "img_1", "x": True, "y": 0, "width": 10, "height": 10},
         ]
         for arguments in invalid:
-            with self.subTest(arguments=arguments), self.assertRaises(ValueError):
+            with self.subTest(arguments=arguments), self.assertRaises(
+                (TypeError, ValueError)
+            ):
                 provider.call("crop", arguments)
 
     def test_safe_call_hides_backend_details(self) -> None:
@@ -90,6 +94,46 @@ class OfficialMultimodalProviderTests(unittest.TestCase):
             "Tool execution error:\nimage_search failed in the current environment.",
         )
         self.assertNotIn("secret", result.observation)
+
+    def test_layout_parsing_uses_registered_image_without_path_exposure(self) -> None:
+        _registry, _seen, provider = self.provider()
+        completed = CompletedProcess(
+            args=["tesseract"],
+            returncode=0,
+            stdout=b"THE STATION, WORCESTER, MASS.\n",
+            stderr=b"",
+        )
+        with patch(
+            "local_retrieval.official_multimodal_provider.subprocess.run",
+            return_value=completed,
+        ) as run:
+            result = provider.call(
+                "layout_parsing",
+                {
+                    "image": "img_1",
+                    "use_chart_recognition": False,
+                    "use_doc_orientation_classify": False,
+                },
+            )
+        self.assertEqual(
+            result.observation,
+            "Layout parsing result:\nTHE STATION, WORCESTER, MASS.",
+        )
+        self.assertEqual(run.call_args.kwargs["timeout"], 15)
+        self.assertEqual(run.call_args.args[0][:3], ["tesseract", "stdin", "stdout"])
+        self.assertTrue(run.call_args.kwargs["input"].startswith(b"\x89PNG"))
+
+    def test_layout_parsing_rejects_paths_and_unsupported_modes(self) -> None:
+        _registry, _seen, provider = self.provider()
+        invalid = [
+            {"file_path": "/secret/image.png"},
+            {"image": "img_1", "use_chart_recognition": True},
+            {"image": "img_1", "use_doc_orientation_classify": True},
+            {"image": "img_1", "unknown": False},
+        ]
+        for arguments in invalid:
+            with self.subTest(arguments=arguments), self.assertRaises(ValueError):
+                provider.call("layout_parsing", arguments)
 
 
 if __name__ == "__main__":

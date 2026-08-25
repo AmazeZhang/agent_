@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import io
+import subprocess
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Callable, Mapping, Sequence
 
 from PIL import Image
 
@@ -41,7 +43,10 @@ class LocalImageRegistry:
 
 
 class OfficialLocalMultimodalProvider:
-    """Execute crop and live image search behind the official model-facing API."""
+    """Execute bounded local tools behind the official model-facing API."""
+
+    _OCR_TIMEOUT_SECONDS = 15
+    _OCR_MAX_CHARACTERS = 8_000
 
     def __init__(self, registry: LocalImageRegistry, visual_lookup: VisualLookup):
         self.registry = registry
@@ -51,7 +56,7 @@ class OfficialLocalMultimodalProvider:
     def _exact_integer(arguments: Mapping[str, object], name: str) -> int:
         value = arguments.get(name)
         if isinstance(value, bool) or not isinstance(value, int):
-            raise ValueError(f"crop {name} must be an integer")
+            raise TypeError(f"crop {name} must be an integer")
         return value
 
     def crop(self, arguments: Mapping[str, object]) -> MultimodalToolResult:
@@ -84,17 +89,63 @@ class OfficialLocalMultimodalProvider:
         results = self.visual_lookup(image, top_k=5)
         return MultimodalToolResult(observation=format_image_results(results))
 
+    def layout_parsing(self, arguments: Mapping[str, object]) -> MultimodalToolResult:
+        allowed = {
+            "image",
+            "file_path",
+            "use_chart_recognition",
+            "use_doc_orientation_classify",
+        }
+        if not set(arguments).issubset(allowed):
+            raise ValueError("layout_parsing received an unsupported argument")
+        if "file_path" in arguments:
+            raise ValueError("local layout_parsing does not accept filesystem paths")
+        if set(arguments).difference(
+            {"image", "use_chart_recognition", "use_doc_orientation_classify"}
+        ):
+            raise ValueError("layout_parsing requires an in-trajectory image reference")
+        handle = arguments.get("image")
+        if not isinstance(handle, str) or not handle.strip():
+            raise ValueError("layout_parsing requires an image reference")
+        for flag in ("use_chart_recognition", "use_doc_orientation_classify"):
+            value = arguments.get(flag, False)
+            if not isinstance(value, bool):
+                raise TypeError(f"layout_parsing {flag} must be a boolean")
+            if value:
+                raise ValueError(f"local layout_parsing does not support {flag}=true")
+
+        image = self.registry.get(handle.strip())
+        encoded = io.BytesIO()
+        image.save(encoded, format="PNG")
+        completed = subprocess.run(
+            ["tesseract", "stdin", "stdout", "-l", "eng", "--psm", "6"],
+            input=encoded.getvalue(),
+            capture_output=True,
+            check=False,
+            timeout=self._OCR_TIMEOUT_SECONDS,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError("local OCR process failed")
+        text = completed.stdout.decode("utf-8", errors="replace").strip()
+        if len(text) > self._OCR_MAX_CHARACTERS:
+            text = text[: self._OCR_MAX_CHARACTERS].rstrip() + "\n[truncated]"
+        if not text:
+            text = "[no text detected]"
+        return MultimodalToolResult(observation=f"Layout parsing result:\n{text}")
+
     def call(self, name: str, arguments: Mapping[str, object]) -> MultimodalToolResult:
         if name == "crop":
             return self.crop(arguments)
         if name == "image_search":
             return self.image_search(arguments)
+        if name == "layout_parsing":
+            return self.layout_parsing(arguments)
         raise ValueError(f"multimodal tool is not implemented locally: {name}")
 
     def safe_call(self, name: str, arguments: Mapping[str, object]) -> MultimodalToolResult:
         try:
             return self.call(name, arguments)
-        except Exception:
+        except Exception:  # noqa: BLE001 - model-facing errors must redact backend details.
             return MultimodalToolResult(
                 observation=f"Tool execution error:\n{name} failed in the current environment."
             )

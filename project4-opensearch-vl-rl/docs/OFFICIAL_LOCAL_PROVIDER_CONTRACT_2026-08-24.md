@@ -85,3 +85,17 @@ dead/status 0 后关闭。该门只授权单独实现并审查的 1-step RL smok
 `b687be7d4ed8d911e9eae363ecfda5313774283f25adaed0a8274c98d31c3698`；optimizer/trainer state 已保存。
 Run `exit_code=0`，GPU1 cleanup 后 18 MiB、无 compute process，GPU0/GPU5 未参与，无网络/API，精确
 tmux dead/status 0 后关闭。下一阶段必须每步生成新 rollout，不允许重复多 epoch 消费同一 report。
+
+## 2026-08-25 多模态句柄扩展
+
+- 模型可见 system prompt 和八工具 schema 已冻结为官方 960-safe SFT 的逐字契约；隐藏执行层新增
+  per-trajectory `img_N` registry。`crop` 只接受官方五参数并产生真实 PIL crop/新句柄，
+  `image_search(img_N)` 对相应像素做 live 本地视觉检索。
+- `layout_parsing` 现有一个诚实收窄的 CPU provider：只接受 registry 内的 `image=img_N`，通过 stdin 调用
+  本机 Tesseract 4.1.1 `eng`，15 秒超时、输出上限 8000 字符。不接受 `file_path`，也不宣称支持
+  chart recognition、orientation classify、段落/标题结构恢复；请求这些能力时稳定失败并隐藏内部细节。
+- 该 OCR provider 不下载权重、不联网、不用 GPU。row71 实际模型 crop `200x50` 的 CPU smoke 返回 `bee`：
+  这证明执行链真实可用，同时说明模型所选 bbox 和传统 OCR 质量仍不足，不能把“工具成功执行”等同于
+  “文本正确识别”。
+- `perspective_correct/super_resolution/sharpen` 仍只有官方 schema 和受控失败，不宣称已实现。后续若加入，
+  必须保持同一句柄注册与图像回传机制，且分别验证像素确实改变。

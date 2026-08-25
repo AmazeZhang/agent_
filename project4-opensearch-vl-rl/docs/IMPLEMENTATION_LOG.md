@@ -1253,3 +1253,17 @@
 - 当前最小结论：官方同名/同参多工具 prompt 已对齐，crop 是真实可运行本地工具；layout 等其余图像工具
   仍是显式声明但受控失败的 provider。下一步应先补齐或明确收窄图像 provider，再决定少量 balanced SFT
   或进入包含这些动作的 RL，不能把这次 `1/3` 写成完整多工具复现。
+
+### 2026-08-25：layout_parsing 接入离线 OCR provider
+
+- 本机已有 Tesseract 4.1.1 `eng/osd`，因此不下载额外权重、不联网、不启动 GPU，先把官方同名
+  `layout_parsing` 收窄为英文 OCR provider，而不冒充上游 Layout Parsing API。
+- provider 只读 per-trajectory `img_N` registry，并通过 PNG stdin 调用 Tesseract；拒绝任意 `file_path`、
+  未注册句柄、未知参数、chart recognition 和 orientation classify，设置 15 秒超时与 8000 字符上限。
+  backend 异常仍转换为稳定脱敏工具错误。
+- 90/90 CPU 单元测试和 Ruff 检查通过。用 row71 刚才模型生成的 `crop(img_1, 0,0,200,50)` 做真实 smoke，
+  成功得到 `Layout parsing result`，OCR 文本仅为 `bee`；执行链成立，但 bbox/OCR 内容质量不成立，此结果
+  不作为识别正确率证据。
+- 现在真实可运行的模型可见图像工具为 `crop/layout_parsing/image_search`；其中 layout 是明确受限的英文
+  OCR。`perspective_correct/super_resolution/sharpen` 仍返回受控失败，下一步不应在 RL reward 中假定它们
+  已可用。
