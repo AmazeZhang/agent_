@@ -1389,3 +1389,23 @@
 - 冻结配置 `official_final8b_matched_v10_phasea_v1.json` 只跑 train task `wit-00000885`、greedy、8 turns、
   256 tokens、无 optimizer/API；完成后用 `evidence-fidelity-v2` 离线 replay reward。CPU 回归 evaluator
   13/13、crop probe 5/5 通过。该单条结果只决定是否值得进入小批 stochastic rollout，不直接授权 RL。
+
+### 2026-08-25：官方最终策略同源 v10 单条 rollout 与 reward 修正
+
+- Run `official-final8b-v10-phasea-wit885-20260825` 在同源 `wit-00000885` 正确首调
+  `image_search(url=img_1)`，得到含 gold `«Mary Rose»` 的3个冻结候选；第2轮 `text_search` 已返回精确 gold
+  首句及两个 positive clues。之后模型把挪威语 `invasjonsflåte` 误解为与 nurse/WWII 有关，连续改写 query，
+  在 manifest 的8轮上限以 `maximum-turns-exceeded` 结束，没有 final response。
+- 原始 evaluation SHA256 `54450fdb...0f16`；exit0，仅物理GPU1，约18.4 GiB/64°C，cleanup 后18 MiB、
+  无 compute process，GPU0/GPU5未参与，精确tmux已关闭。这说明同源环境确实给到了正确证据，但官方最终
+  策略并不天然适应人工 clue-selection QVA 和8轮边界；不能据此进入 optimizer。
+- 诊断发现 `evidence-fidelity-v2` 的 gold-observation 检测仅识别旧 `text_lookup(entity_id)`，漏掉官方
+  `text_search(q)`。修复后仍要求 gold evidence 逐词出现在实际 observation；text_lookup还继续要求目标
+  entity_id，text_search不依赖被隐藏的本地ID。新增回归后 reward 测试7/7、group audit测试4/4通过。
+- 同一冻结轨迹重放由错误的 `evidence_path_valid=false/r_query=0` 修正为
+  `true/0.5`；由于没有有效 final，`r_format=0`，总 reward 仍为0。修正报告 SHA256
+  `4a836828...14b27`。
+- 对此前Phase B四组×四条完整重算：gate仍为 variable groups `3/4`、format `0.8125`、fatal `0.1875`，
+  逐条 group-centered advantages 与原报告一致。原因是受影响的两个组内每条 reward 都统一增加0.2，中心化
+  后抵消；因此已执行的1-step GRPO梯度不受本次修正影响。但历史报告对 query reward 的绝对值/计数偏低，
+  后续引用必须使用修正口径。

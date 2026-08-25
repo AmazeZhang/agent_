@@ -57,13 +57,16 @@ def _observation_has_gold_evidence(
     expected = " ".join(_tokens(gold_evidence))
     for turn in result["turns"]:
         call = turn.get("tool_call")
-        if (
-            call
-            and call.get("name") == "text_lookup"
-            and str(call.get("arguments", {}).get("entity_id")) == target_entity
-            and expected
-            and expected in " ".join(_tokens(str(turn.get("observation", ""))))
-        ):
+        if not call or not expected:
+            continue
+        observation = " ".join(_tokens(str(turn.get("observation", ""))))
+        if expected not in observation:
+            continue
+        if call.get("name") == "text_search":
+            return True
+        if call.get("name") == "text_lookup" and str(
+            call.get("arguments", {}).get("entity_id")
+        ) == target_entity:
             return True
     return False
 

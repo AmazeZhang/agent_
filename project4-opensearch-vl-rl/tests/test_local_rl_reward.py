@@ -135,6 +135,53 @@ class LocalRlRewardTest(unittest.TestCase):
         self.assertFalse(reward["evidence_path_valid"])
         self.assertEqual(reward["r_query"], 0.0)
 
+    def test_official_text_search_observation_can_satisfy_evidence_path(self) -> None:
+        task = {
+            "task_id": "official-search",
+            "task_type": "dual-clue-rank3",
+            "gold_entity_id": "q3",
+            "gold_title": "Target",
+            "gold_evidence_sentence": "Gold evidence appears in this passage.",
+            "oracle_steps": ["image_search", "text_search", "final"],
+            "retrieval_results": [],
+        }
+        result = {
+            "task_id": "official-search",
+            "task_type": "dual-clue-rank3",
+            "fatal": None,
+            "final": "<response>Title: Wrong\nEvidence: Wrong.</response>",
+            "score": {
+                "format_valid": True,
+                "title_exact": False,
+                "evidence_exact": False,
+                "full_success": False,
+            },
+            "turns": [
+                {
+                    "tool_call": {
+                        "name": "image_search",
+                        "arguments": {"url": "img_1"},
+                    },
+                    "observation": "candidates",
+                },
+                {
+                    "tool_call": {
+                        "name": "text_search",
+                        "arguments": {"q": "target clues"},
+                    },
+                    "observation": (
+                        "Tool execution result:\nTitle: Target\n"
+                        "Summary: Gold evidence appears in this passage."
+                    ),
+                },
+                {},
+            ],
+        }
+        reward = score_evidence_fidelity_trajectory(result, task)
+        self.assertTrue(reward["evidence_path_valid"])
+        self.assertEqual(reward["r_query"], 1.0)
+        self.assertAlmostEqual(reward["reward"], 0.2)
+
     def test_no_match_after_retry_requires_exact_oracle_tools(self) -> None:
         task = {
             "task_id": "no-retry",
