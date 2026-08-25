@@ -14,11 +14,10 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from local_retrieval import LocalImageSearchBackend, LocalTextIndex  # noqa: E402
-from local_retrieval.resnet50_encoder import sha256_file  # noqa: E402
-from scripts.evaluate_local_agent import (  # noqa: E402
+from local_retrieval import LocalImageSearchBackend, LocalTextIndex
+from local_retrieval.resnet50_encoder import sha256_file
+from scripts.evaluate_local_agent import (
     MODEL_ROOT,
-    RUN_ROOT,
     evaluate_task,
     require_managed_run,
     validate_adapter,
@@ -43,6 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--maximum-turns", type=int, default=3)
+    parser.add_argument("--probe-rows", type=int, nargs="+", default=list(PROBE_ROWS))
     return parser.parse_args()
 
 
@@ -59,13 +59,30 @@ def first_tool_call(row: dict[str, Any]) -> dict[str, Any]:
     return call
 
 
-def load_probe_rows() -> list[tuple[int, dict[str, Any], dict[str, Any]]]:
+def validate_probe_budget(
+    max_new_tokens: int, maximum_turns: int, probe_rows: list[int]
+) -> tuple[int, ...]:
+    if not 64 <= max_new_tokens <= 1024:
+        raise ValueError("crop probe max_new_tokens must be between 64 and 1024")
+    if not 2 <= maximum_turns <= 20:
+        raise ValueError("crop probe maximum_turns must be between 2 and 20")
+    selected = tuple(probe_rows)
+    if not selected or len(selected) != len(set(selected)):
+        raise ValueError("crop probe rows must be non-empty and unique")
+    if not set(selected).issubset(PROBE_ROWS):
+        raise ValueError("crop probe rows must come from the frozen valid-bbox set")
+    return selected
+
+
+def load_probe_rows(
+    probe_rows: tuple[int, ...] = PROBE_ROWS,
+) -> list[tuple[int, dict[str, Any], dict[str, Any]]]:
     if sha256_file(SFT_JSON) != SFT_SHA256:
         raise ValueError("official SFT probe data no longer matches its frozen hash")
     with SFT_JSON.open(encoding="utf-8") as handle:
         rows = json.load(handle)
     selected = []
-    for index in PROBE_ROWS:
+    for index in probe_rows:
         row = rows[index]
         call = first_tool_call(row)
         image_path = (SFT_ROOT / row["images"][0]).resolve(strict=True)
@@ -104,6 +121,8 @@ def summarize_probe(result: dict[str, Any], expected: dict[str, Any]) -> dict[st
         "crop_succeeded": crop_succeeded,
         "followup_uses_img2": uses_img2,
         "live_image_search_img2": live_img2_search,
+        "turn_count": len(turns),
+        "terminated_with_response": result["fatal"] is None,
         "fatal": result["fatal"],
     }
 
@@ -114,8 +133,9 @@ def main() -> int:
     from transformers import AutoModelForImageTextToText, AutoProcessor
 
     args = parse_args()
-    if not 64 <= args.max_new_tokens <= 256 or not 2 <= args.maximum_turns <= 4:
-        raise ValueError("crop probe is bounded to 64..256 tokens and 2..4 turns")
+    probe_rows = validate_probe_budget(
+        args.max_new_tokens, args.maximum_turns, args.probe_rows
+    )
     run_dir, physical_gpu = require_managed_run(dict(os.environ))
     adapter = validate_adapter(args.adapter)
     if adapter is None:
@@ -123,7 +143,7 @@ def main() -> int:
     output = args.output.resolve()
     if output != (run_dir / "crop_rollout_probe.json").resolve() or output.exists():
         raise ValueError("output must be the absent managed crop_rollout_probe.json")
-    selected = load_probe_rows()
+    selected = load_probe_rows(probe_rows)
     with PILOT_MANIFEST.open(encoding="utf-8") as handle:
         pilot = json.load(handle)
     visual = LocalImageSearchBackend(
@@ -189,7 +209,7 @@ def main() -> int:
         "adapter": str(adapter),
         "adapter_sha256": sha256_file(adapter / "adapter_model.safetensors"),
         "official_sft_sha256": SFT_SHA256,
-        "probe_rows": list(PROBE_ROWS),
+        "probe_rows": list(probe_rows),
         "tool_protocol": "official-local-multimodal-v1",
         "system_and_tools_source": "contracts/official_sft_tool_contract.json",
         "image_search_backend": "live-local-resnet50-v1-cpu",

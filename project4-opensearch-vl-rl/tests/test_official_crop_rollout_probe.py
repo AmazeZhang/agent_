@@ -14,6 +14,22 @@ SPEC.loader.exec_module(MODULE)
 
 
 class OfficialCropRolloutProbeTests(unittest.TestCase):
+    def test_relaxed_budget_accepts_official_scale_single_row(self) -> None:
+        self.assertEqual(MODULE.validate_probe_budget(1024, 20, [71]), (71,))
+
+    def test_relaxed_budget_rejects_unknown_duplicate_or_excessive_rows(self) -> None:
+        invalid = [
+            (2048, 20, [71]),
+            (1024, 21, [71]),
+            (1024, 20, [71, 71]),
+            (1024, 20, [72]),
+        ]
+        for max_tokens, turns, rows in invalid:
+            with self.subTest(
+                max_tokens=max_tokens, turns=turns, rows=rows
+            ), self.assertRaises(ValueError):
+                MODULE.validate_probe_budget(max_tokens, turns, rows)
+
     def test_summary_requires_real_img2_search(self) -> None:
         expected = {
             "name": "crop",
@@ -40,6 +56,8 @@ class OfficialCropRolloutProbeTests(unittest.TestCase):
         self.assertTrue(summary["crop_succeeded"])
         self.assertTrue(summary["followup_uses_img2"])
         self.assertTrue(summary["live_image_search_img2"])
+        self.assertEqual(summary["turn_count"], 2)
+        self.assertTrue(summary["terminated_with_response"])
 
     def test_summary_does_not_treat_img1_cache_as_crop_chain(self) -> None:
         expected = {"name": "crop", "arguments": {}}
