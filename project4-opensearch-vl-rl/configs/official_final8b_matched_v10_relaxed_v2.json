@@ -1,0 +1,27 @@
+{
+  "dataset": {
+    "manifest_sha256": "70142a78d31efcd97a041d7b11eb3d727ed964667c22d3941598d889ca01546c",
+    "root": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/datasets/processed/wit-rl-official-provider-v10",
+    "tasks_sha256": "2ccdb0ef507ebbd20dfba54c199a724ab9056a868856d9291dd65949325cce55"
+  },
+  "generation": {
+    "do_sample": false,
+    "max_new_tokens": 1024,
+    "maximum_turns": 20
+  },
+  "gpu_policy": {
+    "physical_gpu": 1,
+    "forbidden": [0, 5]
+  },
+  "model": {
+    "adapter": null,
+    "local_root": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/models/OpenSearch-VL-8B-official",
+    "revision": "8711cdd1f913563f4b1226c379668effeffbd82a"
+  },
+  "optimizer": false,
+  "reward_replay": "evidence-fidelity-v2",
+  "split": "train",
+  "task_ids": ["wit-00000885"],
+  "tool_observation_schema": "official-provider-v1",
+  "tool_protocol": "official-local-v1"
+}

@@ -108,7 +108,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--adapter", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-new-tokens", type=int, default=192)
+    parser.add_argument("--maximum-turns", type=int)
     return parser.parse_args()
+
+
+def validate_generation_budget(
+    max_new_tokens: int, maximum_turns: int
+) -> tuple[int, int]:
+    if not 32 <= max_new_tokens <= 1024:
+        raise ValueError("max_new_tokens must be between 32 and 1024")
+    if not 2 <= maximum_turns <= 20:
+        raise ValueError("maximum_turns must be between 2 and 20")
+    return max_new_tokens, maximum_turns
 
 
 def strip_official_think_prefix(text: str) -> str:
@@ -638,8 +649,6 @@ def main() -> int:
     import torch
 
     args = parse_args()
-    if not 32 <= args.max_new_tokens <= 256:
-        raise ValueError("max_new_tokens must be between 32 and 256")
     run_dir, physical_gpu = require_managed_run(dict(os.environ))
     model_root = validate_model_root(args.model_root)
     adapter = validate_adapter(args.adapter)
@@ -656,6 +665,12 @@ def main() -> int:
     )
     runtime_observation_format = observation_schema(dataset_manifest)
     runtime_protocol = protocol_version(dataset_manifest)
+    runtime_maximum_turns = (
+        int(dataset_manifest["maximum_agent_turns"])
+        if args.maximum_turns is None
+        else args.maximum_turns
+    )
+    validate_generation_budget(args.max_new_tokens, runtime_maximum_turns)
     if runtime_protocol == "official-local-v1" and runtime_observation_format != "official-provider-v1":
         raise ValueError(
             "official-local-v1 evaluation requires official-provider-v1 observations"
@@ -688,7 +703,7 @@ def main() -> int:
                 max_new_tokens=args.max_new_tokens,
                 dataset_root=dataset_root,
                 observation_format=runtime_observation_format,
-                maximum_turns=int(dataset_manifest["maximum_agent_turns"]),
+                maximum_turns=runtime_maximum_turns,
                 tool_protocol=runtime_protocol,
             )
             results.append(result)
@@ -729,7 +744,11 @@ def main() -> int:
         "split": args.split,
         "task_count": len(results),
         "task_ids": [result["task_id"] for result in results],
-        "generation": {"do_sample": False, "max_new_tokens": args.max_new_tokens},
+        "generation": {
+            "do_sample": False,
+            "max_new_tokens": args.max_new_tokens,
+            "maximum_turns": runtime_maximum_turns,
+        },
         "image_search_backend": "frozen-verified-cache",
         "physical_gpu": physical_gpu,
         "metrics": metrics,

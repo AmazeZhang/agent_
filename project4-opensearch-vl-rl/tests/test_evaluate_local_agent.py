@@ -14,6 +14,14 @@ SPEC.loader.exec_module(MODULE)
 
 
 class EvaluateLocalAgentTest(unittest.TestCase):
+    def test_relaxed_generation_budget_is_bounded(self) -> None:
+        self.assertEqual(MODULE.validate_generation_budget(1024, 20), (1024, 20))
+        for tokens, turns in ((31, 20), (1025, 20), (256, 1), (256, 21)):
+            with self.subTest(tokens=tokens, turns=turns), self.assertRaises(
+                ValueError
+            ):
+                MODULE.validate_generation_budget(tokens, turns)
+
     def test_cli_accepts_an_explicit_full_model_root(self) -> None:
         with mock.patch(
             "sys.argv",
