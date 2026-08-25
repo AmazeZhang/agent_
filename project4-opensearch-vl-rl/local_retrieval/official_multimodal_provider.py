@@ -81,7 +81,7 @@ class OfficialLocalMultimodalProvider:
             raise ValueError("image_search accepts exactly the official 'url' argument")
         handle = str(arguments.get("url", "")).strip()
         image = self.registry.get(handle)
-        results = self.visual_lookup(image, 5)
+        results = self.visual_lookup(image, top_k=5)
         return MultimodalToolResult(observation=format_image_results(results))
 
     def call(self, name: str, arguments: Mapping[str, object]) -> MultimodalToolResult:

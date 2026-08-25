@@ -1,0 +1,17 @@
+{
+  "adapter": "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/runs/official-sft-wiki-en-safe960-v4-step50-20260825/output",
+  "generation": {
+    "do_sample": false,
+    "max_new_tokens": 256,
+    "maximum_turns": 3
+  },
+  "gpu_policy": {
+    "physical_gpu": 1,
+    "forbidden": [0, 5]
+  },
+  "image_search_backend": "live-local-resnet50-v1-cpu",
+  "optimizer": false,
+  "probe_rows": [15, 71, 90],
+  "source_dataset_sha256": "571c9c59a02309e8962d10ac0a0fdb14d86aa2c54cd8c9f86f4cfcbfa8e964a5",
+  "tool_protocol": "official-local-multimodal-v1"
+}

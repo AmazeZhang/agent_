@@ -1142,3 +1142,16 @@
   脱敏错误，尚不宣称 layout/enhancement 可用。
 - 全部 CPU 测试 77/77 通过，无 GPU、网络、API 或数据覆盖。下一步单独构建小型 crop 行为 probe，并在
   物理 GPU1 对 SFT-50 做 rollout-only；不启动 optimizer，也不恢复 GPU5。
+
+### 2026-08-25：冻结官方首动作 crop 的 SFT-50 rollout probe
+
+- 官方 960-safe 中有 39 条轨迹首动作是 `crop`；其中按本地 300px 图像尺寸检查，11 条首个 bbox 完全
+  位于图片内。首个 probe 固定选择 row `15/71/90`，分别覆盖水塔文字、底部位置文字和路线标记；用户问题
+  保持官方原文，只移除已由结构化 image content 表达的开头 `<image>` 占位符，不把专家坐标泄漏进问题。
+- probe 使用精确官方 SFT system/tools、SFT-50 adapter、greedy、每题最多 3 turn。`crop` 后产生真实视觉
+  observation；若调用 `image_search(url=img_2)`，由 CPU ResNet50 对裁剪像素实时编码并查询固定 WIT
+  visual index，不读取旧 task top-3 cache。该检索库与官方 SFT 问题实体不匹配，因此只评工具行为，绝不
+  把返回实体或最终答案当准确率。
+- CPU 预检：冻结 SFT/data hash 与三条首动作均通过；row15 专家 bbox 实际得到 `200x120` 图，live 后端
+  返回非空 Visual Match。完整测试 79/79 通过。配置冻结于 `official_crop_rollout_probe_v1.json`；下一步
+  新 Run ID、命名 tmux、仅物理 GPU1，无 optimizer/网络/API/GPU5。
