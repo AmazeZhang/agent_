@@ -100,6 +100,7 @@ def tools_for_protocol(tool_protocol: str) -> list[dict[str, Any]]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--model-root", type=Path, default=MODEL_ROOT)
     parser.add_argument("--dataset-root", type=Path, default=DATASET_ROOT)
     parser.add_argument("--split", choices=("train", "dev", "test"), default="dev")
     parser.add_argument("--max-tasks", type=int, default=5)
@@ -190,6 +191,31 @@ def validate_dataset_root(raw_root: Path) -> Path:
     allowed = (PROJECT_DATA / "datasets/processed").resolve()
     if not root.is_relative_to(allowed) or not root.is_dir():
         raise ValueError("dataset root must be an existing project4 processed dataset")
+    return root
+
+
+def validate_model_root(raw_root: Path) -> Path:
+    """Accept only a complete model snapshot below the project model root."""
+
+    root = raw_root.resolve()
+    allowed = (PROJECT_DATA / "models").resolve()
+    if not root.is_relative_to(allowed) or not root.is_dir():
+        raise ValueError("model root must be an existing project4 local model")
+    config_path = root / "config.json"
+    index_path = root / "model.safetensors.index.json"
+    if not config_path.is_file() or not index_path.is_file():
+        raise FileNotFoundError("local model requires config and safetensors index")
+    with index_path.open(encoding="utf-8") as handle:
+        index = json.load(handle)
+    weight_map = index.get("weight_map")
+    if not isinstance(weight_map, dict) or not weight_map:
+        raise ValueError("model index has no weight map")
+    shards = sorted(set(weight_map.values()))
+    if not all(isinstance(name, str) and Path(name).name == name for name in shards):
+        raise ValueError("model index contains an unsafe shard name")
+    missing = [name for name in shards if not (root / name).is_file()]
+    if missing:
+        raise FileNotFoundError(f"local model is missing {len(missing)} weight shard(s)")
     return root
 
 
@@ -615,7 +641,10 @@ def main() -> int:
     if not 32 <= args.max_new_tokens <= 256:
         raise ValueError("max_new_tokens must be between 32 and 256")
     run_dir, physical_gpu = require_managed_run(dict(os.environ))
+    model_root = validate_model_root(args.model_root)
     adapter = validate_adapter(args.adapter)
+    if adapter is not None and model_root != MODEL_ROOT.resolve():
+        raise ValueError("managed LoRA adapters require the frozen Qwen3-VL base model")
     output = args.output.resolve()
     if output != (run_dir / "evaluation.json").resolve():
         raise ValueError("evaluation output must be the managed Run evaluation.json")
@@ -632,10 +661,10 @@ def main() -> int:
             "official-local-v1 evaluation requires official-provider-v1 observations"
         )
     processor = AutoProcessor.from_pretrained(
-        MODEL_ROOT, local_files_only=True, trust_remote_code=False
+        model_root, local_files_only=True, trust_remote_code=False
     )
     base = AutoModelForImageTextToText.from_pretrained(
-        MODEL_ROOT,
+        model_root,
         dtype=torch.bfloat16,
         attn_implementation="flash_attention_2",
         device_map="cuda:0",
@@ -686,7 +715,8 @@ def main() -> int:
     }
     report = {
         "schema_version": 1,
-        "model": "base" if adapter is None else "lora-adapter",
+        "model": str(model_root),
+        "policy_kind": "local-full-model" if adapter is None else "local-base-plus-lora",
         "adapter": str(adapter) if adapter else None,
         "adapter_sha256": (
             sha256_file(adapter / "adapter_model.safetensors") if adapter else None

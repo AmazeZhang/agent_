@@ -21,6 +21,7 @@ from scripts.evaluate_local_agent import (
     evaluate_task,
     require_managed_run,
     validate_adapter,
+    validate_model_root,
 )
 
 PROJECT_DATA = Path("/media/imc/data/yzy/agent/project4-opensearch-vl-rl")
@@ -45,30 +46,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--maximum-turns", type=int, default=3)
     parser.add_argument("--probe-rows", type=int, nargs="+", default=list(PROBE_ROWS))
     return parser.parse_args()
-
-
-def validate_model_root(raw_root: Path) -> Path:
-    """Accept only a complete local project4 model directory."""
-
-    root = raw_root.resolve()
-    allowed = (PROJECT_DATA / "models").resolve()
-    if not root.is_relative_to(allowed) or not root.is_dir():
-        raise ValueError("model root must be an existing project4 local model")
-    for filename in ("config.json", "model.safetensors.index.json"):
-        if not (root / filename).is_file():
-            raise FileNotFoundError(f"local model is incomplete: {filename} is missing")
-    with (root / "model.safetensors.index.json").open(encoding="utf-8") as handle:
-        index = json.load(handle)
-    weight_map = index.get("weight_map")
-    if not isinstance(weight_map, dict) or not weight_map:
-        raise ValueError("model index has no weight map")
-    shards = sorted(set(weight_map.values()))
-    if not all(isinstance(name, str) and Path(name).name == name for name in shards):
-        raise ValueError("model index contains an unsafe shard name")
-    missing = [name for name in shards if not (root / name).is_file()]
-    if missing:
-        raise FileNotFoundError(f"local model is missing {len(missing)} weight shard(s)")
-    return root
 
 
 def policy_kind(adapter: Path | None) -> str:

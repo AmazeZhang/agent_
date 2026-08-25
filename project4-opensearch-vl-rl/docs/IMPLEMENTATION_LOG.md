@@ -1376,3 +1376,16 @@
   参与，精确tmux已关闭。进入任何 RL optimizer 前，下一关键步骤不是再调 turn，而是让 rollout 问题、图片、
   visual index、Wiki text index和可验证答案来自同一个冻结数据构建；随后用官方最终策略在该匹配环境做小批
   rollout，确认 reward 非零且方向正确。
+
+### 2026-08-25：冻结官方最终策略的同源 v10 Phase A
+
+- 选择既有 `wit-rl-official-provider-v10`，不新造问题或答案：120条 QVA/图片与其 frozen visual candidates、
+  Wiki text index、gold title/evidence 和 reward contract 同源；tasks SHA256
+  `2ccdb0ef...ce55`，manifest SHA256 `70142a78...546c`。模型仍只看到官方同名 `image_search(url)` 与
+  `text_search(q)`，不暴露 SQLite、entity ID 或本地 provider。
+- evaluator 新增显式 `--model-root`，完整模型与 base+LoRA 共用同一任务执行/评分路径；模型目录必须位于
+  project4 models 下，且 config、index及全部 index shard存在。LoRA仍只允许挂在冻结 Qwen3-VL base，
+  防止把本地 adapter误挂到官方最终权重。crop probe改为复用同一验证函数，没有改变已有轨迹语义。
+- 冻结配置 `official_final8b_matched_v10_phasea_v1.json` 只跑 train task `wit-00000885`、greedy、8 turns、
+  256 tokens、无 optimizer/API；完成后用 `evidence-fidelity-v2` 离线 replay reward。CPU 回归 evaluator
+  13/13、crop probe 5/5 通过。该单条结果只决定是否值得进入小批 stochastic rollout，不直接授权 RL。

@@ -14,6 +14,21 @@ SPEC.loader.exec_module(MODULE)
 
 
 class EvaluateLocalAgentTest(unittest.TestCase):
+    def test_cli_accepts_an_explicit_full_model_root(self) -> None:
+        with mock.patch(
+            "sys.argv",
+            [
+                "evaluate_local_agent.py",
+                "--model-root",
+                "/tmp/official-model",
+                "--output",
+                "x",
+            ],
+        ):
+            self.assertEqual(
+                MODULE.parse_args().model_root, Path("/tmp/official-model")
+            )
+
     def test_train_split_is_available_for_pre_rl_rollout_only_gate(self) -> None:
         with mock.patch(
             "sys.argv", ["evaluate_local_agent.py", "--split", "train", "--output", "x"]
