@@ -1182,3 +1182,20 @@
   `compute_processes=none`；GPU0/GPU5 未参与，无网络/API，精确 dead/status0 tmux 已关闭。
 - 结论：先从官方 960-safe 抽取工具密集和真实错误恢复轨迹做短程 targeted SFT，再复跑同一 probe；
   不用 RL 从零教授 crop 语法，也不立即扩大双搜索 RL。
+
+### 2026-08-25：官方工具密集 SFT-97 发布与训练入口冻结
+
+- 从官方 960-safe 确定性选取所有调用 `crop/layout_parsing/super_resolution/sharpen` 的记录，并 union 所有
+  observation 精确包含 `Tool execution error:` 的真实恢复记录，得到 97 条/185 张图；无重复、无改写、
+  无自造答案。39 条首动作 crop，7 条真实错误恢复。
+- 工具覆盖：crop `56 rows/68 calls`、layout `70/83`、super-resolution `17/17`、sharpen `3/3`；同时
+  保留这些轨迹中的 image-search `66/68` 与 text-search `90/127`，因此不是孤立语法片段。
+- 数据 SHA256 `65e823e7...df02`，manifest `56e4a067...6b17`，dataset_info
+  `7386ea37...8aae`；目录约 9.2 MiB。完整 97 条 CPU collator 审计通过：mismatch=0、
+  zero-supervision=0、image token min/max `64/245`，报告 SHA256 `b882ab3f...d5d3`。
+- 首次审计两次在参数解析阶段停止：一次因 shell 可见多 GPU，一次因隐藏 GPU 后仍继承 `bf16=true`；均未
+  处理样本或生成报告。审计脚本现固定 `use_cpu=true/bf16=false`，不再依赖调用环境；最终成功报告来自
+  修复后的第三次执行。
+- 新 launcher 从冻结 SFT-50 adapter 继续训练同一 rank-8 LoRA，而不是创建新 adapter；保持 NF4 QLoRA、
+  vision/projector frozen、cutoff5120、batch1，学习率降为 `5e-5`，硬限 1..20 step。先只跑 1-step，
+  数值/adapter 更新通过后再决定是否续到 20 并复跑同一 crop probe。CPU 测试 87/87 通过。

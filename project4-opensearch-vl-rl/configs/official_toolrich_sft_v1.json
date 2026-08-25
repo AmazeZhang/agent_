@@ -1,0 +1,15 @@
+{
+  "alignment_sha256": "b882ab3ff063d8d9fc6fa5949e2722ac823ff2a598bbec1b416e6ef1b72ed5d3",
+  "dataset_manifest_sha256": "56e4a0673ad2323a30d71ccb567dec1ec98a306a297e23e219bd8ef25cea6b17",
+  "dataset_sha256": "65e823e7bbbe070ed1b17fc60573be927e745f8482b9808666357577cd37df02",
+  "gpu_policy": {
+    "physical_gpu": 1,
+    "forbidden": [0, 5]
+  },
+  "initial_max_steps": 1,
+  "maximum_authorized_steps": 20,
+  "method": "NF4 QLoRA continuation",
+  "records": 97,
+  "source_adapter_sha256": "8b7e3e49526da33730868ba4b84dce0a5e3310bb602d480067fc6a4909a57955",
+  "source_adapter_step": 50
+}
