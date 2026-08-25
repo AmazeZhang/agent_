@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,24 @@ from scripts.run_official_toolrich_sft import training_config
 
 
 class OfficialToolrichSftTests(unittest.TestCase):
+    def test_direct_cli_import_reaches_managed_run_guard(self) -> None:
+        project = Path(__file__).parents[1]
+        completed = subprocess.run(
+            [
+                "/media/imc/data/yzy/agent/project4-opensearch-vl-rl/envs/sft-py311/bin/python",
+                str(project / "scripts/run_official_toolrich_sft.py"),
+                "--max-steps",
+                "1",
+            ],
+            cwd=project,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("must run inside scripts/run_managed.sh", completed.stderr)
+        self.assertNotIn("ModuleNotFoundError", completed.stderr)
+
     def test_config_continues_existing_adapter_with_frozen_qlora(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

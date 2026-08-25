@@ -1199,3 +1199,12 @@
 - 新 launcher 从冻结 SFT-50 adapter 继续训练同一 rank-8 LoRA，而不是创建新 adapter；保持 NF4 QLoRA、
   vision/projector frozen、cutoff5120、batch1，学习率降为 `5e-5`，硬限 1..20 step。先只跑 1-step，
   数值/adapter 更新通过后再决定是否续到 20 并复跑同一 crop probe。CPU 测试 87/87 通过。
+
+### 2026-08-25：tool-rich SFT 首次 1-step CLI 导入失败
+
+- Run `official-toolrich97-sft-cont-step1-20260825` 在 launcher import 阶段以 exit1 退出：直接执行
+  `scripts/run_official_toolrich_sft.py` 时缺少项目根目录 `sys.path`，报
+  `ModuleNotFoundError: local_retrieval`。模型、processor 和数据均未加载，GPU1 始终 18 MiB，GPU0/GPU5
+  未参与；失败 Run 保留且不复用。
+- 修复显式加入脚本所属项目根目录，并新增直接 CLI 回归，必须到达 managed-run guard 且不得再出现
+  ModuleNotFoundError。提交测试后才使用新 Run ID 重跑相同 1-step 配置。
