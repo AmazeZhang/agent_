@@ -1321,3 +1321,21 @@
 - 首个冻结配置为 `official_final8b_crop_rollout_probe_v1.json`：官方 revision
   `8711cdd1f913563f4b1226c379668effeffbd82a`、row71、greedy、4 turns、256 tokens、无 optimizer。
   只有该受管 smoke 干净退出，才把同一模型/样本放宽到 20 turns；不会把模型下载完成自动等同于 GPU 晋级。
+
+### 2026-08-25：官方最终 8B 权重下载与完整性验证完成
+
+- 无代理 Xet 续传仅约 `0.33..0.50 MiB/s`。用户明确批准使用 Clash 后，32 MiB 的 7890 单连接探测为
+  `1.93 MiB/s`；切换到 `huggingface.co + HTTP Range + max-workers=4` 后聚合约 `7.3 MiB/s`，所有原有
+  `.incomplete` 均被续用，没有从零重下。
+- 首个 Clash Run 在约 8.5 GB 因代理长连接 `IncompleteRead` 以 exit1 退出；已落盘的分片和失败日志保留。
+  新 Run 降为 max-workers=3 后继续相同 Range，最终 `download_exit=0`。这属于可恢复网络中断，不是模型、
+  磁盘或 CUDA 故障。
+- 官方 revision 固定为 `8711cdd1f913563f4b1226c379668effeffbd82a`。四个分片精确尺寸依次为
+  `4998056552/4915962464/4915962496/2704357976` bytes；SHA256 依次为
+  `b383f8bb...a52a7da`、`b8bcc5fd...9801cf11`、`1dc1e1a4...190684ac`、
+  `be24fd5c...1424b73`，全部匹配下载元数据对象哈希；目录无 `.incomplete`。
+- 在显式 `TRANSFORMERS_OFFLINE=1/HF_HUB_OFFLINE=1`、清空代理、`trust_remote_code=False` 条件下，
+  `AutoConfig`/`AutoProcessor` 成功识别为 `Qwen3VLForConditionalGeneration`/`Qwen3VLProcessor`，index
+  精确引用上述四个 shard。验证和下载 tmux 均已精确结束；本步骤没有加载 GPU。
+- 下一步执行冻结的官方最终策略 row71、greedy、4-turn/256-token rollout-only smoke，只使用物理 GPU1；
+  若加载 OOM、环境接口不兼容或出现 Xid，立即停止，不自动量化、扩卡或进入 RL。
