@@ -67,6 +67,8 @@ def main() -> int:
             "dataset": args.dataset_name,
             "dataset_dir": str(dataset_root),
             "max_samples": None,
+            "use_cpu": True,
+            "bf16": False,
         }
     )
     validate_training_config(config)
