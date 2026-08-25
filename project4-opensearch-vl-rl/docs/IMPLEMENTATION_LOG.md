@@ -1233,3 +1233,23 @@
   session 与 GPU 查询纠正。训练没有中断，磁盘剩余约 1.5 TiB。后续监控以主机侧精确会话为准。
 - 下一步使用 checkpoint-20 对同一三条官方首动作 crop 样本进行 greedy 3-turn 行为复测，与 SFT-50 的
   `first_tool_crop=0/3` 基线直接比较；该 probe 仍不宣称答案准确率。
+
+### 2026-08-25：tool-rich SFT-20 crop 行为复测
+
+- Run `official-toolrich97-sft20-crop-probe-20260825` 使用 checkpoint-20，在与 SFT-50 基线完全相同的
+  官方 row15/71/90、greedy、maximum-turns=3 条件下复测。结果从基线 `first_tool_crop=0/3` 提升到
+  `1/3`；report SHA256 `2073cfba...637c`，adapter SHA 与训练产物一致为 `fbc9dd59...c461`。
+- row71 产生真实多轮路径 `crop(img_1) -> layout_parsing(img_2) -> text_search`：crop 成功注册并把结构化
+  `img_2` 回传模型，模型下一轮确实引用 `img_2`；layout provider 返回稳定的受控工具失败后，模型没有
+  终止或输出非法格式，而是改用本地 Wiki text-search。它证明 crop 接口、图像回传和错误恢复行为已被
+  实际触发，不只是 schema 可见。
+- row71 的 crop 坐标与官方专家不完全相同，因此 `first_call_exact_official_expert=false`；后续没有调用
+  `image_search(img_2)`，故 `live_image_search_img2=0/3`。row15/90 仍走
+  `image_search(img_1) -> text_search -> text_search`，说明 20-step 只带来局部行为改善，不能宣称 crop
+  工具选择已稳定学会。
+- 三条均在固定 3-turn 诊断边界以 `maximum-turns-exceeded` 结束，不进行答案准确率声明。exit0，仅物理
+  GPU1，结束 18 MiB/`compute_processes=none`；GPU0/GPU5 未参与，无网络/API，精确 dead/status0 tmux
+  已关闭。
+- 当前最小结论：官方同名/同参多工具 prompt 已对齐，crop 是真实可运行本地工具；layout 等其余图像工具
+  仍是显式声明但受控失败的 provider。下一步应先补齐或明确收窄图像 provider，再决定少量 balanced SFT
+  或进入包含这些动作的 RL，不能把这次 `1/3` 写成完整多工具复现。
