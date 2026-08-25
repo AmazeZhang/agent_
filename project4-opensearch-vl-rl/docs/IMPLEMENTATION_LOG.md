@@ -1355,3 +1355,24 @@
 - 按预先冻结的 promotion rule，下一步只把同一模型、同一样本放宽到20 turns 做 rollout-only 诊断；仍不
   进入优化器。重点观察模型能否在失败/低质量 observation 后停止搜索并输出 final response，以及是否出现
   与本地 SFT-20 相同的重复检索循环。
+
+### 2026-08-25：官方最终 8B 在20轮预算内主动终止，但暴露语料错配
+
+- Run `official-final8b-row71-relaxed20t-20260825` 与本地 SFT-20 relaxed probe 使用同一 row71、greedy、
+  20 turns/1024 tokens；唯一策略差异是改用官方最终 SFT+RL 完整权重。模型在第10轮主动输出
+  `<response>`，`fatal=null`，没有像本地 SFT-20 一样重复成功的 text-search 直到第20轮。这是官方最终
+  策略已学到“低质量检索后停止并作答”的直接行为证据。
+- 动作链为 `crop(img_1, 官方专家精确bbox) -> sharpen(img_2失败) -> layout(img_2='eae a') ->
+  image_search(img_1) -> text_search×5 -> final`。它真实使用 crop/句柄/图像处理失败恢复/图搜/文搜和多轮
+  停止策略；没有调用 `image_search(img_2)`。report SHA256 `6dd69471...1c4`。
+- 最终识别出 `Woodford Halse railway station`，但把官方专家答案中的 **Northamptonshire** 错写成
+  **Wiltshire**；官方 row71 专家最终答案直接提供了这一对照。现有 crop probe 把官方 SFT 图片接到 WIT
+  pilot 的 visual/text index，因此返回的图搜候选和 Wiki passages与该图片实体无关；这正是内容环境错配，
+  不能归咎于工具 schema 或官方策略。
+- `<response>` wrapper 有效，但它不使用项目 challenge scorer 的 `Title:/Evidence:` 两行格式，因此
+  `score.format_valid=false/full_success=false`。该 probe 的 gold 本来就是 `PROBE_ONLY`，不能拿此 score
+  衡量答案准确率；有效结论仅限行为链与专家答案人工对照。
+- exit0，仅物理GPU1，峰值观察约20.2 GiB/60°C；cleanup 后18 MiB、无 compute process，GPU0/GPU5未
+  参与，精确tmux已关闭。进入任何 RL optimizer 前，下一关键步骤不是再调 turn，而是让 rollout 问题、图片、
+  visual index、Wiki text index和可验证答案来自同一个冻结数据构建；随后用官方最终策略在该匹配环境做小批
+  rollout，确认 reward 非零且方向正确。
