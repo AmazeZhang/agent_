@@ -1218,3 +1218,18 @@
   `d1c1c050...9854`，证明 continuation、梯度和可恢复保存链正常；不把单步 loss 当行为提升。
 - exit0，仅物理 GPU1，cleanup 后 18 MiB/`compute_processes=none`，GPU0/GPU5 未参与，无网络/API，精确
   dead/status0 tmux 已关闭。下一步从 checkpoint-1 恢复到总 global step20，再复跑相同三条 crop probe。
+
+### 2026-08-25：官方 tool-rich SFT continuation 完成 20-step
+
+- Run `official-toolrich97-sft-cont-step20-20260825` 从上述 checkpoint-1 恢复，并在同一套 97 条官方原始
+  轨迹上训练到 global step20；实际新增 19 次 optimizer update，epoch `0.2062`。没有扩大数据、没有
+  合成轨迹，也没有进入 RL。
+- step1..20 loss 范围 `0.5373..1.0808`，grad norm 范围 `0.5904..1.0545`，全部 finite；最终
+  checkpoint-20 adapter SHA256 `fbc9dd59...c461`，不同于 step1 的 `786f42e6...389b7`。optimizer
+  SHA256 `bf41afae...e009`，trainer state SHA256 `d68ecbbe...298`。
+- exit0，仅物理 GPU1；结束后 GPU1 18 MiB、cleanup `compute_processes=none`，GPU0/GPU5 未参与，无
+  网络/API。精确 tmux pane dead/status0 后已关闭。
+- 受限命名空间曾无法访问主机 tmux/NVIDIA 驱动，造成一次短暂的“会话消失”误判；随后用主机侧精确
+  session 与 GPU 查询纠正。训练没有中断，磁盘剩余约 1.5 TiB。后续监控以主机侧精确会话为准。
+- 下一步使用 checkpoint-20 对同一三条官方首动作 crop 样本进行 greedy 3-turn 行为复测，与 SFT-50 的
+  `first_tool_crop=0/3` 基线直接比较；该 probe 仍不宣称答案准确率。
