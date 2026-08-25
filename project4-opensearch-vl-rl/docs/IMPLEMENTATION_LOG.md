@@ -1303,3 +1303,18 @@
   `compute_processes=none`，GPU0/GPU5 未参与，无网络/API，精确 dead/status0 tmux 已关闭。
 - 下一步应在官方 SFT 数据中增加“检索后形成 final response”和“重复结果后停止/改策略”的轨迹覆盖，并在
   RL reward/fatal-aware 逻辑中单独记录重复成功调用；不应靠重新收紧 turn 上限掩盖循环。
+
+### 2026-08-25：准备以官方最终 8B 检验本地环境兼容性
+
+- 官方 Hugging Face 组织当前公开 `OpenSearch-VL-8B/30B-A3B/32B` 三个最终模型；未发现单独命名的
+  SFT-only checkpoint。因此本轮下载 `OpenSearch-VL/OpenSearch-VL-8B`，用途是用官方最终策略做
+  rollout-only 环境兼容性对照，不把它表述成我们自己的 SFT→RL 训练产物。
+- 8B BF16 权重共四个 safetensors 分片，合计约 17.6 GB。`huggingface.co:443` 无代理直连超时；改用
+  可直连的 `hf-mirror.com` 元数据入口和 Xet/CDN 续传，显式清空所有大小写 proxy 变量，没有使用 Clash
+  7890/7891。下载位于数据盘、保留 `.incomplete` 续传证据，不进入 Git；下载完成前不启动 GPU。
+- crop rollout probe 现同时支持“完整本地模型”和“base + LoRA”两种策略来源；两者继续使用同一份官方
+  system/tool schema、本地 provider 和冻结 probe 数据。完整模型路径被限制在项目四 model 根，必须有
+  config、index 及 index 引用的全部 shard 才能加载；报告记录 policy kind、model root 和 config hash。
+- CPU 回归 `test_official_crop_rollout_probe.py` 5/5、`test_evaluate_local_agent.py` 12/12 通过。权重完成并
+  通过大小/索引/离线加载检查后，只在物理 GPU1 先跑单行短 rollout；行为成立后才讨论 1～3 step LoRA
+  RL 环境适配，不直接放大训练。

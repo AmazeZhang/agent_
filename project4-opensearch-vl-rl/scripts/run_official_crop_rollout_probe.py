@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Probe SFT-50 crop behaviour with the exact official SFT tool contract."""
+"""Probe a local policy with the exact official SFT tool contract."""
 
 from __future__ import annotations
 
@@ -38,12 +38,41 @@ TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--adapter", type=Path, required=True)
+    parser.add_argument("--model-root", type=Path, default=MODEL_ROOT)
+    parser.add_argument("--adapter", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--maximum-turns", type=int, default=3)
     parser.add_argument("--probe-rows", type=int, nargs="+", default=list(PROBE_ROWS))
     return parser.parse_args()
+
+
+def validate_model_root(raw_root: Path) -> Path:
+    """Accept only a complete local project4 model directory."""
+
+    root = raw_root.resolve()
+    allowed = (PROJECT_DATA / "models").resolve()
+    if not root.is_relative_to(allowed) or not root.is_dir():
+        raise ValueError("model root must be an existing project4 local model")
+    for filename in ("config.json", "model.safetensors.index.json"):
+        if not (root / filename).is_file():
+            raise FileNotFoundError(f"local model is incomplete: {filename} is missing")
+    with (root / "model.safetensors.index.json").open(encoding="utf-8") as handle:
+        index = json.load(handle)
+    weight_map = index.get("weight_map")
+    if not isinstance(weight_map, dict) or not weight_map:
+        raise ValueError("model index has no weight map")
+    shards = sorted(set(weight_map.values()))
+    if not all(isinstance(name, str) and Path(name).name == name for name in shards):
+        raise ValueError("model index contains an unsafe shard name")
+    missing = [name for name in shards if not (root / name).is_file()]
+    if missing:
+        raise FileNotFoundError(f"local model is missing {len(missing)} weight shard(s)")
+    return root
+
+
+def policy_kind(adapter: Path | None) -> str:
+    return "local-full-model" if adapter is None else "local-base-plus-lora"
 
 
 def first_tool_call(row: dict[str, Any]) -> dict[str, Any]:
@@ -129,7 +158,6 @@ def summarize_probe(result: dict[str, Any], expected: dict[str, Any]) -> dict[st
 
 def main() -> int:
     import torch
-    from peft import PeftModel
     from transformers import AutoModelForImageTextToText, AutoProcessor
 
     args = parse_args()
@@ -137,9 +165,8 @@ def main() -> int:
         args.max_new_tokens, args.maximum_turns, args.probe_rows
     )
     run_dir, physical_gpu = require_managed_run(dict(os.environ))
+    model_root = validate_model_root(args.model_root)
     adapter = validate_adapter(args.adapter)
-    if adapter is None:
-        raise ValueError("crop probe requires the frozen SFT adapter")
     output = args.output.resolve()
     if output != (run_dir / "crop_rollout_probe.json").resolve() or output.exists():
         raise ValueError("output must be the absent managed crop_rollout_probe.json")
@@ -152,17 +179,22 @@ def main() -> int:
         device="cpu",
     )
     processor = AutoProcessor.from_pretrained(
-        MODEL_ROOT, local_files_only=True, trust_remote_code=False
+        model_root, local_files_only=True, trust_remote_code=False
     )
-    base = AutoModelForImageTextToText.from_pretrained(
-        MODEL_ROOT,
+    model = AutoModelForImageTextToText.from_pretrained(
+        model_root,
         dtype=torch.bfloat16,
         attn_implementation="flash_attention_2",
         device_map="cuda:0",
         local_files_only=True,
         trust_remote_code=False,
-    )
-    model = PeftModel.from_pretrained(base, adapter, is_trainable=False).eval()
+    ).eval()
+    if adapter is not None:
+        from peft import PeftModel
+
+        model = PeftModel.from_pretrained(
+            model, adapter, is_trainable=False
+        ).eval()
     results = []
     with LocalTextIndex(Path(pilot["text_index"])) as text_index:
         for row_index, row, expected_call in selected:
@@ -204,10 +236,17 @@ def main() -> int:
             print(json.dumps({"row": row_index, **summary}, sort_keys=True), flush=True)
     report = {
         "schema_version": 1,
-        "purpose": "rollout-only official first-crop behaviour probe",
+        "purpose": "rollout-only exact-official-contract crop behaviour probe",
         "physical_gpu": physical_gpu,
-        "adapter": str(adapter),
-        "adapter_sha256": sha256_file(adapter / "adapter_model.safetensors"),
+        "policy_kind": policy_kind(adapter),
+        "model_root": str(model_root),
+        "model_config_sha256": sha256_file(model_root / "config.json"),
+        "adapter": str(adapter) if adapter is not None else None,
+        "adapter_sha256": (
+            sha256_file(adapter / "adapter_model.safetensors")
+            if adapter is not None
+            else None
+        ),
         "official_sft_sha256": SFT_SHA256,
         "probe_rows": list(probe_rows),
         "tool_protocol": "official-local-multimodal-v1",

@@ -14,6 +14,12 @@ SPEC.loader.exec_module(MODULE)
 
 
 class OfficialCropRolloutProbeTests(unittest.TestCase):
+    def test_policy_kind_distinguishes_full_model_and_adapter(self) -> None:
+        self.assertEqual(MODULE.policy_kind(None), "local-full-model")
+        self.assertEqual(
+            MODULE.policy_kind(Path("adapter")), "local-base-plus-lora"
+        )
+
     def test_relaxed_budget_accepts_official_scale_single_row(self) -> None:
         self.assertEqual(MODULE.validate_probe_budget(1024, 20, [71]), (71,))
 
