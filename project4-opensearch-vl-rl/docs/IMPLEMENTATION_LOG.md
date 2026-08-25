@@ -1168,3 +1168,17 @@
   自由前缀、多个调用或调用后文本继续拒绝。最终 response 同样只在 probe 明确声明时允许官方 think
   前缀。修复后使用新 Run ID 重跑；由于三条当前首选择都是 image_search，初步迹象是 SFT-50 尚未形成
   专家 crop 选择行为，但需解析后继续执行才能形成正式结论。
+
+### 2026-08-25：SFT-50 多工具 crop probe 正式结果
+
+- Run `official-sft50-crop-probe-v2-20260825` 在 think-prefix 修复后完成三条×3 turn。三条路径完全一致为
+  `image_search(img_1) -> text_search -> text_search`，tool JSON、官方参数和隐藏本地 Wiki provider 均正常，
+  但 `first_tool_crop/crop_succeeded/followup_uses_img2/live_image_search_img2` 全部为 `0/3`。三条官方专家
+  轨迹首动作均为 crop，因此当前 SFT-50 没有复现这些样本的工具选择行为。
+- 三条都因固定 3-turn probe 边界以 `maximum-turns-exceeded` 结束；这是诊断上限，不是工具异常。row90 的
+  live img1 检索正确命中 Norwegian Trekking Association，说明本地视觉索引能对部分官方图像提供有效
+  候选，但不能替代 crop 行为证据。此 Run 不评答案准确率。
+- 报告 SHA256 `cf881bb8...c47bc`，exit 0，GPU1 最高观察 56°C、结束 18 MiB，cleanup
+  `compute_processes=none`；GPU0/GPU5 未参与，无网络/API，精确 dead/status0 tmux 已关闭。
+- 结论：先从官方 960-safe 抽取工具密集和真实错误恢复轨迹做短程 targeted SFT，再复跑同一 probe；
+  不用 RL 从零教授 crop 语法，也不立即扩大双搜索 RL。
