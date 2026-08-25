@@ -1208,3 +1208,13 @@
   未参与；失败 Run 保留且不复用。
 - 修复显式加入脚本所属项目根目录，并新增直接 CLI 回归，必须到达 managed-run guard 且不得再出现
   ModuleNotFoundError。提交测试后才使用新 Run ID 重跑相同 1-step 配置。
+
+### 2026-08-25：官方 tool-rich SFT continuation 完成 1-step
+
+- 新 Run `official-toolrich97-sft-cont-step1-v2-20260825` 从冻结 SFT-50 adapter 正确加载同一 LoRA，日志确认
+  4-bit bitsandbytes、trainable params `21,823,488 / 8,788,947,184 (0.2483%)`，没有创建第二套 adapter。
+- global step1 loss `0.9237`、grad norm `0.5936`，均 finite；adapter SHA256 从
+  `8b7e3e49...1c3698` 变为 `786f42e6...389b7`。optimizer SHA256 `af65b9be...e341`，trainer state
+  `d1c1c050...9854`，证明 continuation、梯度和可恢复保存链正常；不把单步 loss 当行为提升。
+- exit0，仅物理 GPU1，cleanup 后 18 MiB/`compute_processes=none`，GPU0/GPU5 未参与，无网络/API，精确
+  dead/status0 tmux 已关闭。下一步从 checkpoint-1 恢复到总 global step20，再复跑相同三条 crop probe。
