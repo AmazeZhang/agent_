@@ -1,0 +1,40 @@
+{
+  "kind": "p3-aware-seed2026-topk-replay-failure",
+  "ordered_prefix_mismatches": [
+    {
+      "qid": 213,
+      "query": "world's tallest building from 2566 B.C. to 1311 A.D.",
+      "stored": [
+        "7009181",
+        "7009182",
+        "7009180"
+      ],
+      "replayed": [
+        "7009181",
+        "7009182",
+        "16864745"
+      ]
+    }
+  ],
+  "set_prefix_mismatches": [
+    {
+      "qid": 213,
+      "query": "world's tallest building from 2566 B.C. to 1311 A.D.",
+      "stored": [
+        "7009181",
+        "7009182",
+        "7009180"
+      ],
+      "replayed": [
+        "7009181",
+        "7009182",
+        "16864745"
+      ]
+    }
+  ],
+  "top3_hit_calls": 148,
+  "top3_hit_questions": 128,
+  "expected_top3_hit_calls": 147,
+  "expected_top3_hit_questions": 127,
+  "response_bundle_sha256": "556ef905cb41bcbad9bcfabd1eeab2eac70f918792c441d64ab06ad8f202e222"
+}

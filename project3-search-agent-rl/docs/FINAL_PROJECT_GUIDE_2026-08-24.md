@@ -209,6 +209,11 @@ real 对 shuffled/no-evidence 的配对检验均 `p<1e-8`；搜索题上的正�
 evidence-to-answer；不应继续单纯增加搜索奖励或训练轮次。完整口径见
 [`P3_RETRIEVAL_ANSWER_FUNNEL_2026-08-27.md`](P3_RETRIEVAL_ANSWER_FUNNEL_2026-08-27.md)。
 
+随后对相同既有 query 做 CPU-only 候选扩展：历史 top-3 加两篇文档，只将题级 evidence-hit
+从54.3%提高到59.8%，100个错误且未命中的题中仅补回10个。这说明简单扩大 top-k 不是主要
+解法，下一改进点应放在 query 质量；该回放没有生成新答案，不能据此推断 EM。详见
+[`P3_AWARE_TOPK_REPLAY_2026-08-27.md`](P3_AWARE_TOPK_REPLAY_2026-08-27.md)。
+
 ## 9. 四轮交互上限怎么解释
 
 当前 `max_steps=4` 与原 clean 对照协议保持一致。环境先增加 turn，再判断是否达到上限，
