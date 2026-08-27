@@ -1,0 +1,97 @@
+{
+  "kind": "p3-seed2026-retrieval-answer-funnel",
+  "n": 256,
+  "runs": {
+    "clean": "p3-eval-clean-grpo10-seed2026-gs10-confirm256-20260824a",
+    "aware": "p3-eval-aware-v2-seed2026-gs10-confirm256-20260824a"
+  },
+  "integrity": {
+    "data_sha256": "ffebf468e756a673da267f5830cfc67f2e9c4dc44ec41c979a389c1efebfff60",
+    "episodes_sha256": {
+      "clean": "72c5b24ff1cd83c5f930b00cd4d222c9695b955837e6389c4874ba4d1732ad58",
+      "aware": "fd055ff85c848f25200de1596526379baf0fca310927fc250518ca40576b5756"
+    },
+    "same_protocol": true,
+    "evidence_rule": "frozen v2 alias-in-returned-document-body matcher"
+  },
+  "clean": {
+    "matrix": {
+      "no_search": {
+        "correct": 21,
+        "answered_wrong": 53,
+        "unanswered": 0
+      },
+      "searched_without_evidence": {
+        "correct": 7,
+        "answered_wrong": 55,
+        "unanswered": 25
+      },
+      "searched_with_evidence": {
+        "correct": 49,
+        "answered_wrong": 36,
+        "unanswered": 10
+      }
+    },
+    "searched_questions": 182,
+    "evidence_hit_questions": 95,
+    "question_level_evidence_hit_rate_given_search": 0.521978021978022,
+    "hit_to_answer": 0.8947368421052632,
+    "hit_to_correct": 0.5157894736842106,
+    "no_hit_to_correct": 0.08045977011494253,
+    "incorrect_partition": {
+      "no_search": 53,
+      "searched_without_evidence": 80,
+      "searched_with_evidence": 46
+    },
+    "max_steps_exhausted": 35
+  },
+  "aware": {
+    "matrix": {
+      "no_search": {
+        "correct": 7,
+        "answered_wrong": 15,
+        "unanswered": 0
+      },
+      "searched_without_evidence": {
+        "correct": 7,
+        "answered_wrong": 94,
+        "unanswered": 6
+      },
+      "searched_with_evidence": {
+        "correct": 64,
+        "answered_wrong": 62,
+        "unanswered": 1
+      }
+    },
+    "searched_questions": 234,
+    "evidence_hit_questions": 127,
+    "question_level_evidence_hit_rate_given_search": 0.5427350427350427,
+    "hit_to_answer": 0.9921259842519685,
+    "hit_to_correct": 0.5039370078740157,
+    "no_hit_to_correct": 0.06542056074766354,
+    "incorrect_partition": {
+      "no_search": 15,
+      "searched_without_evidence": 100,
+      "searched_with_evidence": 63
+    },
+    "max_steps_exhausted": 16
+  },
+  "paired_clean_no_search_to_aware_search": {
+    "questions": 56,
+    "aware_evidence_hit": 34,
+    "aware_correct": 20,
+    "clean_correct": 15,
+    "gained": 12,
+    "lost": 7
+  },
+  "decision": {
+    "largest_incorrect_partition": "searched_without_evidence",
+    "counts": {
+      "no_search": 15,
+      "searched_without_evidence": 100,
+      "searched_with_evidence": 63
+    },
+    "recommendation": "Prioritize query quality / retrieval recall with evaluation-only top-k or reranking checks.",
+    "claim_boundary": "Evidence hit is a deterministic answer-alias proxy, not a semantic sufficiency judge."
+  }
+}
