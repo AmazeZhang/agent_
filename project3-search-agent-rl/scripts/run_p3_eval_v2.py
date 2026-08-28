@@ -93,6 +93,8 @@ from searchr1_repro.search_v2_reward import (  # noqa: E402 -- frozen v2 matcher
 from searchr1_repro.stepsearch_protocol import (  # noqa: E402
     STEPSEARCH_SOURCE_COMMIT,
     build_stepsearch_prompt,
+    stepsearch_prompt_contains_query,
+    truncate_stepsearch_response,
 )
 
 EXPECTED_RETRIEVER_VECTORS = 21_015_324
@@ -857,9 +859,7 @@ def check_round2_prompts(episodes: list[dict[str, Any]]) -> dict[str, Any]:
             "step1_query": query,
             "step1_observation": first["observation"],
             "contains_question": normalize_question(episode["question"]) in norm_prompt,
-            "contains_query": re.search(
-                re.escape(f"<search>{query}</search>"), prompt, re.IGNORECASE | re.DOTALL
-            ) is not None,
+            "contains_query": stepsearch_prompt_contains_query(prompt, query),
             "contains_information": re.search(
                 r"<information>(?!\s*</information>)", prompt, re.IGNORECASE | re.DOTALL
             ) is not None,
@@ -1181,6 +1181,11 @@ def main() -> int:
                         for local_index in range(len(batch_records))
                     ]
                     raw_actions = generate_actions(llm, tokenizer, observations["text"], seeds, args)
+                    if stepsearch_protocol:
+                        # The public StepSearch generator applies this boundary
+                        # before projection. Text sampled after </search> must
+                        # not fabricate tool results in next-turn memory.
+                        raw_actions = [truncate_stepsearch_response(action) for action in raw_actions]
                     projected_actions, valids = search_projection(raw_actions)
                     # Empty <search></search> is a degenerate action: upstream
                     # SearchToolGroup.search guards only None (not ""), so the

@@ -1,4 +1,4 @@
-"""Frozen evaluation-only prompt adapter for the open-source StepSearch model.
+"""Frozen evaluation-only protocol adapter for the open-source StepSearch model.
 
 The wording follows StepSearch's public ``scripts/data_process/musi_search.py``
 prompt at commit 43215bab9118a4c8e01b15082f74b2aea30c1fc8.  This module
@@ -29,3 +29,25 @@ def build_stepsearch_prompt(task_description: str, memory_context: str = "") -> 
         return prefix
     return f"{prefix}{memory_context}"
 
+
+def truncate_stepsearch_response(response: str) -> str:
+    """Match StepSearch's public rollout boundary before tool projection."""
+    if "</search>" in response:
+        return response.split("</search>", 1)[0] + "</search>"
+    if "</answer>" in response:
+        return response.split("</answer>", 1)[0] + "</answer>"
+    return response
+
+
+def stepsearch_prompt_contains_query(prompt: str, query: str) -> bool:
+    """Check a recalled search query while tolerating harmless tag whitespace."""
+    import re
+
+    def normalize(value: str) -> str:
+        return " ".join(value.casefold().split())
+
+    expected = normalize(query)
+    return any(
+        normalize(candidate) == expected
+        for candidate in re.findall(r"<search>(.*?)</search>", prompt, re.IGNORECASE | re.DOTALL)
+    )
