@@ -90,6 +90,10 @@ from searchr1_repro.search_v2_reward import (  # noqa: E402 -- frozen v2 matcher
     norm_query,
     valid_aliases,
 )
+from searchr1_repro.stepsearch_protocol import (  # noqa: E402
+    STEPSEARCH_SOURCE_COMMIT,
+    build_stepsearch_prompt,
+)
 
 EXPECTED_RETRIEVER_VECTORS = 21_015_324
 REAL_INDEX_NOTE = "real Wiki-18 IndexFlatIP (21,015,324 vectors); ground-truth-derived fixture is prohibited for evaluation"
@@ -109,6 +113,48 @@ PROTOCOL_FILES = (
 VLLM_DTYPE = "bfloat16"
 VLLM_GPU_MEMORY_UTILIZATION = 0.6
 VLLM_MAX_MODEL_LEN = 3328  # max_input_tokens(3072) + max_new_tokens(256)
+
+
+class StepSearchEnvironmentManager(SearchEnvironmentManager):
+    """Preserve StepSearch's raw plan/observation text in the next-turn trace.
+
+    The tool receives the unchanged upstream projected action, while memory
+    retains the raw model response.  This matches StepSearch's public rollout,
+    which appends generated plan/search text and the returned information to
+    the rolling context.
+    """
+
+    def step_projected(
+        self,
+        raw_actions: list[str],
+        projected_actions: list[str],
+        valids,
+    ):
+        from agent_system.environments.base import to_numpy
+
+        next_obs, rewards, dones, infos = self.envs.step(projected_actions)
+        self.memory.store({"search": raw_actions, "information": next_obs})
+        next_observations = {
+            "text": self.build_text_obs(next_obs),
+            "image": None,
+            "anchor": next_obs.copy(),
+        }
+        for index, info in enumerate(infos):
+            info["is_action_valid"] = to_numpy(valids[index])
+        return next_observations, to_numpy(rewards), to_numpy(dones), infos
+
+    def build_text_obs(self, text_obs: list[str], init: bool = False) -> list[str]:
+        memory_contexts = [""] * len(text_obs)
+        if not init and self.config.env.history_length > 0:
+            memory_contexts, _ = self.memory.fetch(
+                self.config.env.history_length,
+                obs_key="information",
+                action_key="search",
+            )
+        return [
+            build_stepsearch_prompt(self.tasks[index], memory_contexts[index])
+            for index in range(len(text_obs))
+        ]
 
 
 def sha256_file(path: Path) -> str:
@@ -971,6 +1017,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    stepsearch_protocol = os.environ.get("PROJECT3_EXTERNAL_STEPSEARCH_PROTOCOL") == "1"
     if args.tokenizer is None:
         args.tokenizer = args.model
     v2_info = verify_v2_tree(args.v2_dir, args.pristine_dir)
@@ -1107,7 +1154,8 @@ def main() -> int:
                 assert len(stamped) == len(batch_records), (
                     f"question-index stamping incomplete: {len(stamped)}/{len(batch_records)}"
                 )
-            manager = SearchEnvironmentManager(envs, partial(search_projection), config)
+            manager_class = StepSearchEnvironmentManager if stepsearch_protocol else SearchEnvironmentManager
+            manager = manager_class(envs, partial(search_projection), config)
             kwargs = [
                 {
                     "question": record["question"],
@@ -1142,7 +1190,12 @@ def main() -> int:
                     # as invalid actions ("" -> env returns an empty observation
                     # with NO HTTP request, same semantics as the no-tags case).
                     projected_actions, valids = sanitize_empty_search_actions(projected_actions, valids)
-                    next_observations, rewards, step_done, infos = manager.step(projected_actions)
+                    if stepsearch_protocol:
+                        next_observations, rewards, step_done, infos = manager.step_projected(
+                            raw_actions, projected_actions, valids
+                        )
+                    else:
+                        next_observations, rewards, step_done, infos = manager.step(projected_actions)
                     generation_seconds = time.monotonic() - generation_started
                     for local_index in range(len(batch_records)):
                         if not active_before[local_index]:
@@ -1205,8 +1258,12 @@ def main() -> int:
     metrics = aggregate_metrics(episodes)
     result = {
         "schema_version": 1,
-        "kind": "p3-search-aware-clean-v2-evaluation",
-        "line": "v2 line: pristine 20bd331b + patches/v2/v2-0001..0007 (clean protocol restored)",
+        "kind": "p3-stepsearch-external-evaluation" if stepsearch_protocol else "p3-search-aware-clean-v2-evaluation",
+        "line": (
+            "external StepSearch-3B policy on the P3 v2 search environment"
+            if stepsearch_protocol
+            else "v2 line: pristine 20bd331b + patches/v2/v2-0001..0007 (clean protocol restored)"
+        ),
         "runtime_script_sha256": sha256_file(Path(__file__).resolve()),
         "training": False,
         "training_operations": "none by construction: no optimizer, no scheduler, no backward, no Ray",
@@ -1223,10 +1280,18 @@ def main() -> int:
             "enable_lora": False,
         },
         "semantics": {
-            "line": "v2 clean protocol: prompt/projection/terminal reward byte-identical to pristine 20bd331b (v1's 0004/0005 NOT applied)",
+            "line": (
+                f"StepSearch evaluation-only prompt/history adapter from public commit {STEPSEARCH_SOURCE_COMMIT}; no reward or training changes"
+                if stepsearch_protocol
+                else "v2 clean protocol: prompt/projection/terminal reward byte-identical to pristine 20bd331b (v1's 0004/0005 NOT applied)"
+            ),
             "env": "SearchMultiProcessEnv + SearchEnvironmentManager (question + search history via SearchMemory); env.search.search_aware_step_reward=false in the eval config -> the env's clean path executes (the v2 shaping branch never runs during evaluation)",
             "projection": "upstream search_projection (first <search> else <answer> else empty; both/duplicate tags -> invalid)",
-            "prompt": "single-layer official Search prompt (SEARCH_TEMPLATE_NO_HIS round 1 / SEARCH_TEMPLATE round 2+ with memory_context)",
+            "prompt": (
+                "official StepSearch plan/search/information/observation prefix; raw model plan/observation/search text plus real tool information retained in subsequent context"
+                if stepsearch_protocol
+                else "single-layer official Search prompt (SEARCH_TEMPLATE_NO_HIS round 1 / SEARCH_TEMPLATE round 2+ with memory_context)"
+            ),
             "action_parse": "upstream SearchEnv: re.search(r'<search>(.*?)</search>', re.DOTALL); no query -> empty tool output -> no information",
             "termination": "done when '<answer>' and '</answer>' both appear in action, or turns >= max_steps",
             "terminal_reward": "upstream skyrl compute_score(chat_history, ground_truth) format_score=0.0; EM = reward >= 1.0",
@@ -1258,6 +1323,7 @@ def main() -> int:
             "max_input_tokens": args.max_input_tokens,
             "max_new_tokens": args.max_new_tokens,
             "main_mode": main_mode,
+            "prompt_protocol": "stepsearch-public" if stepsearch_protocol else "search-r1-clean",
             "retrieval_condition": args.retrieval_condition,
             "shuffle_step": args.shuffle_step,
             "no_evidence_docs": args.no_evidence_docs,
