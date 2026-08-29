@@ -26,6 +26,7 @@
 #   PROJECT3_EVAL_TOKENIZER=<absolute path to tokenizer>  (default Qwen2.5-3B BASE)
 #   PROJECT3_EVAL_TEMPERATURE=<0.0 greedy main | >0 diagnosis>  (default 0.0)
 #   PROJECT3_EVAL_NUM_ROLLOUTS=<1 main | 5 diagnosis>           (default 1)
+#   PROJECT3_EVAL_MAX_STEPS=<4|5>                              (default 4)
 #   PROJECT3_EVAL_RETRIEVAL_CONDITION=<real|shuffled|no-evidence>  (default real)
 #       Counterfactual evidence conditions (main mode only, confirm256 only):
 #         shuffled    -- model's own query retrieved for real first; on success
@@ -68,11 +69,20 @@ tokenizer_path="${PROJECT3_EVAL_TOKENIZER:-${project_data}/models/Qwen2.5-3B}"
 eval_data="${PROJECT3_EVAL_DATA:-smoke}"
 eval_temperature="${PROJECT3_EVAL_TEMPERATURE:-0.0}"
 eval_num_rollouts="${PROJECT3_EVAL_NUM_ROLLOUTS:-1}"
+eval_max_steps="${PROJECT3_EVAL_MAX_STEPS:-4}"
 eval_retrieval_condition="${PROJECT3_EVAL_RETRIEVAL_CONDITION:-real}"
 eval_shuffle_step="${PROJECT3_EVAL_SHUFFLE_STEP:-17}"
 eval_no_evidence_docs="${PROJECT3_EVAL_NO_EVIDENCE_DOCS:-3}"
 retriever_url="${PROJECT3_RETRIEVER_URL:-http://127.0.0.1:18080/retrieve}"
 run_dir="${PROJECT3_RUN_DIR:-${project_data}/dry-run/p3-eval-v2}"
+
+case "${eval_max_steps}" in
+  4|5) ;;
+  *)
+    echo "PROJECT3_EVAL_MAX_STEPS must be 4 or 5, got: ${eval_max_steps}" >&2
+    exit 21
+    ;;
+esac
 
 case "$eval_data" in
   smoke)
@@ -313,7 +323,7 @@ sampler_pid=$!
   --manifest-key "$manifest_key" \
   --leakage-reference "$leakage_reference" \
   --search-url "$retriever_url" \
-  --max-steps 4 --history-length 4 --topk 3 --timeout 180 \
+  --max-steps "$eval_max_steps" --history-length 4 --topk 3 --timeout 180 \
   --max-input-tokens 3072 --max-new-tokens 256 --seed 0 \
   --temperature "$eval_temperature" --num-rollouts "$eval_num_rollouts" \
   --retrieval-condition "$eval_retrieval_condition" \
