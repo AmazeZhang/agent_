@@ -1,0 +1,5 @@
+step,stage,optimizer_update,optimizer_gate_passed,weighted_loss,grad_norm,learning_rate,rollout_count,fatal_fraction,full_success_fraction,reward_mean,reward_variance,tool_calls_mean,note
+1,replay,1,1,5.162438748129716e-05,0.0038858873303979635,1e-06,4,,,,,,replayed trajectories; not a fresh-online point
+2,fresh-online,1,1,0.0003103039252891904,0.020946510136127472,1e-06,4,0.0,0.0,0.09197296989484074,0.01665388525305001,3.5,optimizer update completed
+3,fresh-online,1,1,-0.00043366050431359326,0.02625119499862194,1e-06,4,0.0,0.0,0.0874446680080483,0.017384320409377797,4.0,optimizer update completed
+4,fresh-online,0,0,,,,4,0.25,0.0,0.008814016172506739,7.780457857760408e-05,4.5,rollouts recorded; optimizer gate failed

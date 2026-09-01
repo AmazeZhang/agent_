@@ -14,7 +14,7 @@
 | P0 受管运行 | 已完成并推送；真实 GPU1 preflight 和受管 smoke 通过 |
 | 推理环境 | 8B 基座已校验；离线单图生成通过 |
 | SFT 环境/训练 | 合成 agentic 数据 1→2→5 step LoRA、断点续训和 adapter 离线推理闭环通过 |
-| RL 环境/训练 | 本地 reward/rollout-only 已通；两轮随机组审计均因组内零方差拒绝进入 optimizer，尚未启动 RL 更新 |
+| RL 环境/训练 | replay 1-step 与 fresh-online Step 2～3 optimizer update 已通；Step 4 gate 失败，当前仅支持 pipeline smoke 声明 |
 | 消融 | 未开始 |
 | 本地效果结论 | 无；不得引用上游论文数字作为本地结果 |
 
@@ -1428,3 +1428,14 @@
 - 下一步应非覆盖重建少量自然语言 QVA：问题应由对应WIT实体/图片与完整Wiki证据生成，保留完整词而非截断
   stem，并让答案可从同一 frozen index验证；工具schema/provider保持不变。先用官方最终模型通过若干
   deterministic rollout和reward门，再让本地SFT模型进入新的RL环境，不能在当前v10上继续堆rollout数量。
+
+# 2026-08-25：Project 4 RL smoke 训练状态图
+
+- 从受管 Run `official-provider-grpo-replay-1step-20260825` 和
+  `official-provider-grpo-online-step5-20260825` 的原始 JSON/stdout 生成 RL 状态图；
+- 提交逐 step CSV、12 条规范化 rollout 事件、来源 SHA256 manifest 和 CPU-only 生成器；
+- Step 1 replay 与 Step 2～3 fresh-online 分段展示；Step 4 仅展示 rollout reward/fatal/tool
+  状态并标注 gate failure，没有补造 optimizer loss；
+- 原日志未记录 KL/entropy，因此明确省略；当前图只支持 pipeline smoke 声明，不支持收敛或质量
+  提升声明；
+- 详见 `docs/RL_SMOKE_TRAINING_CURVES_2026-08-25.md`。

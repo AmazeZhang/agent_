@@ -1,0 +1,12 @@
+{"fatal": null, "full_success": false, "global_step": 2, "reward": 0.017142857142857147, "rollout": 1, "tool_call_count": 3, "tools": ["image_search", "text_search", "text_search"]}
+{"fatal": null, "full_success": false, "global_step": 2, "reward": 0.017142857142857147, "rollout": 2, "tool_call_count": 3, "tools": ["image_search", "text_search", "text_search"]}
+{"fatal": null, "full_success": false, "global_step": 2, "reward": 0.018113207547169812, "rollout": 3, "tool_call_count": 4, "tools": ["image_search", "text_search", "text_search", "text_search"]}
+{"fatal": null, "full_success": false, "global_step": 2, "reward": 0.3154929577464789, "rollout": 4, "tool_call_count": 4, "tools": ["image_search", "text_search", "text_search", "text_search"]}
+{"fatal": null, "full_success": false, "global_step": 3, "reward": 0.017142857142857147, "rollout": 1, "tool_call_count": 3, "tools": ["image_search", "text_search", "text_search"]}
+{"fatal": null, "full_success": false, "global_step": 3, "reward": 0.0, "rollout": 2, "tool_call_count": 6, "tools": ["image_search", "text_search", "text_search", "text_search", "text_search", "text_search"]}
+{"fatal": null, "full_success": false, "global_step": 3, "reward": 0.3154929577464789, "rollout": 3, "tool_call_count": 4, "tools": ["image_search", "text_search", "text_search", "text_search"]}
+{"fatal": null, "full_success": false, "global_step": 3, "reward": 0.017142857142857147, "rollout": 4, "tool_call_count": 3, "tools": ["image_search", "text_search", "text_search"]}
+{"fatal": "maximum-turns-exceeded", "full_success": false, "global_step": 4, "reward": 0.0, "rollout": 1, "tool_call_count": 8, "tools": ["image_search", "text_search", "text_search", "text_search", "text_search", "text_search", "text_search", "text_search"]}
+{"fatal": null, "full_success": false, "global_step": 4, "reward": 0.0, "rollout": 2, "tool_call_count": 4, "tools": ["image_search", "text_search", "text_search", "text_search"]}
+{"fatal": null, "full_success": false, "global_step": 4, "reward": 0.018113207547169812, "rollout": 3, "tool_call_count": 3, "tools": ["image_search", "text_search", "text_search"]}
+{"fatal": null, "full_success": false, "global_step": 4, "reward": 0.017142857142857147, "rollout": 4, "tool_call_count": 3, "tools": ["image_search", "text_search", "text_search"]}

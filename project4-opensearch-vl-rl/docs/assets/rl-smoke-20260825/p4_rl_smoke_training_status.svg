@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820">
+<rect width="100%" height="100%" fill="#f8fafc"/>
+<style>text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;fill:#172033}.title{font-size:25px;font-weight:700}.sub{font-size:13px;fill:#526071}.pt{font-size:16px;font-weight:650}.axis{font-size:11px;fill:#687386}.legend{font-size:11px}.frame{stroke:#d7dee8;fill:#fff}.grid{stroke:#e7ebf0}.line{fill:none;stroke-width:2.5}.dot{stroke:#fff;stroke-width:1.5}</style>
+<text x="34" y="40" class="title">Project 4 RL smoke-training status</text>
+<text x="34" y="66" class="sub">Observed logs only · replay step 1 is not connected to fresh-online steps · step 4 has rollouts but no optimizer update</text>
+<rect x="20" y="95" width="570" height="325" rx="10" class="frame"/>
+<text x="40" y="126" class="pt">Weighted objective (stage-separated)</text>
+<line x1="90" y1="145.0" x2="568" y2="145.0" class="grid"/>
+<text x="82" y="149.0" text-anchor="end" class="axis">4.22e-04</text>
+<line x1="90" y1="200.0" x2="568" y2="200.0" class="grid"/>
+<text x="82" y="204.0" text-anchor="end" class="axis">1.80e-04</text>
+<line x1="90" y1="255.0" x2="568" y2="255.0" class="grid"/>
+<text x="82" y="259.0" text-anchor="end" class="axis">-6.17e-05</text>
+<line x1="90" y1="310.0" x2="568" y2="310.0" class="grid"/>
+<text x="82" y="314.0" text-anchor="end" class="axis">-3.03e-04</text>
+<line x1="90" y1="365.0" x2="568" y2="365.0" class="grid"/>
+<text x="82" y="369.0" text-anchor="end" class="axis">-5.45e-04</text>
+<text x="90.0" y="387" text-anchor="middle" class="axis">1</text>
+<text x="249.3" y="387" text-anchor="middle" class="axis">2</text>
+<text x="408.7" y="387" text-anchor="middle" class="axis">3</text>
+<text x="568.0" y="387" text-anchor="middle" class="axis">4</text>
+<text x="329.0" y="407" text-anchor="middle" class="axis">global step</text>
+<polyline points="249.3,170.4 408.7,339.6" class="line" stroke="#2563eb"/>
+<circle cx="249.3" cy="170.4" r="4.5" fill="#2563eb" class="dot"/>
+<text x="249.3" y="161.4" text-anchor="middle" class="axis">3.10e-04</text>
+<circle cx="408.7" cy="339.6" r="4.5" fill="#2563eb" class="dot"/>
+<text x="408.7" y="330.6" text-anchor="middle" class="axis">-4.34e-04</text>
+<line x1="320" y1="124" x2="338" y2="124" stroke="#2563eb" stroke-width="3"/>
+<text x="344" y="128" class="legend">online</text>
+<circle cx="90.0" cy="229.2" r="4.5" fill="#dc2626" class="dot"/>
+<text x="90.0" y="220.2" text-anchor="middle" class="axis">5.16e-05</text>
+<line x1="440" y1="124" x2="458" y2="124" stroke="#dc2626" stroke-width="3"/>
+<text x="464" y="128" class="legend">replay</text>
+<line x1="169.7" y1="145" x2="169.7" y2="365" stroke="#94a3b8" stroke-dasharray="5 5"/>
+<rect x="610" y="95" width="570" height="325" rx="10" class="frame"/>
+<text x="630" y="126" class="pt">Gradient norm</text>
+<line x1="680" y1="145.0" x2="1158" y2="145.0" class="grid"/>
+<text x="672" y="149.0" text-anchor="end" class="axis">0.030</text>
+<line x1="680" y1="200.0" x2="1158" y2="200.0" class="grid"/>
+<text x="672" y="204.0" text-anchor="end" class="axis">0.022</text>
+<line x1="680" y1="255.0" x2="1158" y2="255.0" class="grid"/>
+<text x="672" y="259.0" text-anchor="end" class="axis">0.015</text>
+<line x1="680" y1="310.0" x2="1158" y2="310.0" class="grid"/>
+<text x="672" y="314.0" text-anchor="end" class="axis">0.007</text>
+<line x1="680" y1="365.0" x2="1158" y2="365.0" class="grid"/>
+<text x="672" y="369.0" text-anchor="end" class="axis">0</text>
+<text x="680.0" y="387" text-anchor="middle" class="axis">1</text>
+<text x="839.3" y="387" text-anchor="middle" class="axis">2</text>
+<text x="998.7" y="387" text-anchor="middle" class="axis">3</text>
+<text x="1158.0" y="387" text-anchor="middle" class="axis">4</text>
+<text x="919.0" y="407" text-anchor="middle" class="axis">global step</text>
+<polyline points="839.3,209.3 998.7,169.9" class="line" stroke="#2563eb"/>
+<circle cx="839.3" cy="209.3" r="4.5" fill="#2563eb" class="dot"/>
+<text x="839.3" y="200.3" text-anchor="middle" class="axis">0.021</text>
+<circle cx="998.7" cy="169.9" r="4.5" fill="#2563eb" class="dot"/>
+<text x="998.7" y="160.9" text-anchor="middle" class="axis">0.026</text>
+<line x1="910" y1="124" x2="928" y2="124" stroke="#2563eb" stroke-width="3"/>
+<text x="934" y="128" class="legend">online</text>
+<circle cx="680.0" cy="336.1" r="4.5" fill="#dc2626" class="dot"/>
+<text x="680.0" y="327.1" text-anchor="middle" class="axis">0.004</text>
+<line x1="1030" y1="124" x2="1048" y2="124" stroke="#dc2626" stroke-width="3"/>
+<text x="1054" y="128" class="legend">replay</text>
+<line x1="759.7" y1="145" x2="759.7" y2="365" stroke="#94a3b8" stroke-dasharray="5 5"/>
+<rect x="20" y="440" width="570" height="325" rx="10" class="frame"/>
+<text x="40" y="471" class="pt">Fresh-online rollout reward</text>
+<line x1="90" y1="490.0" x2="568" y2="490.0" class="grid"/>
+<text x="82" y="494.0" text-anchor="end" class="axis">0.104</text>
+<line x1="90" y1="545.0" x2="568" y2="545.0" class="grid"/>
+<text x="82" y="549.0" text-anchor="end" class="axis">0.077</text>
+<line x1="90" y1="600.0" x2="568" y2="600.0" class="grid"/>
+<text x="82" y="604.0" text-anchor="end" class="axis">0.050</text>
+<line x1="90" y1="655.0" x2="568" y2="655.0" class="grid"/>
+<text x="82" y="659.0" text-anchor="end" class="axis">0.023</text>
+<line x1="90" y1="710.0" x2="568" y2="710.0" class="grid"/>
+<text x="82" y="714.0" text-anchor="end" class="axis">-0.004</text>
+<text x="90.0" y="732" text-anchor="middle" class="axis">1</text>
+<text x="249.3" y="732" text-anchor="middle" class="axis">2</text>
+<text x="408.7" y="732" text-anchor="middle" class="axis">3</text>
+<text x="568.0" y="732" text-anchor="middle" class="axis">4</text>
+<text x="329.0" y="752" text-anchor="middle" class="axis">global step</text>
+<polyline points="249.3,515.4 408.7,524.6 568.0,684.6" class="line" stroke="#2563eb"/>
+<circle cx="249.3" cy="515.4" r="4.5" fill="#2563eb" class="dot"/>
+<text x="249.3" y="506.4" text-anchor="middle" class="axis">0.092</text>
+<circle cx="408.7" cy="524.6" r="4.5" fill="#2563eb" class="dot"/>
+<text x="408.7" y="515.6" text-anchor="middle" class="axis">0.087</text>
+<circle cx="568.0" cy="684.6" r="4.5" fill="#2563eb" class="dot"/>
+<text x="568.0" y="675.6" text-anchor="middle" class="axis">0.009</text>
+<line x1="320" y1="469" x2="338" y2="469" stroke="#2563eb" stroke-width="3"/>
+<text x="344" y="473" class="legend">mean reward</text>
+<line x1="568.0" y1="490" x2="568.0" y2="710" stroke="#dc2626" stroke-dasharray="5 4"/>
+<text x="563.0" y="504" text-anchor="end" class="axis" fill="#dc2626">gate failed</text>
+<rect x="610" y="440" width="570" height="325" rx="10" class="frame"/>
+<text x="630" y="471" class="pt">Rollout behavior</text>
+<line x1="680" y1="490.0" x2="1158" y2="490.0" class="grid"/>
+<text x="672" y="494.0" text-anchor="end" class="axis">5.175</text>
+<line x1="680" y1="545.0" x2="1158" y2="545.0" class="grid"/>
+<text x="672" y="549.0" text-anchor="end" class="axis">3.712</text>
+<line x1="680" y1="600.0" x2="1158" y2="600.0" class="grid"/>
+<text x="672" y="604.0" text-anchor="end" class="axis">2.250</text>
+<line x1="680" y1="655.0" x2="1158" y2="655.0" class="grid"/>
+<text x="672" y="659.0" text-anchor="end" class="axis">0.788</text>
+<line x1="680" y1="710.0" x2="1158" y2="710.0" class="grid"/>
+<text x="672" y="714.0" text-anchor="end" class="axis">-0.675</text>
+<text x="680.0" y="732" text-anchor="middle" class="axis">1</text>
+<text x="839.3" y="732" text-anchor="middle" class="axis">2</text>
+<text x="998.7" y="732" text-anchor="middle" class="axis">3</text>
+<text x="1158.0" y="732" text-anchor="middle" class="axis">4</text>
+<text x="919.0" y="752" text-anchor="middle" class="axis">global step</text>
+<polyline points="839.3,553.0 998.7,534.2 1158.0,515.4" class="line" stroke="#2563eb"/>
+<circle cx="839.3" cy="553.0" r="4.5" fill="#2563eb" class="dot"/>
+<text x="839.3" y="544.0" text-anchor="middle" class="axis">3.500</text>
+<circle cx="998.7" cy="534.2" r="4.5" fill="#2563eb" class="dot"/>
+<text x="998.7" y="525.2" text-anchor="middle" class="axis">4.000</text>
+<circle cx="1158.0" cy="515.4" r="4.5" fill="#2563eb" class="dot"/>
+<text x="1158.0" y="506.4" text-anchor="middle" class="axis">4.500</text>
+<line x1="910" y1="469" x2="928" y2="469" stroke="#2563eb" stroke-width="3"/>
+<text x="934" y="473" class="legend">mean tool calls</text>
+<polyline points="839.3,684.6 998.7,684.6 1158.0,675.2" class="line" stroke="#dc2626"/>
+<circle cx="839.3" cy="684.6" r="4.5" fill="#dc2626" class="dot"/>
+<text x="839.3" y="675.6" text-anchor="middle" class="axis">0</text>
+<circle cx="998.7" cy="684.6" r="4.5" fill="#dc2626" class="dot"/>
+<text x="998.7" y="675.6" text-anchor="middle" class="axis">0</text>
+<circle cx="1158.0" cy="675.2" r="4.5" fill="#dc2626" class="dot"/>
+<text x="1158.0" y="666.2" text-anchor="middle" class="axis">0.250</text>
+<line x1="1030" y1="469" x2="1048" y2="469" stroke="#dc2626" stroke-width="3"/>
+<text x="1054" y="473" class="legend">fatal fraction</text>
+<line x1="1158.0" y1="490" x2="1158.0" y2="710" stroke="#dc2626" stroke-dasharray="5 4"/>
+<text x="1153.0" y="504" text-anchor="end" class="axis" fill="#dc2626">gate failed</text>
+<rect x="20" y="790" width="1160" height="1" fill="#d7dee8"/>
+<text x="30" y="812" class="sub">Scope: pipeline smoke evidence, not convergence or policy-improvement evidence. KL and entropy were not logged and are intentionally omitted.</text>
+</svg>

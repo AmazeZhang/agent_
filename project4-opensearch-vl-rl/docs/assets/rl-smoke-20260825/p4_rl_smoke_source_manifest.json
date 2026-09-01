@@ -1,0 +1,37 @@
+{
+  "claim_scope": "pipeline smoke evidence; not convergence or policy improvement",
+  "normalized_rollout_events": 12,
+  "omitted_metrics": [
+    "kl",
+    "entropy"
+  ],
+  "rows": 4,
+  "schema_version": 1,
+  "sources": [
+    {
+      "bytes": 1116,
+      "label": "replay/trainer_state.json",
+      "sha256": "f3412725581fe1ad38820b0d9c0048740118abff892afc250d8e42203685bd07"
+    },
+    {
+      "bytes": 1165,
+      "label": "replay/stdout.log",
+      "sha256": "18ee93d5a1c340a30633783b490c8c1b807d8fb768d37609d821148669c7ed49"
+    },
+    {
+      "bytes": 6187,
+      "label": "fresh-online/stdout.log",
+      "sha256": "3794a6c269b053e0766bd59f4c0a5b3b7d8fe37b8460e9abc11bfe478c2310d3"
+    },
+    {
+      "bytes": 2217,
+      "label": "fresh-online/checkpoint-2/trainer_state.json",
+      "sha256": "e4ca366a240863aab88d79d7f54c4652b348d50ba48dfd0ecc854c745168100d"
+    },
+    {
+      "bytes": 2201,
+      "label": "fresh-online/checkpoint-3/trainer_state.json",
+      "sha256": "06319e1c1a512de945be46b13ee971bcc8596924770eaa3d500ca117e550389e"
+    }
+  ]
+}
