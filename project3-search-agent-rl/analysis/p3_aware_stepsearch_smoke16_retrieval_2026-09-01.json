@@ -1,0 +1,807 @@
+{
+  "aggregate_metrics": {
+    "aware": {
+      "action_stats": {
+        "steps_per_episode": 2.125,
+        "total_steps": 34
+      },
+      "offline_rescore": {
+        "matches": 16,
+        "mismatches": 0
+      },
+      "overall": {
+        "answer_compliance": 16,
+        "em": 4,
+        "em_rate": 0.25,
+        "n": 16,
+        "success": 4
+      },
+      "per_question": {
+        "n_questions": 16,
+        "questions_answered": 16,
+        "questions_answered_rate": 1.0,
+        "questions_correct": 4,
+        "questions_correct_rate": 0.25,
+        "questions_searched": 16,
+        "questions_searched_rate": 1.0,
+        "search_to_answer_question_level": 1.0,
+        "search_to_correct_question_level": 0.25
+      },
+      "per_source": {
+        "2wikimultihopqa": {
+          "answer_compliance": 3,
+          "answer_compliance_rate": 1.0,
+          "em": 0,
+          "em_rate": 0.0,
+          "n": 3,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "bamboogle": {
+          "answer_compliance": 2,
+          "answer_compliance_rate": 1.0,
+          "em": 2,
+          "em_rate": 1.0,
+          "n": 2,
+          "success": 2,
+          "success_rate": 1.0
+        },
+        "hotpotqa": {
+          "answer_compliance": 2,
+          "answer_compliance_rate": 1.0,
+          "em": 0,
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "musique": {
+          "answer_compliance": 2,
+          "answer_compliance_rate": 1.0,
+          "em": 0,
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "nq": {
+          "answer_compliance": 2,
+          "answer_compliance_rate": 1.0,
+          "em": 1,
+          "em_rate": 0.5,
+          "n": 2,
+          "success": 1,
+          "success_rate": 0.5
+        },
+        "popqa": {
+          "answer_compliance": 3,
+          "answer_compliance_rate": 1.0,
+          "em": 1,
+          "em_rate": 0.3333333333333333,
+          "n": 3,
+          "success": 1,
+          "success_rate": 0.3333333333333333
+        },
+        "triviaqa": {
+          "answer_compliance": 2,
+          "answer_compliance_rate": 1.0,
+          "em": 0,
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        }
+      },
+      "search": {
+        "no_search_episodes": 0,
+        "no_search_to_correct": 0.0,
+        "search_attempt_steps": 18,
+        "search_success_rate": 1.0,
+        "search_successful_steps": 18,
+        "search_to_answer": 1.0,
+        "search_to_correct": 0.25,
+        "searched_episodes": 16
+      },
+      "search_behavior_v2": {
+        "correct_total": 4,
+        "correct_with_evidence_searches": 4,
+        "episodes_with_search": 16,
+        "episodes_with_search_rate": 1.0,
+        "evidence_hit_rate": 0.4444444444444444,
+        "evidence_hit_searches": 8,
+        "invalid_search_calls": 0,
+        "invalid_search_rate": 0.0,
+        "multi_hop_episodes": 2,
+        "multi_hop_ratio": 0.125,
+        "new_document_increment_mean": 3.1875,
+        "search_rounds_distribution": {
+          "1": 14,
+          "2": 2
+        },
+        "search_rounds_per_episode_mean": 1.125,
+        "search_status_counts": {
+          "success": 18
+        },
+        "total_search_calls": 18,
+        "true_redundant_rate": 0.05555555555555555,
+        "true_redundant_searches": 1,
+        "valid_search_calls": 18
+      }
+    },
+    "stepsearch": {
+      "action_stats": {
+        "steps_per_episode": 3.0,
+        "total_steps": 48
+      },
+      "offline_rescore": {
+        "matches": 16,
+        "mismatches": 0
+      },
+      "overall": {
+        "answer_compliance": 9,
+        "em": 2,
+        "em_rate": 0.125,
+        "n": 16,
+        "success": 2
+      },
+      "per_question": {
+        "n_questions": 16,
+        "questions_answered": 9,
+        "questions_answered_rate": 0.5625,
+        "questions_correct": 2,
+        "questions_correct_rate": 0.125,
+        "questions_searched": 16,
+        "questions_searched_rate": 1.0,
+        "search_to_answer_question_level": 0.5625,
+        "search_to_correct_question_level": 0.125
+      },
+      "per_source": {
+        "2wikimultihopqa": {
+          "answer_compliance": 2,
+          "answer_compliance_rate": 0.6666666666666666,
+          "em": 0,
+          "em_rate": 0.0,
+          "n": 3,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "bamboogle": {
+          "answer_compliance": 2,
+          "answer_compliance_rate": 1.0,
+          "em": 1,
+          "em_rate": 0.5,
+          "n": 2,
+          "success": 1,
+          "success_rate": 0.5
+        },
+        "hotpotqa": {
+          "answer_compliance": 1,
+          "answer_compliance_rate": 0.5,
+          "em": 0,
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "musique": {
+          "answer_compliance": 1,
+          "answer_compliance_rate": 0.5,
+          "em": 0,
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "nq": {
+          "answer_compliance": 1,
+          "answer_compliance_rate": 0.5,
+          "em": 0,
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        },
+        "popqa": {
+          "answer_compliance": 1,
+          "answer_compliance_rate": 0.3333333333333333,
+          "em": 1,
+          "em_rate": 0.3333333333333333,
+          "n": 3,
+          "success": 1,
+          "success_rate": 0.3333333333333333
+        },
+        "triviaqa": {
+          "answer_compliance": 1,
+          "answer_compliance_rate": 0.5,
+          "em": 0,
+          "em_rate": 0.0,
+          "n": 2,
+          "success": 0,
+          "success_rate": 0.0
+        }
+      },
+      "search": {
+        "no_search_episodes": 0,
+        "no_search_to_correct": 0.0,
+        "search_attempt_steps": 21,
+        "search_success_rate": 1.0,
+        "search_successful_steps": 21,
+        "search_to_answer": 0.5625,
+        "search_to_correct": 0.125,
+        "searched_episodes": 16
+      },
+      "search_behavior_v2": {
+        "correct_total": 2,
+        "correct_with_evidence_searches": 2,
+        "episodes_with_search": 16,
+        "episodes_with_search_rate": 1.0,
+        "evidence_hit_rate": 0.38095238095238093,
+        "evidence_hit_searches": 8,
+        "invalid_search_calls": 0,
+        "invalid_search_rate": 0.0,
+        "multi_hop_episodes": 5,
+        "multi_hop_ratio": 0.3125,
+        "new_document_increment_mean": 3.9375,
+        "search_rounds_distribution": {
+          "1": 11,
+          "2": 5
+        },
+        "search_rounds_per_episode_mean": 1.3125,
+        "search_status_counts": {
+          "success": 21
+        },
+        "total_search_calls": 21,
+        "true_redundant_rate": 0.0,
+        "true_redundant_searches": 0,
+        "valid_search_calls": 21
+      }
+    }
+  },
+  "aware_run": "/media/imc/data/project3-search-agent-rl/runs/p3-eval-aware-v2-seed2026-gs10-smoke16-20260901a",
+  "dataset_sha256": "c36c2ea42d4d377970914f2042d132977981d6785477f8f51ca349c35de0a495",
+  "decision": {
+    "eligible_for_bounded_aware_experiment": false,
+    "rule": "StepSearch gains >=2 evidence-hit questions and does not reduce EM"
+  },
+  "em": {
+    "aware": 4,
+    "stepsearch": 2
+  },
+  "kind": "p3-aware-stepsearch-smoke16-retrieval-screen",
+  "paired_categories": {
+    "aware_only_hit": [
+      0,
+      3,
+      10
+    ],
+    "both_hit": [
+      4,
+      5,
+      11,
+      14,
+      15
+    ],
+    "neither_hit": [
+      1,
+      2,
+      6,
+      7,
+      8,
+      9,
+      12,
+      13
+    ],
+    "stepsearch_only_hit": []
+  },
+  "per_question": [
+    {
+      "aware": {
+        "em": 1,
+        "evidence_hit_calls": 1,
+        "evidence_hit_question": true,
+        "final_answer": "August 21, 2001",
+        "has_answer": true,
+        "queries": [
+          "when did how you remind me come out"
+        ],
+        "question": "when did how you remind me come out?",
+        "question_id": 0,
+        "search_calls": 1
+      },
+      "category": "aware_only_hit",
+      "question": "when did how you remind me come out?",
+      "question_id": 0,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": null,
+        "has_answer": false,
+        "queries": [
+          "how you remind me release date"
+        ],
+        "question": "when did how you remind me come out?",
+        "question_id": 0,
+        "search_calls": 1
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "Hermann Müller",
+        "has_answer": true,
+        "queries": [
+          "German leader who signed the Treaty of Versailles"
+        ],
+        "question": "who was the german leader who signed the treaty of versailles?",
+        "question_id": 1,
+        "search_calls": 1
+      },
+      "category": "neither_hit",
+      "question": "who was the german leader who signed the treaty of versailles?",
+      "question_id": 1,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "Hermann Müller and Johannes Bell",
+        "has_answer": true,
+        "queries": [
+          "German leader who signed the Treaty of Versailles"
+        ],
+        "question": "who was the german leader who signed the treaty of versailles?",
+        "question_id": 1,
+        "search_calls": 1
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "3,578",
+        "has_answer": true,
+        "queries": [
+          "2010 population Lake George Avenue Historic District"
+        ],
+        "question": "What was the 2010 population of the town where Lake George Avenue Historic District is located?",
+        "question_id": 2,
+        "search_calls": 1
+      },
+      "category": "neither_hit",
+      "question": "What was the 2010 population of the town where Lake George Avenue Historic District is located?",
+      "question_id": 2,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "10,871",
+        "has_answer": true,
+        "queries": [
+          "Lake George Avenue Historic District location"
+        ],
+        "question": "What was the 2010 population of the town where Lake George Avenue Historic District is located?",
+        "question_id": 2,
+        "search_calls": 1
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 1,
+        "evidence_hit_question": true,
+        "final_answer": "Haiti",
+        "has_answer": true,
+        "queries": [
+          "Where did Henri Christophe and other slaves hold an uprising from 1791 to 1804 that led to the founding of a state which was both free from slavery and ruled by non-whites and former captives?"
+        ],
+        "question": "Where did Henri Christophe and other slaves hold an uprising from 1791 to 1804 that led to the founding of a state which was both free from slavery and ruled by non-whites and former captives?",
+        "question_id": 3,
+        "search_calls": 1
+      },
+      "category": "aware_only_hit",
+      "question": "Where did Henri Christophe and other slaves hold an uprising from 1791 to 1804 that led to the founding of a state which was both free from slavery and ruled by non-whites and former captives?",
+      "question_id": 3,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": null,
+        "has_answer": false,
+        "queries": [
+          "Henri Christophe uprising 1791-1804"
+        ],
+        "question": "Where did Henri Christophe and other slaves hold an uprising from 1791 to 1804 that led to the founding of a state which was both free from slavery and ruled by non-whites and former captives?",
+        "question_id": 3,
+        "search_calls": 1
+      }
+    },
+    {
+      "aware": {
+        "em": 1,
+        "evidence_hit_calls": 1,
+        "evidence_hit_question": true,
+        "final_answer": "Thriller",
+        "has_answer": true,
+        "queries": [
+          "genre of In Their Skin"
+        ],
+        "question": "What genre is In Their Skin?",
+        "question_id": 4,
+        "search_calls": 1
+      },
+      "category": "both_hit",
+      "question": "What genre is In Their Skin?",
+      "question_id": 4,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 2,
+        "evidence_hit_question": true,
+        "final_answer": null,
+        "has_answer": false,
+        "queries": [
+          "Who wrote or directed In Their Skin",
+          "genre of Canadian home invasion thriller film"
+        ],
+        "question": "What genre is In Their Skin?",
+        "question_id": 4,
+        "search_calls": 2
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 1,
+        "evidence_hit_question": true,
+        "final_answer": "Velasquez",
+        "has_answer": true,
+        "queries": [
+          "Who was the producer of Cover?"
+        ],
+        "question": "Who was the producer of Cover?",
+        "question_id": 5,
+        "search_calls": 1
+      },
+      "category": "both_hit",
+      "question": "Who was the producer of Cover?",
+      "question_id": 5,
+      "stepsearch": {
+        "em": 1,
+        "evidence_hit_calls": 1,
+        "evidence_hit_question": true,
+        "final_answer": "Bill Duke",
+        "has_answer": true,
+        "queries": [
+          "Who was the producer of Cover"
+        ],
+        "question": "Who was the producer of Cover?",
+        "question_id": 5,
+        "search_calls": 1
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "Hip-hop",
+        "has_answer": true,
+        "queries": [
+          "What genre is Tuesday?"
+        ],
+        "question": "What genre is Tuesday?",
+        "question_id": 6,
+        "search_calls": 1
+      },
+      "category": "neither_hit",
+      "question": "What genre is Tuesday?",
+      "question_id": 6,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": null,
+        "has_answer": false,
+        "queries": [
+          "What genre is Tuesday",
+          "What is creative nonfiction"
+        ],
+        "question": "What genre is Tuesday?",
+        "question_id": 6,
+        "search_calls": 2
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "Ohio",
+        "has_answer": true,
+        "queries": [
+          "place of birth of Cornelia Cole Fairbanks's husband"
+        ],
+        "question": "What is the place of birth of Cornelia Cole Fairbanks's husband?",
+        "question_id": 7,
+        "search_calls": 1
+      },
+      "category": "neither_hit",
+      "question": "What is the place of birth of Cornelia Cole Fairbanks's husband?",
+      "question_id": 7,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "Marysville, Ohio",
+        "has_answer": true,
+        "queries": [
+          "Cornelia Cole Fairbanks husband"
+        ],
+        "question": "What is the place of birth of Cornelia Cole Fairbanks's husband?",
+        "question_id": 7,
+        "search_calls": 1
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "Huntingdonshire",
+        "has_answer": true,
+        "queries": [
+          "director of Timerider: The Adventure Of Lyle Swann place of birth",
+          "William Dear place of birth"
+        ],
+        "question": "What is the place of birth of the director of film Timerider: The Adventure Of Lyle Swann?",
+        "question_id": 8,
+        "search_calls": 2
+      },
+      "category": "neither_hit",
+      "question": "What is the place of birth of the director of film Timerider: The Adventure Of Lyle Swann?",
+      "question_id": 8,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": null,
+        "has_answer": false,
+        "queries": [
+          "Timerider: The Adventure Of Lyle Swann director"
+        ],
+        "question": "What is the place of birth of the director of film Timerider: The Adventure Of Lyle Swann?",
+        "question_id": 8,
+        "search_calls": 1
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "1344",
+        "has_answer": true,
+        "queries": [
+          "date of death of Raoul I Of Brienne, Count Of Eu's father",
+          "Raoul I of Brienne, Count of Eu date of death"
+        ],
+        "question": "What is the date of death of Raoul I Of Brienne, Count Of Eu's father?",
+        "question_id": 9,
+        "search_calls": 2
+      },
+      "category": "neither_hit",
+      "question": "What is the date of death of Raoul I Of Brienne, Count Of Eu's father?",
+      "question_id": 9,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "19 November 1350",
+        "has_answer": true,
+        "queries": [
+          "Raoul I of Brienne, Count of Eu father"
+        ],
+        "question": "What is the date of death of Raoul I Of Brienne, Count Of Eu's father?",
+        "question_id": 9,
+        "search_calls": 1
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 1,
+        "evidence_hit_question": true,
+        "final_answer": "A Journey",
+        "has_answer": true,
+        "queries": [
+          "Whose memoirs published in 2010 were called \"A Journey\"?"
+        ],
+        "question": "\"Whose memoirs, published in 2010, were called \"\"A Journey\"\"?\"?",
+        "question_id": 10,
+        "search_calls": 1
+      },
+      "category": "aware_only_hit",
+      "question": "\"Whose memoirs, published in 2010, were called \"\"A Journey\"\"?\"?",
+      "question_id": 10,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "Patti Smith",
+        "has_answer": true,
+        "queries": [
+          "Memoirs published in 2010"
+        ],
+        "question": "\"Whose memoirs, published in 2010, were called \"\"A Journey\"\"?\"?",
+        "question_id": 10,
+        "search_calls": 1
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 1,
+        "evidence_hit_question": true,
+        "final_answer": "NBC",
+        "has_answer": true,
+        "queries": [
+          "What broadcast channel hosts David Letterman's show?"
+        ],
+        "question": "Tuesday marks the birthday of lat night tv host David Letterman. What broadcast channel hosts his show?",
+        "question_id": 11,
+        "search_calls": 1
+      },
+      "category": "both_hit",
+      "question": "Tuesday marks the birthday of lat night tv host David Letterman. What broadcast channel hosts his show?",
+      "question_id": 11,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 2,
+        "evidence_hit_question": true,
+        "final_answer": null,
+        "has_answer": false,
+        "queries": [
+          "Who hosts David Letterman's show",
+          "Which broadcast channel hosts Late Show with David Letterman"
+        ],
+        "question": "Tuesday marks the birthday of lat night tv host David Letterman. What broadcast channel hosts his show?",
+        "question_id": 11,
+        "search_calls": 2
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "Mountains south of Lesotho",
+        "has_answer": true,
+        "queries": [
+          "Where is the origin of the river that Kraai River is a tributary of?"
+        ],
+        "question": "Where is the origin of the river that Kraai River is a tributary of?",
+        "question_id": 12,
+        "search_calls": 1
+      },
+      "category": "neither_hit",
+      "question": "Where is the origin of the river that Kraai River is a tributary of?",
+      "question_id": 12,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "Lesotho",
+        "has_answer": true,
+        "queries": [
+          "Kraai River"
+        ],
+        "question": "Where is the origin of the river that Kraai River is a tributary of?",
+        "question_id": 12,
+        "search_calls": 1
+      }
+    },
+    {
+      "aware": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": "Samaria",
+        "has_answer": true,
+        "queries": [
+          "region immediately north of Israel and when it was created"
+        ],
+        "question": "When was the region immediately north of the region where Israel is located and the final destination for the export crops created?",
+        "question_id": 13,
+        "search_calls": 1
+      },
+      "category": "neither_hit",
+      "question": "When was the region immediately north of the region where Israel is located and the final destination for the export crops created?",
+      "question_id": 13,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 0,
+        "evidence_hit_question": false,
+        "final_answer": null,
+        "has_answer": false,
+        "queries": [
+          "Israel location",
+          "Levant area of the Fertile Crescent region creation"
+        ],
+        "question": "When was the region immediately north of the region where Israel is located and the final destination for the export crops created?",
+        "question_id": 13,
+        "search_calls": 2
+      }
+    },
+    {
+      "aware": {
+        "em": 1,
+        "evidence_hit_calls": 1,
+        "evidence_hit_question": true,
+        "final_answer": "Mercia",
+        "has_answer": true,
+        "queries": [
+          "The husband of Lady Godiva and which Anglo-Saxon kingdom he belonged to"
+        ],
+        "question": "The husband of Lady Godiva was Earl of which Anglic kingdom?",
+        "question_id": 14,
+        "search_calls": 1
+      },
+      "category": "both_hit",
+      "question": "The husband of Lady Godiva was Earl of which Anglic kingdom?",
+      "question_id": 14,
+      "stepsearch": {
+        "em": 1,
+        "evidence_hit_calls": 2,
+        "evidence_hit_question": true,
+        "final_answer": "Mercia",
+        "has_answer": true,
+        "queries": [
+          "Lady Godiva husband",
+          "Anglic kingdom Mercia"
+        ],
+        "question": "The husband of Lady Godiva was Earl of which Anglic kingdom?",
+        "question_id": 14,
+        "search_calls": 2
+      }
+    },
+    {
+      "aware": {
+        "em": 1,
+        "evidence_hit_calls": 1,
+        "evidence_hit_question": true,
+        "final_answer": "1999",
+        "has_answer": true,
+        "queries": [
+          "In what year was the oldest cat ever recorded with the Cat of the Year award?"
+        ],
+        "question": "In what year did the oldest cat ever recorded with the Cat of the Year award?",
+        "question_id": 15,
+        "search_calls": 1
+      },
+      "category": "both_hit",
+      "question": "In what year did the oldest cat ever recorded with the Cat of the Year award?",
+      "question_id": 15,
+      "stepsearch": {
+        "em": 0,
+        "evidence_hit_calls": 1,
+        "evidence_hit_question": true,
+        "final_answer": "1967",
+        "has_answer": true,
+        "queries": [
+          "Oldest cat ever recorded with the Cat of the Year award"
+        ],
+        "question": "In what year did the oldest cat ever recorded with the Cat of the Year award?",
+        "question_id": 15,
+        "search_calls": 1
+      }
+    }
+  ],
+  "question_evidence_hits": {
+    "aware": 8,
+    "difference_stepsearch_minus_aware": -3,
+    "stepsearch": 5
+  },
+  "stepsearch_run": "/media/imc/data/project3-search-agent-rl/runs/p3-eval-stepsearch3b-smoke16-20260828b"
+}

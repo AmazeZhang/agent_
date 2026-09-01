@@ -48,3 +48,38 @@ The Aware run must exit 0 under `start_tmux_run.sh -> run_managed.sh`, write
 exactly 16 episodes atomically, pass the round-two prompt gate, have no
 Retriever errors, and leave no GPU1 compute process. Preserve and record any
 failure with a new run ID rather than overwriting artifacts.
+
+## Post-run result
+
+Aware-v2 run `p3-eval-aware-v2-seed2026-gs10-smoke16-20260901a` exited 0,
+wrote 16 episodes, passed 16/16 round-two prompt checks, and completed all
+18 searches successfully. Physical GPU1 peaked at 14,045 MiB and cleanup
+reported no remaining compute process. GPU0 was not used.
+
+| Metric | Aware-v2 | StepSearch |
+|---|---:|---:|
+| Evidence-hit questions | 8/16 | 5/16 |
+| Evidence-hit calls | 8/18 | 8/21 |
+| Multi-hop episodes | 2/16 | 5/16 |
+| True redundant searches | 1 | 0 |
+| Answer compliance | 16/16 | 9/16 |
+| EM | 4/16 | 2/16 |
+
+Paired evidence-hit sets were: both hit `[4, 5, 11, 14, 15]`, StepSearch-only
+hit `[]`, Aware-only hit `[0, 3, 10]`, and neither hit
+`[1, 2, 6, 7, 8, 9, 12, 13]`. Thus StepSearch made more multi-hop calls but
+did not cover any question that Aware-v2 missed; its eight hit calls were
+concentrated in five questions. Aware-v2 covered three additional questions
+and doubled smoke EM.
+
+The pre-registered eligibility rule fails (`5 - 8 = -3` evidence-hit
+questions, and StepSearch EM is lower). Stop the external StepSearch branch:
+do not run its confirm-256 and do not transplant its planning/query-rewrite
+mechanism on this evidence. This result does not imply that planning is
+universally harmful; it only says this checkpoint/protocol combination did
+not outperform the existing Aware-v2 mechanism screen.
+
+Reproducible paired outputs:
+
+- `analysis/p3_aware_stepsearch_smoke16_retrieval_2026-09-01.json`
+- `analysis/p3_aware_stepsearch_smoke16_retrieval_2026-09-01.md`
